@@ -138,6 +138,39 @@ describe('arranging', () => {
     expect(screen.getByTestId('isometric-plan')).toBeInTheDocument();
   });
 
+  it('leaves the 3D view unbuilt until the truck is scrolled to', async () => {
+    // jsdom has no IntersectionObserver, so the app treats everything as
+    // visible. Supplying one that never reports puts a truck off screen, which
+    // is where most of them are when a long plan first opens.
+    const observers: {disconnect: () => void}[] = [];
+    class Never {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      constructor() {
+        observers.push(this);
+      }
+    }
+    const original = globalThis.IntersectionObserver;
+    (
+      globalThis as unknown as {IntersectionObserver: unknown}
+    ).IntersectionObserver = Never;
+    try {
+      const user = userEvent.setup();
+      renderPlan();
+      await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
+
+      // The truck and its tier plans are there; only the expensive part waits.
+      expect(screen.getByTestId('tier-plan-0')).toBeInTheDocument();
+      expect(screen.queryByTestId('isometric-plan')).not.toBeInTheDocument();
+      expect(observers.length).toBeGreaterThan(0);
+    } finally {
+      (
+        globalThis as unknown as {IntersectionObserver: unknown}
+      ).IntersectionObserver = original;
+    }
+  });
+
   it('says so plainly when the browser cannot do 3D', async () => {
     const user = userEvent.setup();
     renderPlan();

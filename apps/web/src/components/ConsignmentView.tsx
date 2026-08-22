@@ -1,4 +1,4 @@
-import {Suspense, lazy} from 'react';
+import {Suspense, lazy, memo, useRef} from 'react';
 import {
   balanceOffset,
   consignmentPayload,
@@ -24,7 +24,29 @@ import {
 const IsometricPlanCanvas = lazy(async () => ({
   default: (await import('./IsometricPlanCanvas')).IsometricPlanCanvas,
 }));
+import {useInView} from '../lib/useInView';
 import {TierPlanSvg} from './TierPlanSvg';
+
+const ISOMETRIC_TITLE = 'Loaded truck';
+
+/**
+ * The box the 3D view will occupy, held open before it arrives.
+ *
+ * Same dimensions as the real thing, so a truck coming into view does not shove
+ * the rest of the page down as it builds.
+ */
+function IsometricPlaceholder({note}: {readonly note: string}) {
+  return (
+    <figure className="space-y-1">
+      <figcaption className="text-sm font-medium text-slate-800">
+        {ISOMETRIC_TITLE}
+      </figcaption>
+      <div className="flex aspect-[16/9] w-full items-center justify-center rounded border border-slate-200 bg-white text-sm text-slate-500">
+        {note}
+      </div>
+    </figure>
+  );
+}
 
 function Metric({
   label,
@@ -62,7 +84,7 @@ function Metric({
  * placing them abreast would shrink each one past the point of being checkable
  * — the point of exploding them is that each tier gets the full width.
  */
-export function ConsignmentView({
+function Truck({
   consignment,
   index,
   total,
@@ -79,6 +101,15 @@ export function ConsignmentView({
   readonly options: LoadingOptions;
   readonly violations: readonly Violation[];
 }) {
+  /*
+   * The 3D view is built only once this truck is scrolled to. A plan is a tall
+   * page and only one truck is on screen at a time, so building all of them on
+   * arrival is work done for nobody. Declared before the early return below,
+   * because hooks cannot be conditional.
+   */
+  const stageRef = useRef<HTMLDivElement>(null);
+  const showIsometric = useInView(stageRef);
+
   const vehicle = findVehicle(catalogue, consignment.vehicleId);
   if (!vehicle) {
     return (
@@ -238,21 +269,33 @@ export function ConsignmentView({
         ))}
       </div>
 
-      <Suspense
-        fallback={
-          <p className="rounded border border-slate-200 p-6 text-sm text-slate-500">
-            Loading the 3D view…
-          </p>
-        }
-      >
-        <IsometricPlanCanvas
-          vehicle={vehicle}
-          catalogue={catalogue}
-          placements={placements}
-          options={options}
-          title="Loaded truck"
-        />
-      </Suspense>
+      <div ref={stageRef}>
+        {showIsometric ? (
+          <Suspense
+            fallback={<IsometricPlaceholder note="Loading the 3D view…" />}
+          >
+            <IsometricPlanCanvas
+              vehicle={vehicle}
+              catalogue={catalogue}
+              placements={placements}
+              options={options}
+              title={ISOMETRIC_TITLE}
+            />
+          </Suspense>
+        ) : (
+          <IsometricPlaceholder note="" />
+        )}
+      </div>
     </article>
   );
 }
+
+/**
+ * Memoised, and it earns its keep.
+ *
+ * Rebuilding a truck means rebuilding its 3D scene, which is the expensive
+ * thing on this page. Now that the caller hands over arrays that keep their
+ * identity, this stops a change elsewhere in the panel — picking a different
+ * vehicle to pack onto, say — from touching trucks whose load has not moved.
+ */
+export const ConsignmentView = memo(Truck);

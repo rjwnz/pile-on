@@ -10,6 +10,33 @@ import {ConsignmentView} from './ConsignmentView';
 import {PackingOptionsPanel} from './PackingOptionsPanel';
 import {Button, EmptyState, Panel, SelectField} from './ui';
 
+/** One shared empty, so a truck with nothing on it still gets a stable prop. */
+const NONE: readonly never[] = [];
+
+/**
+ * Sort a plan-wide list into one bucket per truck.
+ *
+ * The saving is not the arithmetic, though this is a single pass where
+ * filtering per truck was a pass each. It is that the arrays keep their
+ * identity from one render to the next. The 3D view rebuilds its scene when its
+ * placements change, and a fresh `.filter()` on every render told it they
+ * always had — so every keystroke anywhere on the page rebuilt every truck.
+ */
+function byConsignment<T extends {readonly consignmentId: string}>(
+  items: readonly T[],
+): ReadonlyMap<string, readonly T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const item of items) {
+    const bucket = grouped.get(item.consignmentId);
+    if (bucket) {
+      bucket.push(item);
+    } else {
+      grouped.set(item.consignmentId, [item]);
+    }
+  }
+  return grouped;
+}
+
 export function PlanSection() {
   const {state, dispatch} = useAppState();
   const {catalogue, job, plan, options} = state;
@@ -26,6 +53,15 @@ export function PlanSection() {
   const violations = useMemo(
     () => validatePlan(plan, catalogue, options),
     [plan, catalogue, options],
+  );
+
+  const placementsPerTruck = useMemo(
+    () => byConsignment(plan.placements),
+    [plan.placements],
+  );
+  const violationsPerTruck = useMemo(
+    () => byConsignment(violations),
+    [violations],
   );
 
   const scheduled = totalPileCount(job);
@@ -182,12 +218,8 @@ export function PlanSection() {
               total={plan.consignments.length}
               catalogue={catalogue}
               options={options}
-              placements={plan.placements.filter(
-                placement => placement.consignmentId === consignment.id,
-              )}
-              violations={violations.filter(
-                violation => violation.consignmentId === consignment.id,
-              )}
+              placements={placementsPerTruck.get(consignment.id) ?? NONE}
+              violations={violationsPerTruck.get(consignment.id) ?? NONE}
             />
           ))}
         </div>

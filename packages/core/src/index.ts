@@ -9,8 +9,17 @@ export * from './units';
 
 export * from './domain/pile';
 export * from './domain/placement';
+export * from './domain/vehicle';
+export * from './domain/catalogue';
 
 export * from './geometry/profile';
 export * from './geometry/separation';
 
 export * from './rules/nzVdam';
+
+export * from './validation/result';
+
+export * from './io/fields';
+export * from './io/pileTypeCsv';
+export * from './io/vehicleCsv';
+export * from './io/appState';

@@ -1,0 +1,145 @@
+import {useState} from 'react';
+import {
+  PILE_TYPE_CSV_EXAMPLE,
+  isSingleHelix,
+  parsePileTypeRows,
+  toMetres,
+  type PileType,
+} from '@pile-on/core';
+import {useAppState} from '../state/AppStateProvider';
+import {CsvImportPanel} from './CsvImportPanel';
+import {PileTypeForm, describeWidth} from './PileTypeForm';
+import {Button, EmptyState, Panel} from './ui';
+
+export function PileTypeSection() {
+  const {state, dispatch} = useAppState();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const pileTypes = state.catalogue.pileTypes;
+  const editing = pileTypes.find(type => type.id === editingId);
+
+  function save(pileType: PileType) {
+    dispatch({type: 'upsertPileType', pileType});
+    setAdding(false);
+    setEditingId(null);
+  }
+
+  return (
+    <Panel
+      title={`Pile types (${pileTypes.length})`}
+      actions={
+        !adding && !editing ? (
+          <Button variant="primary" onClick={() => setAdding(true)}>
+            Add pile type
+          </Button>
+        ) : null
+      }
+    >
+      {pileTypes.length === 0 ? (
+        <EmptyState>
+          No pile types yet. Add one by hand, or import a CSV below.
+        </EmptyState>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[52rem] text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-600">
+                <th className="py-2 pr-3 font-medium">Id</th>
+                <th className="py-2 pr-3 font-medium">Name</th>
+                <th className="py-2 pr-3 text-right font-medium">Length</th>
+                <th className="py-2 pr-3 text-right font-medium">Shaft ⌀</th>
+                <th className="py-2 pr-3 text-right font-medium">Widest ⌀</th>
+                <th className="py-2 pr-3 text-right font-medium">Mass</th>
+                <th className="py-2 pr-3 font-medium">Helices</th>
+                <th className="py-2 font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {pileTypes.map(type => (
+                <tr key={type.id} className="border-b border-slate-100">
+                  <td className="py-2 pr-3 font-mono text-xs">{type.id}</td>
+                  <td className="py-2 pr-3">{type.name}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">
+                    {toMetres(type.length).toFixed(2)} m
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums">
+                    {type.shaftRadius * 2} mm
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums">
+                    {describeWidth(type)}
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums">
+                    {type.mass} kg
+                  </td>
+                  <td className="py-2 pr-3">
+                    {type.helices.length === 0 ? (
+                      <span className="text-slate-500">plain shaft</span>
+                    ) : (
+                      <span
+                        className={
+                          isSingleHelix(type)
+                            ? 'rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-900'
+                            : 'rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900'
+                        }
+                        title={
+                          isSingleHelix(type)
+                            ? 'Single helix — plates may interleave with another single-helix pile'
+                            : 'Multiple helices — full plate-to-plate separation against any neighbour'
+                        }
+                      >
+                        {type.helices.length} ·{' '}
+                        {isSingleHelix(type) ? 'interleaves' : 'no interleave'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 text-right whitespace-nowrap">
+                    <Button
+                      variant="quiet"
+                      onClick={() => {
+                        setEditingId(type.id);
+                        setAdding(false);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={() =>
+                        dispatch({type: 'removePileType', id: type.id})
+                      }
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {adding || editing ? (
+        <PileTypeForm
+          editing={editing}
+          onSave={save}
+          onCancel={() => {
+            setAdding(false);
+            setEditingId(null);
+          }}
+        />
+      ) : null}
+
+      <CsvImportPanel
+        label="pile types"
+        example={PILE_TYPE_CSV_EXAMPLE}
+        parseRows={parsePileTypeRows}
+        onImport={(pileTypes, replace) =>
+          dispatch({type: 'importPileTypes', pileTypes, replace})
+        }
+      />
+    </Panel>
+  );
+}

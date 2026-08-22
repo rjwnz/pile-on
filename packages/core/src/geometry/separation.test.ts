@@ -81,6 +81,19 @@ describe('requiredLateralSeparation', () => {
       );
     });
 
+    it('is not fooled by an offset that only looks staggered', () => {
+      // Plates sit 700 mm apart on the shaft, so an offset of exactly 700 slides
+      // A's second plate onto B's first. Eyeballing a "generous" offset is how
+      // this goes wrong in the yard; the search has to know the feasible
+      // offsets are a disjoint set of windows, not "more is better".
+      const a = place(DOUBLE, {x: 0});
+      const b = place(DOUBLE, {x: 700});
+
+      expect(requiredLateralSeparation(a, b, NO_CLEARANCE)).toBe(
+        HELIX_TO_HELIX,
+      );
+    });
+
     it('gets no relaxation against a single-helix neighbour', () => {
       // Both present a plate at station 500; the double-helix pile forbids
       // interleaving regardless of what its neighbour is.

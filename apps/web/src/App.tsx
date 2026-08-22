@@ -1,52 +1,69 @@
-import {toMetres} from '@pile-on/core';
-import {TierPlanSvg} from './components/TierPlanSvg';
-import {
-  ALIGNED_PAIR,
-  DEMO_DECK_LENGTH,
-  DEMO_DECK_WIDTH,
-  STAGGERED_PAIR,
-  separationOf,
-} from './demo/staggerDemo';
+import {useState} from 'react';
+import {NZ_VDAM_2016} from '@pile-on/core';
+import {AppStateProvider} from './state/AppStateProvider';
+import {PileTypeSection} from './components/PileTypeSection';
+import {VehicleSection} from './components/VehicleSection';
+import {StateIoBar} from './components/StateIoBar';
 
-export function App() {
-  const aligned = separationOf(ALIGNED_PAIR);
-  const staggered = separationOf(STAGGERED_PAIR);
-  const saving = aligned - staggered;
+const TABS = [
+  {id: 'piles', label: 'Pile types'},
+  {id: 'vehicles', label: 'Vehicles'},
+] as const;
+
+type TabId = (typeof TABS)[number]['id'];
+
+function Workspace() {
+  const [tab, setTab] = useState<TabId>('piles');
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-6 text-slate-900">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Pile-On</h1>
-        <p className="text-sm text-slate-600">
-          Load planning for steel screw piles on NZ flat-deck transport.
-          Skeleton — the engine is wired up, the packer is not written yet.
-        </p>
+    <div className="mx-auto max-w-6xl space-y-6 p-6 text-slate-900">
+      <header className="space-y-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Pile-On</h1>
+          <p className="text-sm text-slate-600">
+            Load planning for steel screw piles on NZ flat-deck transport.
+            Catalogues are held in your browser and never leave it — export the
+            JSON to keep or share a session.
+          </p>
+        </div>
+        <StateIoBar />
       </header>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-medium">Why staggering matters</h2>
-        <p className="max-w-prose text-sm text-slate-600">
-          Two identical double-helix piles on a{' '}
-          {toMetres(DEMO_DECK_WIDTH).toFixed(2)} m deck. Sliding one pile down
-          the deck so no two plates share a station lets the pair close up by{' '}
-          <strong>{saving} mm</strong> — {aligned} mm apart becomes {staggered}{' '}
-          mm apart.
-        </p>
+      <nav className="flex gap-1 border-b border-slate-300" role="tablist">
+        {TABS.map(entry => (
+          <button
+            key={entry.id}
+            role="tab"
+            type="button"
+            aria-selected={tab === entry.id}
+            onClick={() => setTab(entry.id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+              tab === entry.id
+                ? 'border-sky-700 text-sky-800'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </nav>
 
-        <TierPlanSvg
-          title={`Plates aligned — ${aligned} mm apart`}
-          deckLength={DEMO_DECK_LENGTH}
-          deckWidth={DEMO_DECK_WIDTH}
-          piles={ALIGNED_PAIR}
-        />
+      {tab === 'piles' ? <PileTypeSection /> : <VehicleSection />}
 
-        <TierPlanSvg
-          title={`Plates staggered — ${staggered} mm apart`}
-          deckLength={DEMO_DECK_LENGTH}
-          deckWidth={DEMO_DECK_WIDTH}
-          piles={STAGGERED_PAIR}
-        />
-      </section>
-    </main>
+      <footer className="text-xs text-slate-500">
+        Limits from Land Transport Rule: Vehicle Dimensions and Mass 2016
+        (ruleset <code>{NZ_VDAM_2016.version}</code>, effective{' '}
+        {NZ_VDAM_2016.effectiveFrom}). Every exported file records the ruleset
+        it was built under.
+      </footer>
+    </div>
+  );
+}
+
+export function App() {
+  return (
+    <AppStateProvider>
+      <Workspace />
+    </AppStateProvider>
   );
 }

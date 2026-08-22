@@ -1,0 +1,166 @@
+import {describe, expect, it} from '@jest/globals';
+import {parsePileTypeEntry, parsePileTypeRows} from './pileTypeCsv';
+import type {CsvRow} from './fields';
+
+const GOOD: CsvRow = {
+  id: 'SP168-D6',
+  name: 'SP168 6.0 m twin helix',
+  length: '6000',
+  shaft_radius: '84',
+  mass: '178',
+  helix1_offset: '400',
+  helix1_radius: '225',
+  helix1_thickness: '110',
+  helix2_offset: '1100',
+  helix2_radius: '175',
+  helix2_thickness: '110',
+};
+
+function paths(result: ReturnType<typeof parsePileTypeRows>): string[] {
+  return result.ok ? [] : result.issues.map(i => i.path);
+}
+
+function messages(result: ReturnType<typeof parsePileTypeRows>): string[] {
+  return result.ok ? [] : result.issues.map(i => `${i.path}: ${i.message}`);
+}
+
+describe('parsePileTypeRows', () => {
+  it('maps a well-formed row', () => {
+    const result = parsePileTypeRows([GOOD]);
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value[0]).toEqual({
+      id: 'SP168-D6',
+      name: 'SP168 6.0 m twin helix',
+      length: 6000,
+      shaftRadius: 84,
+      mass: 178,
+      helices: [
+        {offsetFromButt: 400, radius: 225, thickness: 110},
+        {offsetFromButt: 1100, radius: 175, thickness: 110},
+      ],
+    });
+  });
+
+  it('rejects an empty file rather than silently importing nothing', () => {
+    expect(messages(parsePileTypeRows([]))).toEqual([
+      'file: contains no data rows',
+    ]);
+  });
+
+  it('reads a single-helix pile and ignores the blank second helix columns', () => {
+    const result = parsePileTypeRows([
+      {
+        ...GOOD,
+        id: 'SP139-S4',
+        helix2_offset: '',
+        helix2_radius: '',
+        helix2_thickness: '',
+      },
+    ]);
+
+    expect(result.ok && result.value[0]!.helices).toHaveLength(1);
+  });
+
+  it('handles any number of helices without a hard-coded maximum', () => {
+    const result = parsePileTypeRows([
+      {
+        ...GOOD,
+        helix3_offset: '2000',
+        helix3_radius: '150',
+        helix3_thickness: '110',
+      },
+    ]);
+
+    expect(result.ok && result.value[0]!.helices).toHaveLength(3);
+  });
+
+  it('sorts helices up the shaft regardless of column order', () => {
+    const result = parsePileTypeRows([
+      {
+        ...GOOD,
+        helix1_offset: '1100',
+        helix2_offset: '400',
+      },
+    ]);
+
+    expect(
+      result.ok && result.value[0]!.helices.map(h => h.offsetFromButt),
+    ).toEqual([400, 1100]);
+  });
+
+  it('falls back to the id when the name is blank', () => {
+    const result = parsePileTypeRows([{...GOOD, name: ''}]);
+
+    expect(result.ok && result.value[0]!.name).toBe('SP168-D6');
+  });
+
+  it('reports every problem in a row, not just the first', () => {
+    const result = parsePileTypeRows([
+      {...GOOD, id: '', length: 'six metres', mass: '-4'},
+    ]);
+
+    expect(messages(result)).toEqual([
+      'row 1 / id: is required',
+      'row 1 / length: "six metres" is not a number',
+      'row 1 / mass: must be at least 0.0001, got -4',
+    ]);
+  });
+
+  it('tags issues with the row they came from', () => {
+    const result = parsePileTypeRows([
+      GOOD,
+      {...GOOD, id: 'B', shaft_radius: ''},
+      {...GOOD, id: 'C', mass: 'heavy'},
+    ]);
+
+    expect(paths(result)).toEqual(['row 2 / shaft_radius', 'row 3 / mass']);
+  });
+
+  it('rejects a helix sitting off the end of the pile', () => {
+    const result = parsePileTypeRows([{...GOOD, helix1_offset: '9000'}]);
+
+    expect(messages(result)).toContain(
+      'row 1 / helix1_offset: must be at most 6000, got 9000',
+    );
+  });
+
+  it('catches a helix radius below the shaft radius as a likely unit error', () => {
+    const result = parsePileTypeRows([{...GOOD, helix1_radius: '45'}]);
+
+    expect(messages(result)).toContain(
+      'row 1 / helix1_radius: is smaller than the shaft radius (84) — check the units',
+    );
+  });
+
+  it('flags a duplicated id, which would otherwise overwrite silently', () => {
+    const result = parsePileTypeRows([GOOD, GOOD]);
+
+    expect(messages(result)).toEqual([
+      'row 2 / id: "SP168-D6" appears more than once',
+    ]);
+  });
+});
+
+describe('parsePileTypeEntry', () => {
+  it('validates one entry, as the manual form does', () => {
+    const result = parsePileTypeEntry(GOOD);
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.helices).toHaveLength(2);
+  });
+
+  it('reports issues without any row prefix, since there is no row', () => {
+    const result = parsePileTypeEntry({...GOOD, mass: ''});
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.issues[0]!.path).toBe('mass');
+  });
+
+  it('still bounds a helix offset when the length is unusable', () => {
+    // A bad length must not cascade into a bogus complaint per helix.
+    const result = parsePileTypeEntry({...GOOD, length: 'oops'});
+
+    expect(!result.ok && result.issues.map(i => i.path)).toEqual(['length']);
+  });
+});

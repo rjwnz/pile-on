@@ -11,8 +11,42 @@ does not do, and the phased plan this repo is being built against.
 
 ## Status
 
-Skeleton. The domain model, the helix separation rule and the NZ VDAM ruleset are
-implemented and tested. The packer is not written yet.
+The pile-type and vehicle catalogues are usable: manual entry, CSV import, and
+JSON export/import of a whole session. The domain model, the helix separation
+rule and the NZ VDAM ruleset are implemented and tested. **The packer is not
+written yet** — there is no job entry and no plan view.
+
+### CSV formats
+
+Headers are case-insensitive and a block pasted from Excel works (tabs are
+detected). Both importers offer merge — update matching ids — or replace.
+
+**Pile types.** Helices are flat numbered columns, because this catalogue is
+maintained in a spreadsheet. Any number of helices works; the parser scans
+`helix1_*`, `helix2_*`, … until they run out.
+
+```
+id,name,length,shaft_radius,mass,helix1_offset,helix1_radius,helix1_thickness
+SP139-S4,SP139 4.5 m single helix,4500,70,96,350,175,90
+```
+
+**Vehicles.** Axles go in one packed column — a nine-axle B-train would need 36
+columns laid flat, and there are only ever a handful of vehicles.
+
+```
+axles = position:tyre:set[:steer] | …
+0:SL:steer:steer|3550:T:drive|4870:T:drive|10100:T:tri
+```
+
+Position is millimetres from the front; tyre class is `S`/`SL`/`SM`/`T`; axles
+sharing a set name are one group for the VDAM axle-set limits.
+
+### Session files
+
+Export writes catalogues *and* plan as one versioned JSON. Import makes you
+choose: **catalogue only**, keeping the plan you are part-way through, or
+**catalogue and plan**. A catalogue-only import can orphan the current plan, so
+the app lists exactly which references broke rather than failing silently.
 
 ## Layout
 

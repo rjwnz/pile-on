@@ -6,6 +6,7 @@
  */
 
 export * from './units';
+export * from './collections';
 
 export * from './domain/pile';
 export * from './domain/placement';

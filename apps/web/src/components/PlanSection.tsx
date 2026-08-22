@@ -1,6 +1,7 @@
 import {useMemo, useState} from 'react';
 import {
   arrangeNaively,
+  groupBy,
   pack,
   totalPileCount,
   validatePlan,
@@ -12,30 +13,6 @@ import {Button, EmptyState, Panel, SelectField} from './ui';
 
 /** One shared empty, so a truck with nothing on it still gets a stable prop. */
 const NONE: readonly never[] = [];
-
-/**
- * Sort a plan-wide list into one bucket per truck.
- *
- * The saving is not the arithmetic, though this is a single pass where
- * filtering per truck was a pass each. It is that the arrays keep their
- * identity from one render to the next. The 3D view rebuilds its scene when its
- * placements change, and a fresh `.filter()` on every render told it they
- * always had — so every keystroke anywhere on the page rebuilt every truck.
- */
-function byConsignment<T extends {readonly consignmentId: string}>(
-  items: readonly T[],
-): ReadonlyMap<string, readonly T[]> {
-  const grouped = new Map<string, T[]>();
-  for (const item of items) {
-    const bucket = grouped.get(item.consignmentId);
-    if (bucket) {
-      bucket.push(item);
-    } else {
-      grouped.set(item.consignmentId, [item]);
-    }
-  }
-  return grouped;
-}
 
 export function PlanSection() {
   const {state, dispatch} = useAppState();
@@ -55,12 +32,18 @@ export function PlanSection() {
     [plan, catalogue, options],
   );
 
+  /*
+   * Grouped once, rather than filtered per truck. The saving is not the
+   * arithmetic — it is that these arrays keep their identity between renders.
+   * The 3D view rebuilds its scene when its placements change, and a fresh
+   * `.filter()` on every render told it they always had.
+   */
   const placementsPerTruck = useMemo(
-    () => byConsignment(plan.placements),
+    () => groupBy(plan.placements, placement => placement.consignmentId),
     [plan.placements],
   );
   const violationsPerTruck = useMemo(
-    () => byConsignment(violations),
+    () => groupBy(violations, violation => violation.consignmentId),
     [violations],
   );
 

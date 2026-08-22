@@ -18,6 +18,7 @@ import {requiredLateralSeparation} from '../geometry/separation';
 import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
 import {coveredSpans} from '../validation/plan';
 import type {Millimetres} from '../units';
+import {groupBy} from '../collections';
 import {shiftToBalance} from './balance';
 import {unplaceableReason} from './feasibility';
 import {withoutFlips, type PackingOptions} from './options';
@@ -399,13 +400,7 @@ function settleTiers(
   vehicle: Vehicle,
   options: PackingOptions,
 ): Placement[] {
-  const byTier = new Map<number, Placement[]>();
-  for (const placement of onTruck) {
-    byTier.set(placement.tier, [
-      ...(byTier.get(placement.tier) ?? []),
-      placement,
-    ]);
-  }
+  const byTier = groupBy(onTruck, placement => placement.tier);
 
   const target = balanceTargetOf(vehicle);
   const settled: Placement[] = [];
@@ -471,13 +466,7 @@ function mirrorTiers(
   onTruck: readonly Placement[],
   catalogue: Catalogue,
 ): Placement[] {
-  const byTier = new Map<number, Placement[]>();
-  for (const placement of onTruck) {
-    byTier.set(placement.tier, [
-      ...(byTier.get(placement.tier) ?? []),
-      placement,
-    ]);
-  }
+  const byTier = groupBy(onTruck, placement => placement.tier);
 
   const out: Placement[] = [];
   let moment = 0;
@@ -643,13 +632,7 @@ function allTiersSupported(
   catalogue: Catalogue,
   options: PackingOptions,
 ): boolean {
-  const byTier = new Map<number, Placement[]>();
-  for (const placement of onTruck) {
-    byTier.set(placement.tier, [
-      ...(byTier.get(placement.tier) ?? []),
-      placement,
-    ]);
-  }
+  const byTier = groupBy(onTruck, placement => placement.tier);
 
   const tiers = [...byTier].sort((a, b) => a[0] - b[0]);
   for (const [index, [, inTier]] of tiers.entries()) {

@@ -22,6 +22,7 @@ import {
 import {requiredLateralSeparation} from '../geometry/separation';
 import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
 import {GEOMETRIC_EPSILON, toMetres, type Millimetres} from '../units';
+import {groupBy} from '../collections';
 
 /**
  * The one place that decides whether a load plan is legal.
@@ -136,12 +137,10 @@ export function validatePlan(
 ): Violation[] {
   const violations: Violation[] = [];
 
-  const byConsignment = new Map<string, Placement[]>();
-  for (const placement of plan.placements) {
-    const group = byConsignment.get(placement.consignmentId) ?? [];
-    group.push(placement);
-    byConsignment.set(placement.consignmentId, group);
-  }
+  const byConsignment = groupBy(
+    plan.placements,
+    placement => placement.consignmentId,
+  );
 
   const knownConsignments = new Set(plan.consignments.map(c => c.id));
   for (const consignmentId of byConsignment.keys()) {
@@ -274,13 +273,7 @@ function checkSupport(
     return type ? [placement.x, placement.x + type.length] : null;
   };
 
-  const byTier = new Map<number, Placement[]>();
-  for (const placement of placements) {
-    byTier.set(placement.tier, [
-      ...(byTier.get(placement.tier) ?? []),
-      placement,
-    ]);
-  }
+  const byTier = groupBy(placements, placement => placement.tier);
 
   const violations: Violation[] = [];
   for (const [tier, inTier] of [...byTier].sort((a, b) => a[0] - b[0])) {

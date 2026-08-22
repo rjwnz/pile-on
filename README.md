@@ -153,6 +153,15 @@ in `packages/core/src/rules/` with a version and an effective date, and every
 saved quote records which ruleset produced it. Add a new version alongside the
 old one rather than editing in place.
 
+**The 3D view sorts by occlusion, not by a depth key.** No single sort key can
+order overlapping boxes in an axonometric projection: ordering on `x + y` lets a
+rear bottom-tier pile punch through the top of the load, ordering by tier lets a
+far high pile cover a near low one, and swapping between them just trades one
+artefact for the other. `occlusionOrder` asks "does A occlude B?" for every pair
+that overlaps on screen and topologically sorts the answers, which is exact
+because `validatePlan` guarantees piles never interpenetrate. Both artefacts have
+regression tests; they must pass together.
+
 **Tests are the deliverable, not an afterthought.** `core` is held to 95% coverage
 and currently sits at 100%. Geometry bugs hide well from example-based tests, so
 prefer boundary cases and, as the packer lands, property tests: no two piles ever

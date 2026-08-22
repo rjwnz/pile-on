@@ -12,7 +12,7 @@ import {
 import {
   boxFaces,
   cylinderAlongDeck,
-  depthOrder,
+  occlusionOrder,
   projectedBounds,
   type Cylinder,
 } from '../render/isometric';
@@ -29,6 +29,7 @@ function Tube({
   shaded,
   cap,
   outline,
+  opacity,
   testId,
 }: {
   readonly cylinder: Cylinder;
@@ -36,10 +37,11 @@ function Tube({
   readonly shaded: string;
   readonly cap: string;
   readonly outline: string;
+  readonly opacity: number;
   readonly testId?: string;
 }) {
   return (
-    <g data-testid={testId ?? undefined}>
+    <g data-testid={testId ?? undefined} fillOpacity={opacity}>
       <path d={cylinder.shaded} fill={shaded} />
       <path d={cylinder.lit} fill={lit} />
       <path
@@ -76,13 +78,18 @@ export function IsometricPlanSvg({
   placements,
   options,
   title,
+  xray = false,
 }: {
   readonly vehicle: Vehicle;
   readonly catalogue: Catalogue;
   readonly placements: readonly Placement[];
   readonly options: LoadingOptions;
   readonly title: string;
+  /** See through the load, to find a pile buried inside it. */
+  readonly xray?: boolean;
 }) {
+  // Outlines stay opaque: with the fills faded they carry the whole drawing.
+  const fillOpacity = xray ? 0.35 : 1;
   const heights = tierHeights(placements, catalogue, options);
   const totalHeight = [...heights.values()].reduce((sum, h) => sum + h, 0);
   const halfWidth = vehicle.deckWidth / 2;
@@ -118,12 +125,18 @@ export function IsometricPlanSvg({
     const axisZ =
       tierBaseHeight(placement.tier, heights, options) + maxRadius(type);
 
+    const radius = maxRadius(type);
     return [
       {
         placement,
-        x: placement.x,
-        y: placement.y,
-        tier: placement.tier,
+        box: {
+          x0: placement.x,
+          x1: placement.x + type.length,
+          y0: placement.y - radius,
+          y1: placement.y + radius,
+          z0: axisZ - radius,
+          z1: axisZ + radius,
+        },
         colour: colourForPileType(type.id),
         shaft: cylinderAlongDeck(
           placement.x,
@@ -180,7 +193,7 @@ export function IsometricPlanSvg({
           strokeWidth={10}
         />
 
-        {depthOrder(drawable).map(item => (
+        {occlusionOrder(drawable).map(item => (
           <g key={item.placement.id} data-testid="iso-pile">
             <Tube
               cylinder={item.shaft}
@@ -188,6 +201,7 @@ export function IsometricPlanSvg({
               shaded={item.colour.helix}
               cap={item.colour.end}
               outline={item.colour.outline}
+              opacity={fillOpacity}
             />
             {item.plates.map((plate, index) => (
               <Tube
@@ -197,6 +211,7 @@ export function IsometricPlanSvg({
                 shaded={item.colour.end}
                 cap={item.colour.end}
                 outline={item.colour.outline}
+                opacity={fillOpacity}
                 testId="iso-helix"
               />
             ))}

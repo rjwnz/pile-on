@@ -229,19 +229,115 @@ export function projectedBounds(box: Box, padding = 200): Bounds {
 }
 
 /**
- * Painter's-algorithm ordering: farthest first.
+ * Depth of a box's centre along the line of sight.
  *
- * Tier is the primary key, so every tier is drawn over the one it sits on. A
- * single depth scalar cannot order overlapping boxes correctly, and sorting on
- * x + y alone lets a bottom-tier pile near the rear paint over a top-tier pile
- * further forward — which puts a hole in the top of the load. Tier-major is
- * always right for a flat stacked deck, and matches how such a drawing is read:
- * you see the top of the load.
- *
- * Within a tier, depth grows with x + y, since both axes run toward the viewer.
+ * The projection collapses the direction (1,1,1) — solve project(v) = 0 and
+ * that is what falls out — so the eye is up the (1,1,1) diagonal and depth is
+ * simply x + y + z, with larger meaning nearer.
  */
-export function depthOrder<T extends {x: number; y: number; tier: number}>(
+function centreDepth(box: Box): number {
+  return (box.x0 + box.x1 + box.y0 + box.y1 + box.z0 + box.z1) / 2;
+}
+
+/**
+ * Whether every point of `front` is nearer the eye than every point of `back`.
+ *
+ * Looking along (1,1,1), a ray meets larger coordinates last, so if one box
+ * clears another along any single axis it is unambiguously in front. Boxes that
+ * clear on no axis would have to interpenetrate — which `validatePlan` forbids,
+ * since piles cannot occupy the same steel.
+ */
+export function isInFront(front: Box, back: Box): boolean {
+  return front.x0 >= back.x1 || front.y0 >= back.y1 || front.z0 >= back.z1;
+}
+
+function overlapsOnScreen(a: Bounds, b: Bounds): boolean {
+  return (
+    a.minX < b.minX + b.width &&
+    b.minX < a.minX + a.width &&
+    a.minY < b.minY + b.height &&
+    b.minY < a.minY + a.height
+  );
+}
+
+/**
+ * Painter's-algorithm ordering, farthest first, from pairwise occlusion.
+ *
+ * No single sort key can do this. Ordering on x + y lets a bottom-tier pile at
+ * the rear paint a hole in the top of the load; ordering by tier lets a far,
+ * high pile cover a near, low one. Both are real, and swapping between them
+ * just trades one family of artefacts for the other — so instead of a key, this
+ * asks "does A occlude B?" for every pair that overlaps on screen and
+ * topologically sorts the answers. That is exact for our geometry.
+ *
+ * Pairs that overlap on screen but clear on no axis leave no constraint, and a
+ * cyclic constraint set is theoretically possible; both fall back to centre
+ * depth, which also keeps the output stable for a given plan.
+ */
+export function occlusionOrder<T extends {readonly box: Box}>(
   items: readonly T[],
 ): T[] {
-  return [...items].sort((a, b) => a.tier - b.tier || a.x + a.y - (b.x + b.y));
+  if (items.length < 2) {
+    return [...items];
+  }
+
+  const depth = items.map(item => centreDepth(item.box));
+  const screen = items.map(item => projectedBounds(item.box, 0));
+  const farthestFirst = [...items.keys()].sort(
+    (a, b) => depth[a]! - depth[b]! || a - b,
+  );
+
+  /** drawAfter[i] holds everything that must be drawn once i is down. */
+  const drawAfter: Set<number>[] = items.map(() => new Set<number>());
+  const blockedBy = new Array<number>(items.length).fill(0);
+
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      if (!overlapsOnScreen(screen[i]!, screen[j]!)) {
+        continue;
+      }
+      const iInFront = isInFront(items[i]!.box, items[j]!.box);
+      const jInFront = isInFront(items[j]!.box, items[i]!.box);
+      if (iInFront === jInFront) {
+        continue;
+      }
+      const back = iInFront ? j : i;
+      const front = iInFront ? i : j;
+      if (!drawAfter[back]!.has(front)) {
+        drawAfter[back]!.add(front);
+        blockedBy[front]!++;
+      }
+    }
+  }
+
+  const ready = farthestFirst.filter(index => blockedBy[index] === 0);
+  const ordered: T[] = [];
+  const placed = new Array<boolean>(items.length).fill(false);
+
+  while (ready.length > 0) {
+    // Always take the farthest of what is free, so ties resolve the same way
+    // every render.
+    let choice = 0;
+    for (let k = 1; k < ready.length; k++) {
+      if (depth[ready[k]!]! < depth[ready[choice]!]!) {
+        choice = k;
+      }
+    }
+    const next = ready.splice(choice, 1)[0]!;
+    ordered.push(items[next]!);
+    placed[next] = true;
+    for (const blocked of drawAfter[next]!) {
+      if (--blockedBy[blocked]! === 0) {
+        ready.push(blocked);
+      }
+    }
+  }
+
+  for (const index of farthestFirst) {
+    if (!placed[index]) {
+      ordered.push(items[index]!);
+    }
+  }
+
+  return ordered;
 }

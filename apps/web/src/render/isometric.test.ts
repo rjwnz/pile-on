@@ -2,7 +2,8 @@ import {describe, expect, it} from '@jest/globals';
 import {
   boxFaces,
   cylinderAlongDeck,
-  depthOrder,
+  isInFront,
+  occlusionOrder,
   project,
   projectedBounds,
 } from './isometric';
@@ -122,45 +123,116 @@ describe('projectedBounds', () => {
   });
 });
 
-describe('depthOrder', () => {
-  it('draws the farthest item in a tier first', () => {
-    const ordered = depthOrder([
-      {id: 'near', x: 6000, y: 900, tier: 0},
-      {id: 'far', x: 100, y: -900, tier: 0},
-      {id: 'middle', x: 3000, y: 0, tier: 0},
-    ]);
+/** A pile-shaped box: 6 m along the deck, 450 mm across, in a named lane. */
+function pile(id: string, x: number, y: number, z: number, length = 6000) {
+  return {
+    id,
+    box: {x0: x, x1: x + length, y0: y - 225, y1: y + 225, z0: z, z1: z + 450},
+  };
+}
 
-    expect(ordered.map(item => item.id)).toEqual(['far', 'middle', 'near']);
+describe('isInFront', () => {
+  it('puts a box further along the deck in front', () => {
+    expect(isInFront(pile('a', 7000, 0, 0).box, pile('b', 0, 0, 0).box)).toBe(
+      true,
+    );
   });
 
-  it('draws a lower tier before the one stacked on it', () => {
-    const ordered = depthOrder([
-      {id: 'upper', x: 100, y: 0, tier: 2},
-      {id: 'lower', x: 100, y: 0, tier: 0},
-    ]);
-
-    expect(ordered.map(item => item.id)).toEqual(['lower', 'upper']);
+  it('puts a box in a nearer lane in front', () => {
+    expect(isInFront(pile('a', 0, 900, 0).box, pile('b', 0, 0, 0).box)).toBe(
+      true,
+    );
   });
 
-  it('never lets a lower tier paint over a higher one, however near it is', () => {
-    // A bottom-tier pile at the rear is closer to the viewer than a top-tier
-    // pile at the front, but it must not punch a hole in the top of the load.
-    const ordered = depthOrder([
-      {id: 'top-far', x: 100, y: 0, tier: 3},
-      {id: 'bottom-near', x: 12000, y: 900, tier: 0},
-    ]);
-
-    expect(ordered.map(item => item.id)).toEqual(['bottom-near', 'top-far']);
+  it('puts a box on a higher tier in front', () => {
+    expect(isInFront(pile('a', 0, 0, 600).box, pile('b', 0, 0, 0).box)).toBe(
+      true,
+    );
   });
 
-  it('does not mutate the array it was given', () => {
-    const items = [
-      {id: 'a', x: 9000, y: 0, tier: 0},
-      {id: 'b', x: 0, y: 0, tier: 0},
+  it('claims nothing about boxes that clear on no axis', () => {
+    const a = pile('a', 0, 0, 0);
+    const b = pile('b', 3000, 100, 0);
+
+    expect(isInFront(a.box, b.box)).toBe(false);
+    expect(isInFront(b.box, a.box)).toBe(false);
+  });
+});
+
+describe('occlusionOrder', () => {
+  const idsOf = (items: {id: string}[]) => items.map(item => item.id);
+
+  it('draws the farthest of a simple row first', () => {
+    expect(
+      idsOf(occlusionOrder([pile('near', 6200, 0, 0), pile('far', 100, 0, 0)])),
+    ).toEqual(['far', 'near']);
+  });
+
+  /*
+   * The two artefacts that kept coming back. Ordering on x + y got the first
+   * right and the second wrong; ordering by tier did the reverse. Both must
+   * pass together, or the fix is just another trade.
+   */
+  it('does not let a rear bottom-tier pile punch through the top of the load', () => {
+    const top = pile('top', 100, 0, 550);
+    const bottomRear = pile('bottom-rear', 1200, 0, 0);
+
+    expect(idsOf(occlusionOrder([top, bottomRear]))).toEqual([
+      'bottom-rear',
+      'top',
+    ]);
+  });
+
+  it('does not let a far top-tier pile cover a near bottom-tier one', () => {
+    // Depths 5475 against 3025: the low, near pile is closer to the eye.
+    const farTop = pile('far-top', 100, -950, 550);
+    const nearBottom = pile('near-bottom', 1200, 950, 0);
+
+    expect(idsOf(occlusionOrder([farTop, nearBottom]))).toEqual([
+      'far-top',
+      'near-bottom',
+    ]);
+  });
+
+  it('keeps a stack in tier order when the piles sit directly on top', () => {
+    expect(
+      idsOf(
+        occlusionOrder([pile('upper', 100, 0, 550), pile('lower', 100, 0, 0)]),
+      ),
+    ).toEqual(['lower', 'upper']);
+  });
+
+  it('is stable — the same plan always draws in the same order', () => {
+    const piles = [
+      pile('a', 100, -950, 0),
+      pile('b', 6200, 950, 550),
+      pile('c', 100, 475, 0),
+      pile('d', 6200, -475, 550),
     ];
-    depthOrder(items);
 
-    expect(items[0]!.id).toBe('a');
+    expect(idsOf(occlusionOrder(piles))).toEqual(
+      idsOf(occlusionOrder([...piles].reverse())),
+    );
+  });
+
+  it('returns every item exactly once, even in a tangled load', () => {
+    const piles = Array.from({length: 24}, (_, index) =>
+      pile(
+        `p${index}`,
+        100 + (index % 2) * 6100,
+        -950 + Math.floor(index / 2) * 200,
+        (index % 3) * 550,
+      ),
+    );
+    const ordered = occlusionOrder(piles);
+
+    expect(ordered).toHaveLength(24);
+    expect(new Set(idsOf(ordered)).size).toBe(24);
+  });
+
+  it('handles trivial inputs', () => {
+    expect(occlusionOrder([])).toEqual([]);
+    expect(idsOf(occlusionOrder([pile('only', 0, 0, 0)]))).toEqual(['only']);
   });
 });
 

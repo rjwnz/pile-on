@@ -203,3 +203,43 @@ describe('what will not fit', () => {
     expect(alert).toHaveTextContent('too long for the deck');
   });
 });
+
+describe('x-ray', () => {
+  async function arranged() {
+    const user = userEvent.setup();
+    renderPlan();
+    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+    return user;
+  }
+
+  const fillOpacities = () =>
+    screen.getAllByTestId('iso-pile').map(pile => pile.firstElementChild);
+
+  it('is off until asked for, so the load reads as solid', async () => {
+    await arranged();
+
+    for (const tube of fillOpacities()) {
+      expect(tube).toHaveAttribute('fill-opacity', '1');
+    }
+  });
+
+  it('fades the fills so buried piles show through', async () => {
+    const user = await arranged();
+
+    await user.click(
+      screen.getByRole('checkbox', {name: /See through the load/}),
+    );
+
+    for (const tube of fillOpacities()) {
+      expect(tube).toHaveAttribute('fill-opacity', '0.35');
+    }
+  });
+
+  it('is not offered before there is a plan to see into', () => {
+    renderPlan();
+
+    expect(
+      screen.queryByRole('checkbox', {name: /See through the load/}),
+    ).not.toBeInTheDocument();
+  });
+});

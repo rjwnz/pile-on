@@ -1,0 +1,111 @@
+{
+  "formatVersion": 7,
+  "savedAt": "2026-08-22T00:00:00.000Z",
+  "rulesetVersion": "nz-vdam-2016",
+  "options": {
+    "clearances": {
+      "shaftToShaft": 25,
+      "helixToShaft": 25,
+      "helixToHelix": 25
+    },
+    "balance": {
+      "longitudinal": 200,
+      "lateral": 50
+    },
+    "dunnageThickness": 100,
+    "endGap": 100,
+    "sideMargin": 50,
+    "headboardGap": 100,
+    "maxTiers": 4,
+    "ancillaryMassPerTier": 60
+  },
+  "catalogue": {
+    "pileTypes": [
+      {
+        "id": "SP168-D6",
+        "name": "SP168 6.0 m twin helix",
+        "length": 6000,
+        "shaftRadius": 84,
+        "mass": 178,
+        "helices": [
+          {
+            "offsetFromButt": 400,
+            "radius": 225,
+            "length": 110
+          },
+          {
+            "offsetFromButt": 1100,
+            "radius": 175,
+            "length": 110
+          }
+        ]
+      },
+      {
+        "id": "SP273-D8",
+        "name": "SP273 8.0 m twin helix, heavy wall",
+        "length": 8000,
+        "shaftRadius": 137,
+        "mass": 610,
+        "helices": [
+          {
+            "offsetFromButt": 500,
+            "radius": 300,
+            "length": 120
+          },
+          {
+            "offsetFromButt": 1500,
+            "radius": 250,
+            "length": 120
+          }
+        ]
+      }
+    ],
+    "vehicles": [
+      {
+        "id": "RIGID-8",
+        "name": "8-wheeler rigid",
+        "kind": "rigid",
+        "deckLength": 7200,
+        "deckWidth": 2450,
+        "deckHeight": 1200,
+        "tare": 10600,
+        "maxGross": 30000,
+        "maxFrontOverhang": 0,
+        "maxRearOverhang": 0,
+        "balanceTarget": null,
+        "towableBy": []
+      },
+      {
+        "id": "TRAILER-4A",
+        "name": "4-axle full trailer",
+        "kind": "full_trailer",
+        "deckLength": 8100,
+        "deckWidth": 2450,
+        "deckHeight": 1150,
+        "tare": 6800,
+        "maxGross": 22000,
+        "maxFrontOverhang": 0,
+        "maxRearOverhang": 0,
+        "balanceTarget": null,
+        "towableBy": ["RIGID-8"]
+      }
+    ]
+  },
+  "job": {
+    "name": "Substation piling — rigid towing its 4-axle",
+    "lines": [
+      {
+        "pileTypeId": "SP168-D6",
+        "quantity": 64
+      },
+      {
+        "pileTypeId": "SP273-D8",
+        "quantity": 16
+      }
+    ]
+  },
+  "plan": {
+    "consignments": [],
+    "placements": []
+  }
+}

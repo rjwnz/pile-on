@@ -9,7 +9,7 @@
     "massUsed": 31,
     "worstBalance": 0,
     "errors": 0,
-    "millis": 97
+    "millis": 232
   },
   {
     "fixture": "02-two-types-semi",
@@ -21,7 +21,7 @@
     "massUsed": 25,
     "worstBalance": 0,
     "errors": 0,
-    "millis": 171
+    "millis": 337
   },
   {
     "fixture": "03-four-types-semi",
@@ -33,7 +33,7 @@
     "massUsed": 23,
     "worstBalance": 16,
     "errors": 0,
-    "millis": 525
+    "millis": 1073
   },
   {
     "fixture": "04-short-deck-rigid",
@@ -45,7 +45,7 @@
     "massUsed": 18,
     "worstBalance": 0,
     "errors": 0,
-    "millis": 86
+    "millis": 185
   },
   {
     "fixture": "05-long-piles-semi",
@@ -57,6 +57,18 @@
     "massUsed": 34,
     "worstBalance": 0,
     "errors": 0,
-    "millis": 11
+    "millis": 36
+  },
+  {
+    "fixture": "06-rigid-and-trailer",
+    "piles": 80,
+    "baselineTrucks": 4,
+    "packedTrucks": 2,
+    "noFlipTrucks": 4,
+    "deckUsed": 32,
+    "massUsed": 34,
+    "worstBalance": 0,
+    "errors": 0,
+    "millis": 101
   }
 ]

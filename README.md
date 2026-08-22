@@ -15,11 +15,15 @@ the packer and the six stages it lands in.
 
 Usable end to end: the pile-type and vehicle catalogues, the piling schedule,
 and a loading plan you can look at — exploded per-tier top-down drawings and an
-isometric view of each truck, with the load checked against the NZ limits.
+isometric view of each deck, with the load checked against the NZ limits.
 
-**Packer stages 1 and 2 of 6 are in.** The helix-aware packer works, and on the
-benchmark fixtures it takes **12 trucks where the bounding-box control takes
-19**.
+**Packer stages 1, 2 and the 4+5 core of 6 are in.** The helix-aware packer
+works, and it packs onto a mixed fleet: every truck in the catalogue, each
+towing up to one trailer (`towableBy` on the trailer row says which trucks
+may). A truck and its trailer count as one movement, budgeted together under
+the 44 t route cap, and on the benchmark fixtures the packer takes **14
+movements where the bounding-box control takes 23**. Still to come from
+stages 4-6: the solo-towing-unit cap, a cost model, LNS repair, and phases.
 
 That is the whole business case, and it comes from one observation: a pile is
 not a cylinder of its widest diameter. A plate is a short fat band on a thin
@@ -57,9 +61,9 @@ it on every job. Being the control licenses it to pack badly, not illegally, so
 it too fills from the middle of the deck outward and slides each load onto its
 balance point.
 
-Still to come: vertical interleaving (stage 3), multi-deck vehicles and the
-solo-tractor rule (4), fleet selection and LNS (5), phases and early delivery
-(6). Single phase only until then; the schedule is a quantity per pile type.
+Still to come: vertical interleaving (stage 3), the solo-tractor rule and a
+cost model (4/5 leftovers), LNS repair (5), phases and early delivery (6).
+Single phase only until then; the schedule is a quantity per pile type.
 
 ### Overhang
 
@@ -75,11 +79,15 @@ unit rather than about a job — and it cannot be derived here, because axle
 positions were deliberately scoped out. It is what the yard says this trailer
 will carry.
 
-Because it is easy to miss when it is somewhere else, the loading rules panel
-shows the selected vehicle's figures read-only, and a truck carrying an overhang
-gets a metric reading what it uses against what it is allowed. A truck with no
-overhang and no allowance shows nothing — a column reading "0 of 0 mm" on every
-truck is the noise that stops the one that matters being noticed.
+A deck carrying an overhang gets a metric reading what it uses against what it
+is allowed. A deck with no overhang and no allowance shows nothing — a column
+reading "0 of 0 mm" on every deck is the noise that stops the one that matters
+being noticed.
+
+One interaction to know about: the allowance applies to the row whether it runs
+solo or in a combination, so a truck with a rear allowance may legally carry
+overhang while towing — into the drawbar space. Set `maxRearOverhang: 0` on
+trucks that tow; `docs/01-packer-design.md` §4.4 records the limitation.
 
 ### What the packer does not promise
 
@@ -135,22 +143,26 @@ of its flight — not the plate gauge. It decides whether two plates share a
 station on the deck, so it is what makes staggering possible or not. The column
 was once `helixN_thickness`; sheets using the old header still import.
 
-**Vehicles.** A deck and a mass limit — no axle data.
+**Vehicles.** A deck and a mass limit — no axle data. One row per unit; a
+trailer is a row whose `towable_by` names the trucks allowed to tow it,
+semicolon-separated.
 
 ```
-id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target
-SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,1200,
+id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target,towable_by
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,0,,
+RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000,0,0,,
+TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,1150,6800,22000,0,0,,RIGID-8
 ```
 
 `kind` is one of `rigid`, `semi_trailer`, `full_trailer`, `simple_trailer`,
 `b_train`.
 
-The last three columns are optional and default to the conservative reading —
-no overhang either end, no opinion about where the load should sit — so a sheet
-written before they existed still imports and still means what it meant. None of
-them can be derived: VDAM states rear overhang against axle spacing, and where a
-deck wants its load depends on where its axles are. A blank `balance_target`
-means unstated, which is not the same as mid-deck.
+The loading columns are optional and default to the conservative reading — no
+overhang either end, no opinion about where the load should sit, towed by
+nobody — so a sheet written before they existed still imports and still means
+what it meant. None of them can be derived: VDAM states rear overhang against
+axle spacing, and where a deck wants its load depends on where its axles are. A
+blank `balance_target` means unstated, which is not the same as mid-deck.
 
 **Piling schedule.** A quantity per pile type. Pile types must already exist in
 the catalogue — a schedule naming an unknown type is rejected with the id, since

@@ -26,7 +26,7 @@ import {
  * self-propelled truck.
  */
 export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target,towable_by
-SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,1200,,
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,0,,
 RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000,0,0,,
 TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,1150,6800,22000,0,0,,RIGID-8
 `;

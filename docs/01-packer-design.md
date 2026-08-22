@@ -251,6 +251,36 @@ substitute; it cannot be derived, so it is data the yard enters.
 
 ### 4.4 Vehicles decompose into units
 
+> **What came out differently (Stages 4+5, 2026-08-22).** The build inverted
+> this section's data model. Rows stay one deck each; a trailer is a `Vehicle`
+> whose new `towableBy: string[]` names the trucks allowed to tow it, and
+> combinations are **composed at pack time** (`combinationsOf`) rather than
+> pre-enumerated as multi-deck rows. There is no `Deck[]`, no `towingUnitId`,
+> and no plan-scope violation: `Placement` gained `deck: 'truck' | 'trailer'`
+> instead of `deckIndex`, `Consignment` gained `trailerId`, and every per-deck
+> helper (`payloadCapacity`, `balanceTargetOf`, `loadableSpan`) kept working
+> untouched because a deck _is_ a row. The ratio bonus below did land:
+> `maxTrailerToTruckMassRatio` is now the `trailer-heavy` warning, and the
+> 44 t route cap binds the combination as `over-combined-gross`. Deliberately
+> **not** built in this pass: the solo-towing-unit cap (and with it the
+> plan-scope `Violation`), any cost model / `ObjectiveWeights`, LNS / no-good
+> cuts / time-boxing / the worker, phases, vertical interleaving, overall
+> combination length limits, and SRT warnings. Fleet selection is a greedy
+> fewest-movements loop (most piles per movement, ties to least deck area);
+> the CSV gained `towable_by` (semicolon-separated) rather than deck columns.
+>
+> **Known limitation (noted 2026-08-23, deliberately not fixed).** Overhang
+> allowances are per row and apply whether or not the row is in a
+> combination, so a truck with `maxRearOverhang > 0` may legally hang steel
+> off its tail _while towing_ — into the drawbar space ahead of the trailer
+> (verified: the packer does this, and the validator accepts it, because
+> both are correct to the model). One number cannot say "700 mm solo, zero
+> when towing", and composed combinations reuse the same row for both roles.
+> The yard's workaround is to set `maxRearOverhang: 0` on trucks that tow;
+> the fix, when wanted, is an effective allowance of zero for the truck's
+> rear (and the trailer's front) whenever the movement has a trailer, in
+> both the packer's usable span and `checkEnvelope`.
+
 Requirement (3) cannot be modelled without this. A _tractor_ alone carries
 nothing, so a bare tractor would never appear in a load plan at all — the case
 that actually bites is a **truck dispatched without its full trailer**, and a
@@ -856,6 +886,15 @@ actually is, and the trailer:truck ratio becomes checkable._
 **Stage 5 — Fleet selection, LNS, worker.** Heterogeneous assignment,
 solo-unit repair, no-good cuts, time-boxing, off-thread (§6.5). _Deliverable:
 option (3), and "this job needs 2 × 8-wheeler + trailer and 1 × semi"._
+
+> **Stages 4+5, what came out differently (2026-08-22).** Landed together, and
+> smaller than planned — see the deviation note at the top of §4.4 for the
+> model that was actually built (single-deck rows + `towableBy`, combinations
+> composed at pack time) and the full list of what was deliberately left out
+> (solo-unit cap, costs, LNS, worker). Fleet selection shipped as a greedy
+> fewest-movements loop with per-movement route-cap budgeting; the deliverable
+> sentence — "this job needs 2 × 8-wheeler + trailer" — is real, at fixture
+> `06-rigid-and-trailer`: baseline 4 movements, packed 2, zero errors.
 
 **Stage 6 — Phases and early delivery.** `Job.phases`, `JobLine.phaseId`,
 `allowEarlyDelivery`, the storage term (§4.5). _Deliverable: option (1)._

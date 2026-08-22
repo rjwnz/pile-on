@@ -60,7 +60,8 @@ export function place(
   return {
     type,
     placement: {
-      pileId: `${type.id}-1`,
+      id: `${type.id}-1`,
+      pileTypeId: type.id,
       tier: 0,
       x: 0,
       y: 0,

@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {NZ_VDAM_2016} from '@pile-on/core';
 import {AppStateProvider} from './state/AppStateProvider';
+import {JobSection} from './components/JobSection';
 import {PileTypeSection} from './components/PileTypeSection';
 import {VehicleSection} from './components/VehicleSection';
 import {StateIoBar} from './components/StateIoBar';
@@ -8,6 +9,7 @@ import {StateIoBar} from './components/StateIoBar';
 const TABS = [
   {id: 'piles', label: 'Pile types'},
   {id: 'vehicles', label: 'Vehicles'},
+  {id: 'job', label: 'Piling schedule'},
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -48,7 +50,9 @@ function Workspace() {
         ))}
       </nav>
 
-      {tab === 'piles' ? <PileTypeSection /> : <VehicleSection />}
+      {tab === 'piles' ? <PileTypeSection /> : null}
+      {tab === 'vehicles' ? <VehicleSection /> : null}
+      {tab === 'job' ? <JobSection /> : null}
 
       <footer className="text-xs text-slate-500">
         Limits from Land Transport Rule: Vehicle Dimensions and Mass 2016

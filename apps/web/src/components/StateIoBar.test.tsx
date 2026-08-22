@@ -36,10 +36,10 @@ const VEHICLE: Vehicle = {
 const CURRENT: AppState = {
   ...emptyAppState('2026-08-01T00:00:00.000Z'),
   catalogue: {pileTypes: [TYPE_A], vehicles: [VEHICLE]},
+  job: {name: 'Current job', lines: [{pileTypeId: 'A', quantity: 12}]},
   plan: {
-    piles: [{id: 'P-1', typeId: 'A'}],
     consignments: [{id: 'C1', vehicleId: 'V', phase: null}],
-    placements: [{pileId: 'P-1', tier: 0, x: 100, y: 0, flipped: false}],
+    placements: [],
   },
 };
 
@@ -47,7 +47,8 @@ const CURRENT: AppState = {
 const INCOMING: AppState = {
   ...emptyAppState('2026-08-20T00:00:00.000Z'),
   catalogue: {pileTypes: [{...TYPE_A, id: 'B', name: 'B'}], vehicles: []},
-  plan: {piles: [{id: 'Q-1', typeId: 'B'}], consignments: [], placements: []},
+  job: {name: 'Incoming job', lines: [{pileTypeId: 'B', quantity: 5}]},
+  plan: {consignments: [], placements: []},
 };
 
 function renderBar(initialState: AppState = CURRENT) {
@@ -104,7 +105,7 @@ describe('import', () => {
 
     expect(
       await screen.findByText(
-        /1 pile types, 0 vehicles, 1 piles across 0 consignments/,
+        /1 pile types, 0 vehicles, a schedule of 5 piles \(Incoming job\), no plan/,
       ),
     ).toBeInTheDocument();
     // Nothing applied yet — the current catalogue is still on screen.
@@ -138,7 +139,7 @@ describe('import', () => {
       'the existing plan now references things that are gone',
     );
     expect(
-      within(alert).getByText(/uses missing pile type "A"/),
+      within(alert).getByText(/needs 12 of missing pile type "A"/),
     ).toBeInTheDocument();
     expect(
       within(alert).getByText(/uses missing vehicle "V"/),
@@ -152,7 +153,7 @@ describe('import', () => {
     await upload(user, INCOMING);
     await user.click(
       await screen.findByRole('radio', {
-        name: /Catalogue and plan — replace everything/,
+        name: /Everything — catalogue, schedule and plan/,
       }),
     );
     await user.click(screen.getByRole('button', {name: 'Import'}));
@@ -212,7 +213,7 @@ describe('import', () => {
     await upload(user, CURRENT);
     await user.click(
       await screen.findByRole('radio', {
-        name: /Catalogue and plan — replace everything/,
+        name: /Everything — catalogue, schedule and plan/,
       }),
     );
     await user.click(screen.getByRole('button', {name: 'Import'}));

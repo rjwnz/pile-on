@@ -1,7 +1,10 @@
 import {
+  EMPTY_JOB,
   removeById,
+  setJobQuantity,
   upsertById,
   type AppState,
+  type JobLine,
   type PileType,
   type Vehicle,
 } from '@pile-on/core';
@@ -28,6 +31,18 @@ export type AppAction =
       readonly vehicles: readonly Vehicle[];
       readonly replace: boolean;
     }
+  | {readonly type: 'setJobName'; readonly name: string}
+  | {
+      readonly type: 'setJobQuantity';
+      readonly pileTypeId: string;
+      readonly quantity: number;
+    }
+  | {
+      readonly type: 'importJobLines';
+      readonly lines: readonly JobLine[];
+      readonly replace: boolean;
+    }
+  | {readonly type: 'clearJob'}
   | {readonly type: 'replaceState'; readonly state: AppState};
 
 function mergeAll<T extends {readonly id: string}>(
@@ -107,6 +122,37 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           ),
         },
       };
+
+    case 'setJobName':
+      return {...state, job: {...state.job, name: action.name}};
+
+    case 'setJobQuantity':
+      return {
+        ...state,
+        job: setJobQuantity(state.job, action.pileTypeId, action.quantity),
+      };
+
+    case 'importJobLines': {
+      // Merge adds to what is already there rather than overwriting, because a
+      // schedule commonly arrives in parts — one file per building.
+      const base = action.replace ? EMPTY_JOB.lines : state.job.lines;
+      const merged = action.lines.reduce(
+        (job, line) =>
+          setJobQuantity(
+            job,
+            line.pileTypeId,
+            action.replace
+              ? line.quantity
+              : (job.lines.find(l => l.pileTypeId === line.pileTypeId)
+                  ?.quantity ?? 0) + line.quantity,
+          ),
+        {...state.job, lines: base},
+      );
+      return {...state, job: merged};
+    }
+
+    case 'clearJob':
+      return {...state, job: {...state.job, lines: []}};
 
     case 'replaceState':
       return action.state;

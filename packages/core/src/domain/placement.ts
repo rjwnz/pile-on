@@ -13,7 +13,15 @@ import type {PileType} from './pile';
  * lever for getting helices off each other's stations.
  */
 export interface Placement {
-  readonly pileId: string;
+  /**
+   * Identity of this placement within the plan.
+   *
+   * A placement *is* an individual pile on a deck — there is no separate pile
+   * registry. The job holds quantities per type; what makes one of those 400
+   * piles distinguishable is being placed somewhere.
+   */
+  readonly id: string;
+  readonly pileTypeId: string;
   readonly tier: number;
   /** Position of the pile's leading (headboard-most) end. */
   readonly x: Millimetres;

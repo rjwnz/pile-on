@@ -90,6 +90,6 @@ describe('removeById', () => {
 describe('empty values', () => {
   it('provides an empty catalogue and plan to start from', () => {
     expect(EMPTY_CATALOGUE).toEqual({pileTypes: [], vehicles: []});
-    expect(EMPTY_PLAN).toEqual({piles: [], consignments: [], placements: []});
+    expect(EMPTY_PLAN).toEqual({consignments: [], placements: []});
   });
 });

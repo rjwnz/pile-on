@@ -60,7 +60,7 @@ export function TierPlanSvg({
         {piles.map(placed =>
           radiusProfile(placed).map((segment, index) => (
             <rect
-              key={`${placed.placement.pileId}-${index}`}
+              key={`${placed.placement.id}-${index}`}
               x={segment.start}
               y={toSvgY(placed.placement.y - segment.radius)}
               width={segment.end - segment.start}

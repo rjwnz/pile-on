@@ -12,7 +12,7 @@ const PILE: PlacedPile = {
     mass: 300,
     helices: [{offsetFromButt: 500, radius: 200, thickness: 100}],
   },
-  placement: {pileId: 'p1', tier: 0, x: 0, y: 0, flipped: false},
+  placement: {id: 'p1', pileTypeId: 't', tier: 0, x: 0, y: 0, flipped: false},
 };
 
 function renderPlan(piles: readonly PlacedPile[] = [PILE]) {

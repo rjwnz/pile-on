@@ -1,4 +1,4 @@
-import type {Pile, PileType} from './pile';
+import type {PileType} from './pile';
 import type {Placement} from './placement';
 import type {Vehicle} from './vehicle';
 
@@ -27,13 +27,11 @@ export interface Consignment {
  * utilisation — is computed on demand and stored nowhere.
  */
 export interface LoadPlan {
-  readonly piles: readonly Pile[];
   readonly consignments: readonly Consignment[];
   readonly placements: readonly Placement[];
 }
 
 export const EMPTY_PLAN: LoadPlan = {
-  piles: [],
   consignments: [],
   placements: [],
 };

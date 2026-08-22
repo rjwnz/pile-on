@@ -32,14 +32,6 @@ export interface PileType {
   readonly helices: readonly Helix[];
 }
 
-/** One physical pile on a job. */
-export interface Pile {
-  readonly id: string;
-  readonly typeId: string;
-  /** Phase this pile is needed on site for. Absent means "any phase". */
-  readonly requiredByPhase?: string;
-}
-
 /**
  * Whether this type may have its helices overlap a neighbour's helices.
  *

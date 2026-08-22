@@ -2,9 +2,12 @@ import {
   EMPTY_CATALOGUE,
   EMPTY_PLAN,
   type Catalogue,
+  type Consignment,
   type LoadPlan,
 } from '../domain/catalogue';
+import {EMPTY_JOB, type Job, type JobLine} from '../domain/job';
 import type {PileType} from '../domain/pile';
+import type {Placement} from '../domain/placement';
 import type {Vehicle} from '../domain/vehicle';
 import {NZ_VDAM_2016} from '../rules/nzVdam';
 import {IssueLog, type Issue, type Result} from '../validation/result';
@@ -15,8 +18,12 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  *
  * 2 — dropped `vehicle.axles`. Version 1 files still read cleanly: the axle
  *     data is simply ignored, and nothing else about the shape changed.
+ * 3 — added `job` (quantity per pile type); dropped `plan.piles` and changed
+ *     `placement.pileId` to `placement.pileTypeId` plus its own `id`. Version 2
+ *     files read cleanly: they have no job, and in practice no placements
+ *     either, since nothing produced them.
  */
-export const STATE_FORMAT_VERSION = 2;
+export const STATE_FORMAT_VERSION = 3;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -28,6 +35,7 @@ export interface AppState {
    */
   readonly rulesetVersion: string;
   readonly catalogue: Catalogue;
+  readonly job: Job;
   readonly plan: LoadPlan;
 }
 
@@ -37,6 +45,7 @@ export function emptyAppState(now: string): AppState {
     savedAt: now,
     rulesetVersion: NZ_VDAM_2016.version,
     catalogue: EMPTY_CATALOGUE,
+    job: EMPTY_JOB,
     plan: EMPTY_PLAN,
   };
 }
@@ -46,8 +55,8 @@ export const IMPORT_MODES = ['catalogue-only', 'catalogue-and-plan'] as const;
 export type ImportMode = (typeof IMPORT_MODES)[number];
 
 export const IMPORT_MODE_LABELS: Readonly<Record<ImportMode, string>> = {
-  'catalogue-only': 'Catalogue only — keep my current plan',
-  'catalogue-and-plan': 'Catalogue and plan — replace everything',
+  'catalogue-only': 'Catalogue only — keep my current schedule and plan',
+  'catalogue-and-plan': 'Everything — catalogue, schedule and plan',
 };
 
 export function serialiseAppState(state: AppState): string {
@@ -161,6 +170,76 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
   };
 }
 
+function parseJobLine(value: unknown, log: IssueLog): JobLine | null {
+  if (!isRecord(value)) {
+    log.add('', 'must be an object');
+    return null;
+  }
+  const {pileTypeId, quantity} = value;
+  if (typeof pileTypeId !== 'string' || !pileTypeId) {
+    log.add('pileTypeId', 'must be a non-empty string');
+    return null;
+  }
+  if (
+    typeof quantity !== 'number' ||
+    !Number.isInteger(quantity) ||
+    quantity < 0
+  ) {
+    log.add('quantity', 'must be a whole number of piles, zero or more');
+    return null;
+  }
+  return {pileTypeId, quantity};
+}
+
+function parseConsignment(value: unknown, log: IssueLog): Consignment | null {
+  if (!isRecord(value)) {
+    log.add('', 'must be an object');
+    return null;
+  }
+  const {id, vehicleId, phase} = value;
+  if (
+    typeof id !== 'string' ||
+    !id ||
+    typeof vehicleId !== 'string' ||
+    !vehicleId
+  ) {
+    log.add('', 'needs a non-empty id and vehicleId');
+    return null;
+  }
+  return {id, vehicleId, phase: typeof phase === 'string' ? phase : null};
+}
+
+/**
+ * A version 2 placement carried `pileId` and no `id`. Those are dropped with an
+ * issue rather than guessed at — but in practice no version 2 file has any,
+ * because nothing produced placements before the packer.
+ */
+function parsePlacement(value: unknown, log: IssueLog): Placement | null {
+  if (!isRecord(value)) {
+    log.add('', 'must be an object');
+    return null;
+  }
+  const {id, pileTypeId, tier, x, y, flipped} = value;
+  if (
+    typeof id !== 'string' ||
+    !id ||
+    typeof pileTypeId !== 'string' ||
+    !pileTypeId
+  ) {
+    log.add('', 'needs a non-empty id and pileTypeId');
+    return null;
+  }
+  if (
+    typeof tier !== 'number' ||
+    typeof x !== 'number' ||
+    typeof y !== 'number'
+  ) {
+    log.add('', 'tier, x and y must be numbers');
+    return null;
+  }
+  return {id, pileTypeId, tier, x, y, flipped: flipped === true};
+}
+
 /**
  * Read a saved file. Tolerant about anything that can be defaulted, strict
  * about anything that would silently corrupt a plan.
@@ -213,23 +292,28 @@ export function parseAppState(raw: string): Result<AppState> {
     )
     .filter((vehicle): vehicle is Vehicle => vehicle !== null);
 
+  const jobSource = isRecord(parsed['job']) ? parsed['job'] : {};
+  const job: Job = {
+    name: typeof jobSource['name'] === 'string' ? jobSource['name'] : '',
+    lines: readArray(jobSource, 'lines', log.child('job'))
+      .map((value, index) =>
+        parseJobLine(value, log.child(`job / lines[${index}]`)),
+      )
+      .filter((line): line is JobLine => line !== null),
+  };
+
   const planSource = isRecord(parsed['plan']) ? parsed['plan'] : {};
   const plan: LoadPlan = {
-    piles: readArray(
-      planSource,
-      'piles',
-      log.child('plan'),
-    ) as LoadPlan['piles'],
-    consignments: readArray(
-      planSource,
-      'consignments',
-      log.child('plan'),
-    ) as LoadPlan['consignments'],
-    placements: readArray(
-      planSource,
-      'placements',
-      log.child('plan'),
-    ) as LoadPlan['placements'],
+    consignments: readArray(planSource, 'consignments', log.child('plan'))
+      .map((value, index) =>
+        parseConsignment(value, log.child(`plan / consignments[${index}]`)),
+      )
+      .filter((entry): entry is Consignment => entry !== null),
+    placements: readArray(planSource, 'placements', log.child('plan'))
+      .map((value, index) =>
+        parsePlacement(value, log.child(`plan / placements[${index}]`)),
+      )
+      .filter((entry): entry is Placement => entry !== null),
   };
 
   return log.settle({
@@ -240,6 +324,7 @@ export function parseAppState(raw: string): Result<AppState> {
         ? parsed['rulesetVersion']
         : NZ_VDAM_2016.version,
     catalogue: {pileTypes, vehicles},
+    job,
     plan,
   });
 }
@@ -254,6 +339,7 @@ export function applyImport(
   if (mode === 'catalogue-and-plan') {
     return {...imported, savedAt: now};
   }
+  // Catalogue only: the job and plan being worked on are left alone.
   return {
     ...current,
     savedAt: now,
@@ -262,10 +348,10 @@ export function applyImport(
 }
 
 /**
- * Placements and consignments pointing at catalogue entries that are no longer
- * there. Importing a catalogue over an existing plan is legitimate — a revised
- * price list, say — but it can orphan the plan, and the user needs telling
- * rather than discovering it at the loading bay.
+ * Job lines, placements and consignments pointing at catalogue entries that are
+ * no longer there. Importing a catalogue over an existing job is legitimate — a
+ * revised price list, say — but it can orphan the job, and the user needs
+ * telling rather than discovering it at the loading bay.
  */
 export function findDanglingReferences(state: AppState): Issue[] {
   const log = new IssueLog();
@@ -273,13 +359,12 @@ export function findDanglingReferences(state: AppState): Issue[] {
   const vehicleIds = new Set(
     state.catalogue.vehicles.map(vehicle => vehicle.id),
   );
-  const pileIds = new Map(state.plan.piles.map(pile => [pile.id, pile]));
 
-  for (const pile of state.plan.piles) {
-    if (!pileTypeIds.has(pile.typeId)) {
+  for (const line of state.job.lines) {
+    if (!pileTypeIds.has(line.pileTypeId)) {
       log.add(
-        `plan / pile ${pile.id}`,
-        `uses missing pile type "${pile.typeId}"`,
+        'job',
+        `needs ${line.quantity} of missing pile type "${line.pileTypeId}"`,
       );
     }
   }
@@ -292,8 +377,11 @@ export function findDanglingReferences(state: AppState): Issue[] {
     }
   }
   for (const placement of state.plan.placements) {
-    if (!pileIds.has(placement.pileId)) {
-      log.add('plan / placements', `places unknown pile "${placement.pileId}"`);
+    if (!pileTypeIds.has(placement.pileTypeId)) {
+      log.add(
+        `plan / placement ${placement.id}`,
+        `places missing pile type "${placement.pileTypeId}"`,
+      );
     }
   }
 

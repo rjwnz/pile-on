@@ -166,3 +166,97 @@ describe('immutability', () => {
     expect(JSON.stringify(BASE)).toBe(before);
   });
 });
+
+describe('job', () => {
+  it('sets and keeps the job name', () => {
+    const named = appReducer(BASE, {type: 'setJobName', name: 'Te Rapa'});
+
+    expect(named.job.name).toBe('Te Rapa');
+  });
+
+  it('sets a quantity', () => {
+    const next = appReducer(BASE, {
+      type: 'setJobQuantity',
+      pileTypeId: 'A',
+      quantity: 12,
+    });
+
+    expect(next.job.lines).toEqual([{pileTypeId: 'A', quantity: 12}]);
+  });
+
+  it('drops a line set back to zero', () => {
+    const withLine = appReducer(BASE, {
+      type: 'setJobQuantity',
+      pileTypeId: 'A',
+      quantity: 12,
+    });
+    const cleared = appReducer(withLine, {
+      type: 'setJobQuantity',
+      pileTypeId: 'A',
+      quantity: 0,
+    });
+
+    expect(cleared.job.lines).toEqual([]);
+  });
+
+  it('adds to existing quantities when merging an import', () => {
+    const withLine = appReducer(BASE, {
+      type: 'setJobQuantity',
+      pileTypeId: 'A',
+      quantity: 40,
+    });
+    const merged = appReducer(withLine, {
+      type: 'importJobLines',
+      lines: [
+        {pileTypeId: 'A', quantity: 80},
+        {pileTypeId: 'B', quantity: 5},
+      ],
+      replace: false,
+    });
+
+    expect(merged.job.lines).toEqual([
+      {pileTypeId: 'A', quantity: 120},
+      {pileTypeId: 'B', quantity: 5},
+    ]);
+  });
+
+  it('overwrites everything when replacing on import', () => {
+    const withLine = appReducer(BASE, {
+      type: 'setJobQuantity',
+      pileTypeId: 'A',
+      quantity: 40,
+    });
+    const replaced = appReducer(withLine, {
+      type: 'importJobLines',
+      lines: [{pileTypeId: 'B', quantity: 5}],
+      replace: true,
+    });
+
+    expect(replaced.job.lines).toEqual([{pileTypeId: 'B', quantity: 5}]);
+  });
+
+  it('clears quantities but keeps the name', () => {
+    const populated = appReducer(
+      appReducer(BASE, {type: 'setJobName', name: 'Te Rapa'}),
+      {type: 'setJobQuantity', pileTypeId: 'A', quantity: 12},
+    );
+    const cleared = appReducer(populated, {type: 'clearJob'});
+
+    expect(cleared.job.lines).toEqual([]);
+    expect(cleared.job.name).toBe('Te Rapa');
+  });
+
+  it('leaves the catalogue alone', () => {
+    const withType = appReducer(BASE, {
+      type: 'upsertPileType',
+      pileType: pileType('A'),
+    });
+    const next = appReducer(withType, {
+      type: 'setJobQuantity',
+      pileTypeId: 'A',
+      quantity: 12,
+    });
+
+    expect(next.catalogue.pileTypes).toHaveLength(1);
+  });
+});

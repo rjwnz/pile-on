@@ -36,10 +36,22 @@ const VEHICLE: Vehicle = {
 const POPULATED: AppState = {
   ...emptyAppState(NOW),
   catalogue: {pileTypes: [PILE_TYPE], vehicles: [VEHICLE]},
+  job: {
+    name: 'Te Rapa warehouse',
+    lines: [{pileTypeId: 'SP168-D6', quantity: 12}],
+  },
   plan: {
-    piles: [{id: 'P-1', typeId: 'SP168-D6'}],
     consignments: [{id: 'C1', vehicleId: 'SEMI-45', phase: null}],
-    placements: [{pileId: 'P-1', tier: 0, x: 100, y: 0, flipped: false}],
+    placements: [
+      {
+        id: 'PL-1',
+        pileTypeId: 'SP168-D6',
+        tier: 0,
+        x: 100,
+        y: 0,
+        flipped: false,
+      },
+    ],
   },
 };
 
@@ -154,11 +166,8 @@ describe('applyImport', () => {
   const incoming: AppState = {
     ...emptyAppState('2026-01-01T00:00:00.000Z'),
     catalogue: {pileTypes: [{...PILE_TYPE, id: 'OTHER'}], vehicles: []},
-    plan: {
-      piles: [{id: 'Q-1', typeId: 'OTHER'}],
-      consignments: [],
-      placements: [],
-    },
+    job: {name: 'Other job', lines: [{pileTypeId: 'OTHER', quantity: 5}]},
+    plan: {consignments: [], placements: []},
   };
 
   it('takes catalogue and plan when asked for both', () => {
@@ -202,22 +211,32 @@ describe('findDanglingReferences', () => {
     );
 
     expect(findDanglingReferences(orphaned).map(i => i.message)).toEqual([
-      'uses missing pile type "SP168-D6"',
+      'needs 12 of missing pile type "SP168-D6"',
       'uses missing vehicle "SEMI-45"',
+      'places missing pile type "SP168-D6"',
     ]);
   });
 
-  it('catches a placement pointing at a pile that is not in the job', () => {
+  it('catches a placement of a pile type that is not in the catalogue', () => {
     const broken: AppState = {
       ...POPULATED,
       plan: {
         ...POPULATED.plan,
-        placements: [{pileId: 'GHOST', tier: 0, x: 0, y: 0, flipped: false}],
+        placements: [
+          {
+            id: 'PL-9',
+            pileTypeId: 'GHOST',
+            tier: 0,
+            x: 0,
+            y: 0,
+            flipped: false,
+          },
+        ],
       },
     };
 
     expect(findDanglingReferences(broken).map(i => i.message)).toEqual([
-      'places unknown pile "GHOST"',
+      'places missing pile type "GHOST"',
     ]);
   });
 });
@@ -351,5 +370,99 @@ describe('reading a version 1 file', () => {
     const result = parseAppState(V1);
 
     expect(result.ok && result.value.formatVersion).toBe(STATE_FORMAT_VERSION);
+  });
+});
+
+describe('parseAppState — job and plan entries', () => {
+  function withParts(parts: Record<string, unknown>): string {
+    return JSON.stringify({formatVersion: STATE_FORMAT_VERSION, ...parts});
+  }
+
+  it('rejects a job line that is not an object', () => {
+    expect(
+      messages(parseAppState(withParts({job: {lines: ['SP168-D6']}}))),
+    ).toEqual(['job / lines[0]: must be an object']);
+  });
+
+  it('rejects a job line with no pile type', () => {
+    expect(
+      messages(parseAppState(withParts({job: {lines: [{quantity: 10}]}}))),
+    ).toEqual(['job / lines[0] / pileTypeId: must be a non-empty string']);
+  });
+
+  it('rejects a fractional or negative job quantity', () => {
+    const fractional = withParts({
+      job: {lines: [{pileTypeId: 'A', quantity: 2.5}]},
+    });
+    const negative = withParts({
+      job: {lines: [{pileTypeId: 'A', quantity: -1}]},
+    });
+    const expected = [
+      'job / lines[0] / quantity: must be a whole number of piles, zero or more',
+    ];
+
+    expect(messages(parseAppState(fractional))).toEqual(expected);
+    expect(messages(parseAppState(negative))).toEqual(expected);
+  });
+
+  it('defaults a missing job to an unnamed empty schedule', () => {
+    const result = parseAppState(withParts({}));
+
+    expect(result.ok && result.value.job).toEqual({name: '', lines: []});
+  });
+
+  it('rejects a consignment that is not an object or has no vehicle', () => {
+    expect(
+      messages(parseAppState(withParts({plan: {consignments: [7]}}))),
+    ).toEqual(['plan / consignments[0]: must be an object']);
+    expect(
+      messages(parseAppState(withParts({plan: {consignments: [{id: 'C1'}]}}))),
+    ).toEqual(['plan / consignments[0]: needs a non-empty id and vehicleId']);
+  });
+
+  it('defaults a consignment with no phase to unphased', () => {
+    const result = parseAppState(
+      withParts({plan: {consignments: [{id: 'C1', vehicleId: 'V'}]}}),
+    );
+
+    expect(result.ok && result.value.plan.consignments[0]!.phase).toBeNull();
+  });
+
+  it('drops a version 2 placement rather than guessing at its shape', () => {
+    // Version 2 carried `pileId` and no `id`. Nothing produced placements back
+    // then, so dropping with an issue is honest and costs nobody real data.
+    const v2Placement = JSON.stringify({
+      formatVersion: 2,
+      plan: {placements: [{pileId: 'P-1', tier: 0, x: 100, y: 0}]},
+    });
+
+    expect(messages(parseAppState(v2Placement))).toEqual([
+      'plan / placements[0]: needs a non-empty id and pileTypeId',
+    ]);
+  });
+
+  it('rejects a placement that is not an object', () => {
+    expect(
+      messages(parseAppState(withParts({plan: {placements: ['nope']}}))),
+    ).toEqual(['plan / placements[0]: must be an object']);
+  });
+
+  it('rejects a placement with non-numeric coordinates', () => {
+    const source = withParts({
+      plan: {placements: [{id: 'PL-1', pileTypeId: 'A', tier: 0, x: 'left'}]},
+    });
+
+    expect(messages(parseAppState(source))).toEqual([
+      'plan / placements[0]: tier, x and y must be numbers',
+    ]);
+  });
+
+  it('treats a missing flipped flag as not flipped', () => {
+    const source = withParts({
+      plan: {placements: [{id: 'PL-1', pileTypeId: 'A', tier: 0, x: 0, y: 0}]},
+    });
+    const result = parseAppState(source);
+
+    expect(result.ok && result.value.plan.placements[0]!.flipped).toBe(false);
   });
 });

@@ -11,10 +11,15 @@ does not do, and the phased plan this repo is being built against.
 
 ## Status
 
-The pile-type and vehicle catalogues are usable: manual entry, CSV import, and
-JSON export/import of a whole session. The domain model, the helix separation
-rule and the NZ VDAM ruleset are implemented and tested. **The packer is not
-written yet** — there is no job entry and no plan view.
+Usable: the pile-type and vehicle catalogues, and the piling schedule — manual
+entry and CSV import for all three, plus JSON export/import of a whole session.
+The domain model, the helix separation rule and the NZ VDAM ruleset are
+implemented and tested. **The packer is not written yet** — nothing produces a
+load plan, so there is no plan view and no truck count.
+
+Single phase only. Splitting a delivery across phases, and shipping early into
+storage, are deferred; the schedule is a quantity per pile type, and phase will
+become another field on the line when it lands.
 
 ### CSV formats
 
@@ -56,6 +61,18 @@ If the assumption stops holding (much heavier piles, shorter-wheelbase units),
 the limits come back as a new `VdamRuleset` version, not as an edit to the
 current one. The tables are in
 [docs/00-problem-analysis.md](docs/00-problem-analysis.md).
+
+**Piling schedule.** A quantity per pile type. Pile types must already exist in
+the catalogue — a schedule naming an unknown type is rejected with the id, since
+that is the most likely thing to be wrong with it. Repeated types are summed
+rather than overwritten, because schedules routinely list a type once per
+building or grid line.
+
+```
+pile_type_id,quantity
+SP168-D6,120
+SP139-S4,64
+```
 
 ### Session files
 

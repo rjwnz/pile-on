@@ -6,6 +6,7 @@ import {
   findDanglingReferences,
   parseAppState,
   serialiseAppState,
+  totalPileCount,
   type AppState,
   type ImportMode,
   type Issue,
@@ -17,12 +18,16 @@ import {Button, IssueList} from './ui';
 
 function summarise(state: AppState): string {
   const {pileTypes, vehicles} = state.catalogue;
-  const {piles, consignments} = state.plan;
+  const pileCount = totalPileCount(state.job);
+  const jobPart =
+    pileCount > 0
+      ? `a schedule of ${pileCount} piles${state.job.name ? ` (${state.job.name})` : ''}`
+      : 'no schedule';
   const planPart =
-    consignments.length > 0 || piles.length > 0
-      ? `${piles.length} piles across ${consignments.length} consignments`
+    state.plan.consignments.length > 0
+      ? `${state.plan.consignments.length} consignments`
       : 'no plan';
-  return `${pileTypes.length} pile types, ${vehicles.length} vehicles, ${planPart}`;
+  return `${pileTypes.length} pile types, ${vehicles.length} vehicles, ${jobPart}, ${planPart}`;
 }
 
 /**

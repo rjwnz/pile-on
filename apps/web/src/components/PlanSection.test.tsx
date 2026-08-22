@@ -135,24 +135,18 @@ describe('arranging', () => {
     expect(screen.getByTestId('isometric-plan')).toBeInTheDocument();
   });
 
-  it('draws every pile in the 3D view', async () => {
+  it('says so plainly when the browser cannot do 3D', async () => {
     const user = userEvent.setup();
     renderPlan();
 
     await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
 
-    expect(screen.getAllByTestId('iso-pile')).toHaveLength(25);
-  });
-
-  it('draws the helix plates in the 3D view, not just the shafts', async () => {
-    const user = userEvent.setup();
-    renderPlan();
-
-    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
-
-    // Two plates on every SP168 — where they sit is the whole story of the
-    // load, so the 3D view has to show them.
-    expect(screen.getAllByTestId('iso-helix')).toHaveLength(50);
+    // jsdom has no WebGL, which is exactly the degraded case: the tier plans
+    // still carry the load, so this must inform rather than break.
+    expect(
+      await screen.findByText(/cannot show the 3D view/),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('tier-plan-0')).toBeInTheDocument();
   });
 
   it('reports the load against the truck limits', async () => {
@@ -205,41 +199,43 @@ describe('what will not fit', () => {
 });
 
 describe('x-ray', () => {
-  async function arranged() {
-    const user = userEvent.setup();
-    renderPlan();
-    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
-    return user;
-  }
-
-  const fillOpacities = () =>
-    screen.getAllByTestId('iso-pile').map(pile => pile.firstElementChild);
-
-  it('is off until asked for, so the load reads as solid', async () => {
-    await arranged();
-
-    for (const tube of fillOpacities()) {
-      expect(tube).toHaveAttribute('fill-opacity', '1');
-    }
-  });
-
-  it('fades the fills so buried piles show through', async () => {
-    const user = await arranged();
-
-    await user.click(
-      screen.getByRole('checkbox', {name: /See through the load/}),
-    );
-
-    for (const tube of fillOpacities()) {
-      expect(tube).toHaveAttribute('fill-opacity', '0.35');
-    }
-  });
-
+  /*
+   * What the toggle *does* to the geometry is covered in loadScene.test.ts,
+   * where the materials can actually be inspected. Here we only check the
+   * control itself: jsdom cannot run WebGL, so there is nothing to look at.
+   */
   it('is not offered before there is a plan to see into', () => {
     renderPlan();
 
     expect(
       screen.queryByRole('checkbox', {name: /See through the load/}),
     ).not.toBeInTheDocument();
+  });
+
+  it('is offered once a plan exists, and starts off', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+
+    expect(
+      screen.getByRole('checkbox', {name: /See through the load/}),
+    ).not.toBeChecked();
+  });
+
+  it('can be turned on and off again', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+    const toggle = screen.getByRole('checkbox', {
+      name: /See through the load/,
+    });
+
+    await user.click(toggle);
+    expect(toggle).toBeChecked();
+
+    await user.click(toggle);
+    expect(toggle).not.toBeChecked();
   });
 });

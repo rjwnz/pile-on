@@ -153,14 +153,15 @@ in `packages/core/src/rules/` with a version and an effective date, and every
 saved quote records which ruleset produced it. Add a new version alongside the
 old one rather than editing in place.
 
-**The 3D view sorts by occlusion, not by a depth key.** No single sort key can
-order overlapping boxes in an axonometric projection: ordering on `x + y` lets a
-rear bottom-tier pile punch through the top of the load, ordering by tier lets a
-far high pile cover a near low one, and swapping between them just trades one
-artefact for the other. `occlusionOrder` asks "does A occlude B?" for every pair
-that overlaps on screen and topologically sorts the answers, which is exact
-because `validatePlan` guarantees piles never interpenetrate. Both artefacts have
-regression tests; they must pass together.
+**The tier plans are SVG; the 3D view is WebGL.** They are different jobs. The
+tier plans are what a load is checked against, so they are vector: exact,
+printable, snapshot-testable. The 3D view only has to convey the shape of the
+load, and it went through three attempts at sorting shapes back to front — by
+`x + y`, then by tier, then a topological sort over pairwise occlusion — each of
+which fixed one family of artefacts and left another. A correct draw order does
+not reliably exist for overlapping solids. A depth buffer settles visibility per
+pixel, so the question stops arising. three.js is lazy-loaded, since plenty of
+sessions never leave the catalogue tabs.
 
 **Tests are the deliverable, not an afterthought.** `core` is held to 95% coverage
 and currently sits at 100%. Geometry bugs hide well from example-based tests, so

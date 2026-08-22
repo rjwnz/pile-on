@@ -1,3 +1,4 @@
+import {Suspense, lazy} from 'react';
 import {
   consignmentMass,
   findVehicle,
@@ -13,7 +14,14 @@ import {
   type Placement,
   type Violation,
 } from '@pile-on/core';
-import {IsometricPlanSvg} from './IsometricPlanSvg';
+/*
+ * three.js is most of the bundle, and plenty of sessions never leave the
+ * catalogue tabs. Loading it only when a plan is actually on screen keeps that
+ * weight off everyone else.
+ */
+const IsometricPlanCanvas = lazy(async () => ({
+  default: (await import('./IsometricPlanCanvas')).IsometricPlanCanvas,
+}));
 import {TierPlanSvg} from './TierPlanSvg';
 
 function Metric({
@@ -179,14 +187,22 @@ export function ConsignmentView({
         ))}
       </div>
 
-      <IsometricPlanSvg
-        vehicle={vehicle}
-        catalogue={catalogue}
-        placements={placements}
-        options={options}
-        title="Loaded truck"
-        xray={xray}
-      />
+      <Suspense
+        fallback={
+          <p className="rounded border border-slate-200 p-6 text-sm text-slate-500">
+            Loading the 3D view…
+          </p>
+        }
+      >
+        <IsometricPlanCanvas
+          vehicle={vehicle}
+          catalogue={catalogue}
+          placements={placements}
+          options={options}
+          title="Loaded truck"
+          xray={xray}
+        />
+      </Suspense>
     </article>
   );
 }

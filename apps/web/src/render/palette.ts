@@ -10,28 +10,21 @@
  * the pile type is still distinguishable in greyscale on a printed plan.
  */
 export interface PileColour {
-  /** Lit face — the shaft in plan, the top of the box in the 3D view. */
+  /** The shaft, in both the tier plans and the 3D view. */
   readonly shaft: string;
-  /** Mid tone — the helix plate in plan, the long side of the box in 3D. */
+  /** The helix plates, darker so they read as part of the same pile. */
   readonly helix: string;
-  /**
-   * Shaded face for the cut end of a pile in the 3D view.
-   *
-   * Deliberately not the outline colour: piles sit nearly end to end, so a row
-   * of end caps forms a continuous band across the load, and at outline
-   * darkness that band reads as damage rather than as pile ends.
-   */
-  readonly end: string;
+  /** Outline for the tier plans, which are drawn flat and need the edge. */
   readonly outline: string;
 }
 
 const PALETTE: readonly PileColour[] = [
-  {shaft: '#bae6fd', helix: '#38bdf8', end: '#0ea5e9', outline: '#075985'},
-  {shaft: '#fde68a', helix: '#f59e0b', end: '#d97706', outline: '#92400e'},
-  {shaft: '#bbf7d0', helix: '#34d399', end: '#10b981', outline: '#065f46'},
-  {shaft: '#e9d5ff', helix: '#a78bfa', end: '#8b5cf6', outline: '#5b21b6'},
-  {shaft: '#fecaca', helix: '#f87171', end: '#ef4444', outline: '#991b1b'},
-  {shaft: '#cbd5e1', helix: '#64748b', end: '#475569', outline: '#1e293b'},
+  {shaft: '#bae6fd', helix: '#38bdf8', outline: '#075985'},
+  {shaft: '#fde68a', helix: '#f59e0b', outline: '#92400e'},
+  {shaft: '#bbf7d0', helix: '#34d399', outline: '#065f46'},
+  {shaft: '#e9d5ff', helix: '#a78bfa', outline: '#5b21b6'},
+  {shaft: '#fecaca', helix: '#f87171', outline: '#991b1b'},
+  {shaft: '#cbd5e1', helix: '#64748b', outline: '#1e293b'},
 ];
 
 /** Small stable string hash — FNV-1a, enough to spread ids over the palette. */
@@ -47,5 +40,3 @@ function hash(value: string): number {
 export function colourForPileType(pileTypeId: string): PileColour {
   return PALETTE[hash(pileTypeId) % PALETTE.length]!;
 }
-
-export const PALETTE_SIZE = PALETTE.length;

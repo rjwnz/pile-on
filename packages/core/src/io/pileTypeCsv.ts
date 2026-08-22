@@ -1,13 +1,3 @@
-import type {Helix, PileType} from '../domain/pile';
-import type {Millimetres} from '../units';
-import {IssueLog, type Result} from '../validation/result';
-import {
-  readNumber,
-  readString,
-  reportDuplicateIds,
-  type CsvRow,
-} from './fields';
-
 /**
  * CSV shape for the pile type catalogue.
  *
@@ -20,19 +10,16 @@ import {
  * `helixN_length` was once called `helixN_thickness`. Both are accepted, so a
  * sheet written against the old header still imports.
  */
-export const PILE_TYPE_CSV_HEADERS = [
-  'id',
-  'name',
-  'length',
-  'shaft_radius',
-  'mass',
-  'helix1_offset',
-  'helix1_radius',
-  'helix1_length',
-  'helix2_offset',
-  'helix2_radius',
-  'helix2_length',
-] as const;
+
+import type {Helix, PileType} from '../domain/pile';
+import type {Millimetres} from '../units';
+import {IssueLog, type Result} from '../validation/result';
+import {
+  readNumber,
+  readString,
+  reportDuplicateIds,
+  type CsvRow,
+} from './fields';
 
 /** Superseded by `helixN_length`; still read so old sheets keep importing. */
 const LEGACY_LENGTH_SUFFIX = 'thickness';
@@ -93,7 +80,7 @@ function readHelices(row: CsvRow, pileLength: number, log: IssueLog): Helix[] {
 }
 
 /** Map one CSV row to a pile type, collecting every problem it has. */
-export function parsePileTypeRow(row: CsvRow, log: IssueLog): PileType {
+function parsePileTypeRow(row: CsvRow, log: IssueLog): PileType {
   const id = readString(row, 'id', log);
   const name = readString(row, 'name', log, {required: false}) || id;
   const length = readNumber(row, 'length', log, {min: 1});

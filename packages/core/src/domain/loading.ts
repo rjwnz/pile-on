@@ -7,13 +7,11 @@ import {findPileType} from './catalogue';
 /**
  * Minimum steel-to-steel gaps, by which two surfaces are meeting.
  *
- * One number used to cover all three cases. It does not, because the cases are
- * physically different: two shafts touching is a hard clash, a plate passing a
- * shaft is the one staggering is meant to exploit, and two plates at the same
- * station is what a double-helix pile can never avoid. The yard sets them
- * independently.
- *
- * Equal values reproduce the single-clearance behaviour exactly.
+ * Three numbers rather than one, because the cases are physically different:
+ * two shafts touching is a hard clash, a plate passing a shaft is the one
+ * staggering is meant to exploit, and two plates at the same station is what a
+ * double-helix pile can never avoid. The yard sets them independently, and
+ * setting them equal collapses this back to a single clearance.
  */
 export interface ClearanceOptions {
   /** Shaft to shaft — the absolute floor, wherever two piles overlap. */
@@ -72,7 +70,7 @@ export interface LoadingOptions {
   readonly ancillaryMassPerTier: Kilograms;
 }
 
-export const DEFAULT_CLEARANCES: ClearanceOptions = Object.freeze({
+const DEFAULT_CLEARANCES: ClearanceOptions = Object.freeze({
   shaftToShaft: 25,
   helixToShaft: 25,
   helixToHelix: 25,
@@ -87,7 +85,7 @@ export const DEFAULT_CLEARANCES: ClearanceOptions = Object.freeze({
  * costs almost nothing, because lanes are generated symmetric about the
  * centreline and a load lands near-balanced by construction.
  */
-export const DEFAULT_BALANCE_TOLERANCE: BalanceTolerance = Object.freeze({
+const DEFAULT_BALANCE_TOLERANCE: BalanceTolerance = Object.freeze({
   longitudinal: 200,
   lateral: 50,
 });
@@ -146,7 +144,7 @@ export function tierHeights(
 }
 
 /** Height of the deck surface of a given tier above the deck itself. */
-export function tierBaseHeight(
+function tierBaseHeight(
   tier: number,
   heights: ReadonlyMap<number, Millimetres>,
   options: LoadingOptions,
@@ -169,9 +167,8 @@ export function tierBaseHeight(
  * different diameter therefore sit at *different* heights in the same tier, and
  * that vertical offset is real clearance the lateral separation rule can spend.
  *
- * This lived in the renderer, where it could quietly disagree with the packer
- * and the validator about where steel actually is. It is geometry, so it lives
- * here and everything reads it from one place.
+ * It lives here, not in the renderer, so the drawing cannot quietly disagree
+ * with the packer and the validator about where steel actually is.
  */
 export function axisHeightOf(
   placed: PlacedPile,

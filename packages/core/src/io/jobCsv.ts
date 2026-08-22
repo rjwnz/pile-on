@@ -10,14 +10,12 @@ import {readNumber, readString, type CsvRow} from './fields';
  * to be wrong with a schedule — and much cheaper to catch here than after
  * someone has quoted from it.
  */
-export const JOB_CSV_HEADERS = ['pile_type_id', 'quantity'] as const;
-
 export const JOB_CSV_EXAMPLE = `pile_type_id,quantity
 SP168-D6,120
 SP139-S4,64
 `;
 
-export function parseJobRow(
+function parseJobRow(
   row: CsvRow,
   knownPileTypeIds: ReadonlySet<string>,
   log: IssueLog,

@@ -21,26 +21,12 @@ import {
  * meant. They cannot be derived: overhang limits are stated against axle
  * spacing, and where a deck wants its load depends on where its axles are.
  */
-export const VEHICLE_CSV_HEADERS = [
-  'id',
-  'name',
-  'kind',
-  'deck_length',
-  'deck_width',
-  'deck_height',
-  'tare',
-  'max_gross',
-  'max_front_overhang',
-  'max_rear_overhang',
-  'balance_target',
-] as const;
-
 export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target
 SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,1200,
 RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000,0,0,
 `;
 
-export function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
+function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
   const id = readString(row, 'id', log);
   const name = readString(row, 'name', log, {required: false}) || id;
   const kind = readEnum<VehicleKind>(row, 'kind', VEHICLE_KINDS, log, 'rigid');

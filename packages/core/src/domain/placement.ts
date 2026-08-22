@@ -38,10 +38,3 @@ export interface PlacedPile {
   readonly type: PileType;
   readonly placement: Placement;
 }
-
-/** Longitudinal extent of a placed pile, as [start, end] along the deck. */
-export function extentOf(
-  placed: PlacedPile,
-): readonly [Millimetres, Millimetres] {
-  return [placed.placement.x, placed.placement.x + placed.type.length];
-}

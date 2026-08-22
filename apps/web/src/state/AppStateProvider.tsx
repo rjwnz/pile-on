@@ -15,7 +15,7 @@ import {
 } from '@pile-on/core';
 import {appReducer, type AppAction} from './appReducer';
 
-export const STORAGE_KEY = 'pile-on:state:v1';
+const STORAGE_KEY = 'pile-on:state:v1';
 
 interface AppStateContextValue {
   readonly state: AppState;
@@ -29,7 +29,7 @@ const AppStateContext = createContext<AppStateContextValue | null>(null);
  * rather than crashing the app — nothing here is the system of record, the
  * exported JSON file is.
  */
-export function loadPersistedState(storage: Storage | undefined): AppState {
+function loadPersistedState(storage: Storage | undefined): AppState {
   const fallback = emptyAppState('');
   if (!storage) {
     return fallback;

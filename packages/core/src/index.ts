@@ -12,6 +12,7 @@ export * from './domain/placement';
 export * from './domain/vehicle';
 export * from './domain/catalogue';
 export * from './domain/job';
+export * from './domain/loading';
 
 export * from './geometry/profile';
 export * from './geometry/separation';
@@ -19,6 +20,9 @@ export * from './geometry/separation';
 export * from './rules/nzVdam';
 
 export * from './validation/result';
+export * from './validation/plan';
+
+export * from './solver/baseline';
 
 export * from './io/fields';
 export * from './io/pileTypeCsv';

@@ -21,6 +21,8 @@ export interface Placement {
    * piles distinguishable is being placed somewhere.
    */
   readonly id: string;
+  /** Which truck this pile rides on. */
+  readonly consignmentId: string;
   readonly pileTypeId: string;
   readonly tier: number;
   /** Position of the pile's leading (headboard-most) end. */

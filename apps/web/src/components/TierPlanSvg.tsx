@@ -1,80 +1,128 @@
-import {radiusProfile, type PlacedPile} from '@pile-on/core';
+import {
+  findPileType,
+  radiusProfile,
+  toMetres,
+  type Catalogue,
+  type Placement,
+  type Vehicle,
+} from '@pile-on/core';
+import {colourForPileType} from '../render/palette';
 
-export interface TierPlanSvgProps {
-  /** Deck length in millimetres. */
-  readonly deckLength: number;
-  /** Deck width in millimetres. */
-  readonly deckWidth: number;
-  readonly piles: readonly PlacedPile[];
-  readonly title: string;
-}
+const LABEL_BAND = 420;
 
 /**
- * Top-down view of a single tier, drawn in deck millimetres.
+ * One tier of one truck, seen from above, drawn in deck millimetres.
  *
- * The viewBox is the deck itself, so no manual scaling is needed anywhere and
- * the drawing stays exact at any size — which matters, because this is the
- * drawing a yard hand will hold up against a real truck.
+ * The viewBox is the deck itself, so nothing is ever scaled by hand and the
+ * drawing stays exact at any size — which matters, because this is the drawing
+ * a yard hand holds up against a real truck.
  *
- * Each pile is drawn from its radius profile rather than from a bounding box,
- * so the helices show where they actually are. That is the whole point of the
- * exploded per-tier view: you can see at a glance whether plates are staggered.
+ * Piles come from their radius profile rather than a bounding box, so the
+ * plates appear where they actually are. Seeing whether plates line up or
+ * stagger is the entire reason this view is exploded per tier instead of
+ * overlaid.
  */
 export function TierPlanSvg({
-  deckLength,
-  deckWidth,
-  piles,
+  vehicle,
+  catalogue,
+  placements,
+  tier,
   title,
-}: TierPlanSvgProps) {
-  const toSvgY = (y: number) => deckWidth / 2 + y;
+}: {
+  readonly vehicle: Vehicle;
+  readonly catalogue: Catalogue;
+  readonly placements: readonly Placement[];
+  readonly tier: number;
+  readonly title: string;
+}) {
+  const halfWidth = vehicle.deckWidth / 2;
+  const toSvgY = (y: number) => halfWidth + y;
 
   return (
-    <figure className="w-full">
-      <figcaption className="mb-1 text-sm font-medium text-slate-700">
-        {title}
+    <figure className="space-y-1">
+      <figcaption className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+        <span className="font-medium text-slate-800">{title}</span>
+        <span className="text-xs text-slate-500">
+          {placements.length} {placements.length === 1 ? 'pile' : 'piles'}
+        </span>
       </figcaption>
+
       <svg
-        viewBox={`0 0 ${deckLength} ${deckWidth}`}
-        className="w-full rounded border border-slate-300 bg-slate-50"
+        viewBox={`${-LABEL_BAND} ${-LABEL_BAND} ${vehicle.deckLength + LABEL_BAND * 2} ${vehicle.deckWidth + LABEL_BAND * 2}`}
+        className="w-full rounded border border-slate-300 bg-white"
         role="img"
-        aria-label={title}
+        aria-label={`${title}, ${placements.length} piles`}
+        data-testid={`tier-plan-${tier}`}
       >
         <rect
           x={0}
           y={0}
-          width={deckLength}
-          height={deckWidth}
-          className="fill-white stroke-slate-400"
-          strokeWidth={12}
-        />
-        <line
-          x1={0}
-          y1={deckWidth / 2}
-          x2={deckLength}
-          y2={deckWidth / 2}
-          className="stroke-slate-300"
-          strokeWidth={6}
-          strokeDasharray="60 60"
+          width={vehicle.deckLength}
+          height={vehicle.deckWidth}
+          className="fill-slate-50 stroke-slate-400"
+          strokeWidth={14}
         />
 
-        {piles.map(placed =>
-          radiusProfile(placed).map((segment, index) => (
+        {/* Headboard — the front tier is butted up against it. */}
+        <rect
+          x={-70}
+          y={0}
+          width={70}
+          height={vehicle.deckWidth}
+          className="fill-slate-500"
+        />
+
+        <line
+          x1={0}
+          y1={halfWidth}
+          x2={vehicle.deckLength}
+          y2={halfWidth}
+          className="stroke-slate-300"
+          strokeWidth={8}
+          strokeDasharray="80 80"
+        />
+
+        {placements.map(placement => {
+          const type = findPileType(catalogue, placement.pileTypeId);
+          if (!type) {
+            return null;
+          }
+          const colour = colourForPileType(type.id);
+          return radiusProfile({type, placement}).map((segment, index) => (
             <rect
-              key={`${placed.placement.id}-${index}`}
+              key={`${placement.id}-${index}`}
               x={segment.start}
-              y={toSvgY(placed.placement.y - segment.radius)}
+              y={toSvgY(placement.y - segment.radius)}
               width={segment.end - segment.start}
               height={segment.radius * 2}
-              className={
-                segment.kind === 'helix'
-                  ? 'fill-amber-400/80 stroke-amber-700'
-                  : 'fill-sky-300/80 stroke-sky-800'
-              }
-              strokeWidth={6}
+              fill={segment.kind === 'helix' ? colour.helix : colour.shaft}
+              stroke={colour.outline}
+              strokeWidth={8}
               data-testid={`segment-${segment.kind}`}
             />
-          )),
-        )}
+          ));
+        })}
+
+        <text
+          x={vehicle.deckLength / 2}
+          y={-140}
+          textAnchor="middle"
+          className="fill-slate-500"
+          fontSize={220}
+        >
+          {toMetres(vehicle.deckLength).toFixed(2)} m deck
+        </text>
+        <text
+          x={-140}
+          y={halfWidth}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="fill-slate-500"
+          fontSize={220}
+          transform={`rotate(-90 ${-140} ${halfWidth})`}
+        >
+          {toMetres(vehicle.deckWidth).toFixed(2)} m
+        </text>
       </svg>
     </figure>
   );

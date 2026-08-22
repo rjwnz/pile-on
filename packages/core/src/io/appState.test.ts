@@ -45,6 +45,7 @@ const POPULATED: AppState = {
     placements: [
       {
         id: 'PL-1',
+        consignmentId: 'C1',
         pileTypeId: 'SP168-D6',
         tier: 0,
         x: 100,
@@ -225,6 +226,7 @@ describe('findDanglingReferences', () => {
         placements: [
           {
             id: 'PL-9',
+            consignmentId: 'C1',
             pileTypeId: 'GHOST',
             tier: 0,
             x: 0,
@@ -437,7 +439,7 @@ describe('parseAppState — job and plan entries', () => {
     });
 
     expect(messages(parseAppState(v2Placement))).toEqual([
-      'plan / placements[0]: needs a non-empty id and pileTypeId',
+      'plan / placements[0]: needs a non-empty id, consignmentId and pileTypeId',
     ]);
   });
 
@@ -449,7 +451,17 @@ describe('parseAppState — job and plan entries', () => {
 
   it('rejects a placement with non-numeric coordinates', () => {
     const source = withParts({
-      plan: {placements: [{id: 'PL-1', pileTypeId: 'A', tier: 0, x: 'left'}]},
+      plan: {
+        placements: [
+          {
+            id: 'PL-1',
+            consignmentId: 'C1',
+            pileTypeId: 'A',
+            tier: 0,
+            x: 'left',
+          },
+        ],
+      },
     });
 
     expect(messages(parseAppState(source))).toEqual([
@@ -459,7 +471,18 @@ describe('parseAppState — job and plan entries', () => {
 
   it('treats a missing flipped flag as not flipped', () => {
     const source = withParts({
-      plan: {placements: [{id: 'PL-1', pileTypeId: 'A', tier: 0, x: 0, y: 0}]},
+      plan: {
+        placements: [
+          {
+            id: 'PL-1',
+            consignmentId: 'C1',
+            pileTypeId: 'A',
+            tier: 0,
+            x: 0,
+            y: 0,
+          },
+        ],
+      },
     });
     const result = parseAppState(source);
 

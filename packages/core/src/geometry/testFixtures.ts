@@ -61,6 +61,7 @@ export function place(
     type,
     placement: {
       id: `${type.id}-1`,
+      consignmentId: 'C1',
       pileTypeId: type.id,
       tier: 0,
       x: 0,

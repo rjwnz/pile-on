@@ -11,11 +11,17 @@ does not do, and the phased plan this repo is being built against.
 
 ## Status
 
-Usable: the pile-type and vehicle catalogues, and the piling schedule — manual
-entry and CSV import for all three, plus JSON export/import of a whole session.
-The domain model, the helix separation rule and the NZ VDAM ruleset are
-implemented and tested. **The packer is not written yet** — nothing produces a
-load plan, so there is no plan view and no truck count.
+Usable end to end: the pile-type and vehicle catalogues, the piling schedule,
+and a loading plan you can look at — exploded per-tier top-down drawings and an
+isometric view of each truck, with the load checked against the NZ limits.
+
+**The packer is not written yet.** What builds the plan today is
+`arrangeNaively`, the deliberately dumb *control* from the project plan: every
+pile is a cylinder of its widest diameter for its whole length, each tier goes
+to one pile type, nothing is staggered or flipped. It exists to give the view
+something real to draw and to be the number the helix-aware packer has to beat.
+The tier drawings show the waste plainly — every helix plate lines up across
+every lane, and closing those up is the whole opportunity.
 
 Single phase only. Splitting a delivery across phases, and shipping early into
 storage, are deferred; the schedule is a quantity per pile type, and phase will

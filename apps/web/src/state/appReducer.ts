@@ -3,8 +3,10 @@ import {
   removeById,
   setJobQuantity,
   upsertById,
+  EMPTY_PLAN,
   type AppState,
   type JobLine,
+  type LoadPlan,
   type PileType,
   type Vehicle,
 } from '@pile-on/core';
@@ -43,6 +45,8 @@ export type AppAction =
       readonly replace: boolean;
     }
   | {readonly type: 'clearJob'}
+  | {readonly type: 'setPlan'; readonly plan: LoadPlan}
+  | {readonly type: 'clearPlan'}
   | {readonly type: 'replaceState'; readonly state: AppState};
 
 function mergeAll<T extends {readonly id: string}>(
@@ -153,6 +157,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'clearJob':
       return {...state, job: {...state.job, lines: []}};
+
+    case 'setPlan':
+      return {...state, plan: action.plan};
+
+    case 'clearPlan':
+      return {...state, plan: EMPTY_PLAN};
 
     case 'replaceState':
       return action.state;

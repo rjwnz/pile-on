@@ -22,8 +22,11 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  *     `placement.pileId` to `placement.pileTypeId` plus its own `id`. Version 2
  *     files read cleanly: they have no job, and in practice no placements
  *     either, since nothing produced them.
+ * 4 — placements gained `consignmentId`; without it a plan cannot say which
+ *     truck a pile rides on. No version 3 file has placements either, since
+ *     the arranger did not exist yet.
  */
-export const STATE_FORMAT_VERSION = 3;
+export const STATE_FORMAT_VERSION = 4;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -210,23 +213,26 @@ function parseConsignment(value: unknown, log: IssueLog): Consignment | null {
 }
 
 /**
- * A version 2 placement carried `pileId` and no `id`. Those are dropped with an
- * issue rather than guessed at — but in practice no version 2 file has any,
- * because nothing produced placements before the packer.
+ * Placements before version 4 lacked `consignmentId` (and before version 3
+ * carried `pileId` instead of `pileTypeId`). Those are dropped with an issue
+ * rather than guessed at — in practice no such file has any, because nothing
+ * produced placements before the arranger.
  */
 function parsePlacement(value: unknown, log: IssueLog): Placement | null {
   if (!isRecord(value)) {
     log.add('', 'must be an object');
     return null;
   }
-  const {id, pileTypeId, tier, x, y, flipped} = value;
+  const {id, consignmentId, pileTypeId, tier, x, y, flipped} = value;
   if (
     typeof id !== 'string' ||
     !id ||
+    typeof consignmentId !== 'string' ||
+    !consignmentId ||
     typeof pileTypeId !== 'string' ||
     !pileTypeId
   ) {
-    log.add('', 'needs a non-empty id and pileTypeId');
+    log.add('', 'needs a non-empty id, consignmentId and pileTypeId');
     return null;
   }
   if (
@@ -237,7 +243,7 @@ function parsePlacement(value: unknown, log: IssueLog): Placement | null {
     log.add('', 'tier, x and y must be numbers');
     return null;
   }
-  return {id, pileTypeId, tier, x, y, flipped: flipped === true};
+  return {id, consignmentId, pileTypeId, tier, x, y, flipped: flipped === true};
 }
 
 /**

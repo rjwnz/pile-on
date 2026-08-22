@@ -30,16 +30,32 @@ id,name,length,shaft_radius,mass,helix1_offset,helix1_radius,helix1_thickness
 SP139-S4,SP139 4.5 m single helix,4500,70,96,350,175,90
 ```
 
-**Vehicles.** Axles go in one packed column — a nine-axle B-train would need 36
-columns laid flat, and there are only ever a handful of vehicles.
+**Vehicles.** A deck and a mass limit — no axle data.
 
 ```
-axles = position:tyre:set[:steer] | …
-0:SL:steer:steer|3550:T:drive|4870:T:drive|10100:T:tri
+id,name,kind,deck_length,deck_width,deck_height,tare,max_gross
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000
 ```
 
-Position is millimetres from the front; tyre class is `S`/`SL`/`SM`/`T`; axles
-sharing a set name are one group for the VDAM axle-set limits.
+`kind` is one of `rigid`, `semi_trailer`, `full_trailer`, `simple_trailer`,
+`b_train`.
+
+### Why there are no axle limits
+
+Axle positions, tyre classes and the VDAM bridge formula were modelled and then
+removed. In this operation the total payload limit is always reached before any
+individual axle or axle-set limit, so the axle model cost real complexity —
+including a deck-origin-to-axle coordinate mapping needed for the statics — to
+enforce a constraint that never binds. **`maxGross − tare` is the mass
+constraint.**
+
+Even distribution is still required. It is a load-balance question — centroid
+against the deck centre and the centreline — and does not need axle geometry.
+
+If the assumption stops holding (much heavier piles, shorter-wheelbase units),
+the limits come back as a new `VdamRuleset` version, not as an edit to the
+current one. The tables are in
+[docs/00-problem-analysis.md](docs/00-problem-analysis.md).
 
 ### Session files
 

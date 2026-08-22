@@ -12,8 +12,11 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
 /**
  * Bump when a change to the shape cannot be read by the previous reader.
  * Adding an optional field does not need a bump; renaming or removing does.
+ *
+ * 2 — dropped `vehicle.axles`. Version 1 files still read cleanly: the axle
+ *     data is simply ignored, and nothing else about the shape changed.
  */
-export const STATE_FORMAT_VERSION = 1;
+export const STATE_FORMAT_VERSION = 2;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -127,17 +130,10 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     log.add('', 'must be an object');
     return null;
   }
-  const {
-    id,
-    name,
-    kind,
-    deckLength,
-    deckWidth,
-    deckHeight,
-    tare,
-    maxGross,
-    axles,
-  } = value;
+  // A version 1 file also carries `axles`. It is read and discarded — payload
+  // capacity is the mass constraint now, so there is nothing to migrate.
+  const {id, name, kind, deckLength, deckWidth, deckHeight, tare, maxGross} =
+    value;
   if (typeof id !== 'string' || !id) {
     log.add('id', 'must be a non-empty string');
     return null;
@@ -153,27 +149,6 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     return null;
   }
 
-  const axleList = Array.isArray(axles) ? axles : [];
-  const parsedAxles = axleList.flatMap(axle => {
-    if (
-      !isRecord(axle) ||
-      typeof axle['xFromFront'] !== 'number' ||
-      typeof axle['tyreClass'] !== 'string' ||
-      typeof axle['setId'] !== 'string'
-    ) {
-      log.add('axles', 'each axle needs xFromFront, tyreClass and setId');
-      return [];
-    }
-    return [
-      {
-        xFromFront: axle['xFromFront'],
-        tyreClass: axle['tyreClass'] as Vehicle['axles'][number]['tyreClass'],
-        setId: axle['setId'],
-        steering: axle['steering'] === true,
-      },
-    ];
-  });
-
   return {
     id,
     name: typeof name === 'string' && name ? name : id,
@@ -183,7 +158,6 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     deckHeight,
     tare,
     maxGross,
-    axles: parsedAxles,
   };
 }
 

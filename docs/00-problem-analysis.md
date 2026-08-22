@@ -88,13 +88,13 @@ that waste is your business case — see the baseline milestone in §7.
 
 ### 1.2 The other three sub-problems
 
-- **Weight distribution** is a *linear* function of the layout. Once longitudinal positions are
-  fixed, axle-group reactions come from simple statics (sum of moments about the axle groups). So
-  axle compliance is cheap to evaluate and can be posted as linear constraints or scored as a
-  penalty. This is the well-studied *Container Loading Problem with Axle Weight constraints*
-  (SCLPAW).
+- **Weight distribution** is a *linear* function of the layout, so it is cheap either way. The
+  literature here is the *Container Loading Problem with Axle Weight constraints* (SCLPAW), which
+  computes axle-group reactions by statics. **We do not need it** — see the scoping note in §2 —
+  but the same linearity makes the reduced problem trivial: total mass is a sum, and the centroid
+  is a weighted mean, both recomputable on every edit.
 - **Multi-truck assignment** is heterogeneous bin packing / set partitioning over a fleet with
-  different deck sizes, tare masses, axle configurations and costs.
+  different deck sizes, tare masses, payload capacities and costs.
 - **Multi-phase with early shipment + storage** is a *multi-period* variant: each pile has a
   required-by phase `p` and may ship in any phase `q ≤ p` at a storage cost. This is lot-sizing
   bolted onto bin packing — an extra dimension on the assignment problem, not a new problem.
@@ -111,11 +111,20 @@ that waste is your business case — see the baseline milestone in §7.
 - Total loaded height ≤ 4.3 m including deck height
 
 ### Mass
-- Individual axle limits, axle-set limits, combined axle-set (bridge formula) limits
-- GVM / GCM / brake code mass (manufacturer ratings — often bind before legal limits)
-- ≥ 20% of vehicle mass on front axles
-- Trailer:truck gross mass ratio ≤ 1.5
-- Lateral balance (left/right) — not legally specified but a hard operational requirement
+
+> **Scoped out, 2026-08-22.** Axle limits are *not modelled*. The business
+> confirmed the total payload limit is always reached first, so `maxGross − tare`
+> is the whole mass constraint. The axle tables below stay here as reference for
+> the day that stops being true — see §3.2. What was removed: individual axle,
+> axle-set and bridge-formula limits, the 20% front-axle rule, tyre classes, and
+> the deck-origin-to-axle mapping the statics needed.
+
+- GVM / GCM (manufacturer ratings — the binding figure, alongside the 44 t
+  general-access route limit)
+- Trailer:truck gross mass ratio ≤ 1.5 *(not yet modelled — needs multi-unit
+  combinations, which the single-deck `Vehicle` does not yet represent)*
+- Longitudinal and lateral balance — not legally specified, but a hard
+  operational requirement, and answerable from the load centroid alone
 
 ### Stability
 - SRT ≥ 0.35g for NC trucks > 12 t GVM; TD trailers > 10 t GVM with load height > 2.8 m must be
@@ -160,7 +169,11 @@ underrun system is required if that overhang exceeds 1 m. Any load overhanging >
 > 200 mm to either side needs a 400 × 300 mm flag or hazard panel by day and specified red/white
 lamps by night.
 
-### 3.2 Mass
+### 3.2 Mass — reference only, not implemented
+
+*These tables are not in the code.* Axle limits were scoped out (see §2); they are recorded here
+so that reinstating them is a lookup rather than a fresh research exercise.
+
 
 Individual axles (Class 1 roads), kg — S = single standard tyre, SL = large, SM = mega, T = twin:
 
@@ -265,7 +278,8 @@ feasibility predicate, not a research project — the difficulty is in the *sear
 
 **Solvers usable from a static site**: `highs-js` (HiGHS compiled to WASM — good, actively
 maintained, MILP/LP) is the realistic option if you want an exact component. OR-Tools CP-SAT has no
-official WASM build. `javascript-lp-solver` is fine for the tiny axle-balance LP only.
+official WASM build. `javascript-lp-solver` would do for a small LP, though with axle constraints gone there is
+no longer an obvious one to solve.
 
 **Recommendation: build.** The differentiator — helix-aware staggering, NZ VDAM compliance, phased
 delivery with storage, and a quote-ready drawing — is exactly the part you cannot buy. But
@@ -300,7 +314,7 @@ src/
     lanes/       lane pattern generation + staggering
     assign/      truck/fleet assignment, multi-phase
     improve/     LNS / simulated annealing
-    evaluate/    axle statics, CG, cost model, objective weights
+    evaluate/    total mass, centroid/balance, cost model, objective weights
   validate/      one pure function: Plan -> Violation[]   (used by solver AND manual edits)
   render/        svg-topdown, svg-isometric, svg-loadchart
   ui/
@@ -309,15 +323,15 @@ src/
 **The single most important design decision:** `validate(plan) -> Violation[]` is a pure function
 that the optimiser and the manual editor both call. Never let the optimiser and the UI disagree
 about what's legal. Every violation carries a human-readable reason and a reference to the rule
-(`"VDAM tri-axle set 2.4–2.49 m spacing: 17 500 kg limit, actual 17 940 kg"`). That single function
+(`"SEMI-45 payload 28 200 kg, load is 29 140 kg"`). That single function
 is what makes the tool trustworthy for quoting.
 
 ### Algorithm, in the order I'd build it
 
 1. **Construct** — sort piles (longest/heaviest first), generate lane patterns per tier, place
    greedily with the conditional-separation predicate. Try both flips.
-2. **Repair weight** — with positions fixed, solve/greedily shuffle for axle compliance and lateral
-   balance. Linear, cheap.
+2. **Repair weight** — with positions fixed, shuffle for total-mass compliance and for balance
+   (centroid near the deck centre and the centreline). Linear, cheap.
 3. **Improve** — Large Neighbourhood Search: rip out a random tier / lane / truck and re-insert.
    Accept by weighted objective. Time-boxed to ~2 s so quoting stays interactive.
 4. **Assign across trucks & phases** — outer loop over the fleet, with infeasibility from steps 1–3
@@ -325,7 +339,7 @@ is what makes the tool trustworthy for quoting.
 
 Objective as an explicit weight vector so the UI's "minimise volume / minimise weight / best
 packing" toggles are just presets over the same function:
-`cost = w1·truckCost + w2·overdimensionPenalty + w3·tierCount + w4·axleImbalance + w5·storageCost`.
+`cost = w1·truckCost + w2·overdimensionPenalty + w3·tierCount + w4·loadImbalance + w5·storageCost`.
 
 ---
 
@@ -340,9 +354,9 @@ good. Nail down the clearance rules (see the open questions in §8). Build the p
 and the fleet catalogue as data. *Deliverable: `data/` + `fixtures/`.*
 
 **Phase 1 — Model, validate, visualise. No optimiser.**
-Domain types, VDAM ruleset, `validate()`, axle/CG calculator, manual drag-and-drop layout editor,
+Domain types, VDAM ruleset, `validate()`, mass and centroid calculator, manual layout editor,
 both SVG views, CSV import. *Deliverable: a tool that checks a plan a human made.* This alone is
-worth shipping — it catches overloaded axles today.
+worth shipping — it catches an over-payload or unbalanced load today.
 
 **Phase 2 — Baseline packer (the control).**
 Bounding-box lane packing, no helix intelligence. Run it over the Phase 0 fixtures and record
@@ -382,6 +396,7 @@ diagrams, chain/chock/dunnage schedule, permit and travel-time flags.
 | Regulatory change invalidates saved quotes | Versioned ruleset data files; stamp version on every quote (§3.4) |
 | Solver too slow in-browser | Web Worker + hard time box + always return the best-so-far |
 | Overdimension/HPMV regimes conflated | Encode the divisible/indivisible distinction explicitly (§3.3) — getting this wrong produces unquotable plans |
+| The "payload always binds before axles" assumption stops holding | The axle tables stay documented in §3.2; reinstating them means a new ruleset version, not an edit to the current one |
 
 ---
 

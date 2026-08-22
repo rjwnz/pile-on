@@ -31,10 +31,6 @@ const VEHICLE: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  axles: [
-    {xFromFront: 0, tyreClass: 'SL', setId: 'steer', steering: true},
-    {xFromFront: 3550, tyreClass: 'T', setId: 'drive', steering: false},
-  ],
 };
 
 const POPULATED: AppState = {
@@ -94,7 +90,7 @@ describe('parseAppState', () => {
     const future = JSON.stringify({...POPULATED, formatVersion: 99});
 
     expect(messages(parseAppState(future))).toContain(
-      'formatVersion: is 99, but this build only reads up to 1. Update Pile-On.',
+      `formatVersion: is 99, but this build only reads up to ${STATE_FORMAT_VERSION}. Update Pile-On.`,
     );
   });
 
@@ -270,27 +266,6 @@ describe('parseAppState — malformed entries', () => {
     ]);
   });
 
-  it('rejects a malformed axle', () => {
-    const source = raw({
-      pileTypes: [],
-      vehicles: [
-        {
-          id: 'V',
-          deckLength: 7200,
-          deckWidth: 2450,
-          deckHeight: 1200,
-          tare: 10600,
-          maxGross: 30000,
-          axles: [{xFromFront: 0, tyreClass: 'SL'}],
-        },
-      ],
-    });
-
-    expect(messages(parseAppState(source))).toEqual([
-      'catalogue / vehicles[0] / axles: each axle needs xFromFront, tyreClass and setId',
-    ]);
-  });
-
   it('defaults a missing name to the id and a missing kind to rigid', () => {
     const source = raw({
       pileTypes: [{id: 'X', length: 6000, shaftRadius: 84, mass: 178}],
@@ -310,30 +285,71 @@ describe('parseAppState — malformed entries', () => {
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.catalogue.pileTypes[0]!.name).toBe('X');
     expect(result.ok && result.value.catalogue.vehicles[0]!.kind).toBe('rigid');
-    expect(result.ok && result.value.catalogue.vehicles[0]!.axles).toEqual([]);
   });
+});
 
-  it('keeps a steering flag through a round trip', () => {
-    const source = raw({
+describe('reading a version 1 file', () => {
+  /*
+   * Version 1 carried `vehicle.axles`. Version 2 dropped it. Old saved
+   * sessions must still open — this is the whole point of stamping a format
+   * version, so it gets a test rather than an assumption.
+   */
+  const V1 = JSON.stringify({
+    formatVersion: 1,
+    savedAt: '2026-08-01T00:00:00.000Z',
+    rulesetVersion: 'nz-vdam-2016',
+    catalogue: {
       pileTypes: [],
       vehicles: [
         {
-          id: 'V',
-          deckLength: 7200,
+          id: 'SEMI-45',
+          name: 'Semi',
+          kind: 'semi_trailer',
+          deckLength: 12500,
           deckWidth: 2450,
-          deckHeight: 1200,
-          tare: 10600,
-          maxGross: 30000,
+          deckHeight: 1350,
+          tare: 15800,
+          maxGross: 44000,
           axles: [
             {xFromFront: 0, tyreClass: 'SL', setId: 'steer', steering: true},
+            {xFromFront: 3550, tyreClass: 'T', setId: 'drive', steering: false},
           ],
         },
       ],
+    },
+    plan: {piles: [], consignments: [], placements: []},
+  });
+
+  it('opens without complaint', () => {
+    expect(parseAppState(V1).ok).toBe(true);
+  });
+
+  it('keeps the deck and mass figures', () => {
+    const result = parseAppState(V1);
+
+    expect(result.ok && result.value.catalogue.vehicles[0]).toEqual({
+      id: 'SEMI-45',
+      name: 'Semi',
+      kind: 'semi_trailer',
+      deckLength: 12500,
+      deckWidth: 2450,
+      deckHeight: 1350,
+      tare: 15800,
+      maxGross: 44000,
     });
-    const result = parseAppState(source);
+  });
+
+  it('drops the axle data rather than carrying it as dead weight', () => {
+    const result = parseAppState(V1);
 
     expect(
-      result.ok && result.value.catalogue.vehicles[0]!.axles[0]!.steering,
-    ).toBe(true);
+      result.ok && Object.keys(result.value.catalogue.vehicles[0]!),
+    ).not.toContain('axles');
+  });
+
+  it('is re-saved at the current format version', () => {
+    const result = parseAppState(V1);
+
+    expect(result.ok && result.value.formatVersion).toBe(STATE_FORMAT_VERSION);
   });
 });

@@ -30,10 +30,6 @@ const VEHICLE: Vehicle = {
   deckHeight: 1200,
   tare: 10600,
   maxGross: 30000,
-  axles: [
-    {xFromFront: 0, tyreClass: 'SL', setId: 'steer', steering: true},
-    {xFromFront: 4900, tyreClass: 'T', setId: 'drive', steering: false},
-  ],
 };
 
 /** Current session: catalogue A + V, and a plan that depends on both. */

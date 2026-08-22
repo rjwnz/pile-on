@@ -1,16 +1,5 @@
 import type {Kilograms, Millimetres} from '../units';
 
-/** Tyre classes from VDAM factsheet 13 — they set the per-axle mass limit. */
-export const TYRE_CLASSES = ['S', 'SL', 'SM', 'T'] as const;
-export type TyreClass = (typeof TYRE_CLASSES)[number];
-
-export const TYRE_CLASS_LABELS: Readonly<Record<TyreClass, string>> = {
-  S: 'Single standard (<355 mm)',
-  SL: 'Single large (355–443 mm)',
-  SM: 'Single mega (444 mm+)',
-  T: 'Twin',
-};
-
 export const VEHICLE_KINDS = [
   'rigid',
   'semi_trailer',
@@ -29,21 +18,18 @@ export const VEHICLE_KIND_LABELS: Readonly<Record<VehicleKind, string>> = {
 };
 
 /**
- * One axle.
+ * A deck to load, and the mass it may carry.
  *
- * Positions and tyre classes are held per axle rather than as a single payload
- * figure because that is what the limits are actually written against: the
- * axle-set and combined axle-set tables are functions of spacing and tyre
- * class, and that is where a load fails in practice.
+ * Deliberately no axles. In this operation the total payload limit is always
+ * reached before any individual axle or axle-set limit, so modelling axle
+ * positions, tyre classes and the VDAM bridge formula bought complexity — and a
+ * deck-origin-to-axle coordinate mapping — for a constraint that never binds.
+ * Mass compliance is `payloadCapacity`, and nothing else.
+ *
+ * Even distribution is still required, but that is a load-balance question
+ * (centroid against the deck centre and the centreline) and does not need axle
+ * geometry to answer.
  */
-export interface Axle {
-  readonly xFromFront: Millimetres;
-  readonly tyreClass: TyreClass;
-  /** Axles sharing a set id are treated as one group for the set limits. */
-  readonly setId: string;
-  readonly steering: boolean;
-}
-
 export interface Vehicle {
   readonly id: string;
   readonly name: string;
@@ -55,7 +41,6 @@ export interface Vehicle {
   readonly tare: Kilograms;
   /** GVM for a rigid, GCM for a combination. */
   readonly maxGross: Kilograms;
-  readonly axles: readonly Axle[];
 }
 
 /** Mass available for piles, dunnage and restraint. */
@@ -63,24 +48,7 @@ export function payloadCapacity(vehicle: Vehicle): Kilograms {
   return vehicle.maxGross - vehicle.tare;
 }
 
-/** Distinct axle set ids, in the order the axles appear along the vehicle. */
-export function axleSetIds(vehicle: Vehicle): string[] {
-  const seen = new Set<string>();
-  const order: string[] = [];
-  for (const axle of vehicle.axles) {
-    if (!seen.has(axle.setId)) {
-      seen.add(axle.setId);
-      order.push(axle.setId);
-    }
-  }
-  return order;
-}
-
-/** Distance from the foremost to the rearmost axle — the bridge-formula span. */
-export function axleSpan(vehicle: Vehicle): Millimetres {
-  if (vehicle.axles.length < 2) {
-    return 0;
-  }
-  const positions = vehicle.axles.map(axle => axle.xFromFront);
-  return Math.max(...positions) - Math.min(...positions);
+/** Usable deck area, in square millimetres. */
+export function deckArea(vehicle: Vehicle): number {
+  return vehicle.deckLength * vehicle.deckWidth;
 }

@@ -65,9 +65,9 @@ describe('IssueLog', () => {
 
   it('nests child prefixes', () => {
     const root = new IssueLog();
-    root.child('vehicles[0]').child('axles').add('axle 2', 'is wrong');
+    root.child('pileTypes[0]').child('helices').add('plate 2', 'is wrong');
 
-    expect(root.all[0]!.path).toBe('vehicles[0] / axles / axle 2');
+    expect(root.all[0]!.path).toBe('pileTypes[0] / helices / plate 2');
   });
 
   it('accepts a batch of issues from elsewhere', () => {

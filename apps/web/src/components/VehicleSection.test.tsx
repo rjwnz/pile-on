@@ -14,12 +14,6 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  axles: [
-    {xFromFront: 0, tyreClass: 'SL', setId: 'steer', steering: true},
-    {xFromFront: 3550, tyreClass: 'T', setId: 'drive', steering: false},
-    {xFromFront: 4870, tyreClass: 'T', setId: 'drive', steering: false},
-    {xFromFront: 10100, tyreClass: 'T', setId: 'tri', steering: false},
-  ],
 };
 
 function renderWith(vehicles: Vehicle[] = []) {
@@ -37,30 +31,36 @@ function renderWith(vehicles: Vehicle[] = []) {
 beforeEach(() => localStorage.clear());
 
 describe('VehicleSection', () => {
-  it('lists a vehicle with its derived payload and axle span', () => {
+  it('lists a vehicle with its deck and derived payload', () => {
     renderWith([SEMI]);
 
     const row = screen.getByRole('row', {name: /SEMI-45/});
     expect(within(row).getByText('Semi-trailer')).toBeInTheDocument();
     expect(within(row).getByText('12.50 × 2.45 m')).toBeInTheDocument();
+    expect(within(row).getByText('15,800 kg')).toBeInTheDocument();
     expect(within(row).getByText('28,200 kg')).toBeInTheDocument();
-    expect(within(row).getByText('10.10 m')).toBeInTheDocument();
+  });
+
+  it('does not flag a permit at exactly the general-access gross mass', () => {
+    renderWith([SEMI]);
+
+    expect(screen.queryByText(/HPMV permit/)).not.toBeInTheDocument();
+  });
+
+  it('flags an HPMV permit above the general-access gross mass', () => {
+    renderWith([{...SEMI, maxGross: 50000}]);
+
     expect(
-      within(row).getByText('steer, drive, tri (4 axles)'),
+      screen.getByText(/HPMV permit — over 44,000 kg gross/),
     ).toBeInTheDocument();
   });
 
-  it('warns when the bridge formula caps the vehicle below its rated gross', () => {
-    // 10.1 m span with 4 axles caps at 34,000 kg, below the stated 44,000.
-    renderWith([SEMI]);
+  it('flags a deck that breaks the height limit before anything is loaded', () => {
+    renderWith([{...SEMI, deckHeight: 4400}]);
 
-    expect(screen.getByText('bridge limit 34,000 kg')).toBeInTheDocument();
-  });
-
-  it('does not warn when the rated gross is the binding figure', () => {
-    renderWith([{...SEMI, maxGross: 30000}]);
-
-    expect(screen.queryByText(/bridge limit/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/over the 4.3 m limit before any load/),
+    ).toBeInTheDocument();
   });
 
   it('adds a vehicle through the form', async () => {
@@ -73,7 +73,6 @@ describe('VehicleSection', () => {
     await user.type(screen.getByLabelText(/^Deck height/), '1200');
     await user.type(screen.getByLabelText(/^Tare/), '10600');
     await user.type(screen.getByLabelText(/^Max gross/), '30000');
-    await user.type(screen.getByLabelText(/Axle 2 position/), '4900');
 
     expect(screen.getByText(/Payload capacity/)).toHaveTextContent('19,400 kg');
 
@@ -94,7 +93,6 @@ describe('VehicleSection', () => {
     await user.type(screen.getByLabelText(/^Deck height/), '1200');
     await user.type(screen.getByLabelText(/^Tare/), '30000');
     await user.type(screen.getByLabelText(/^Max gross/), '20000');
-    await user.type(screen.getByLabelText(/Axle 2 position/), '4900');
     await user.click(screen.getByRole('button', {name: 'Add vehicle'}));
 
     expect(screen.getByRole('alert')).toHaveTextContent(

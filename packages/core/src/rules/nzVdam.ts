@@ -10,30 +10,26 @@ import type {Kilograms, Millimetres} from '../units';
  * quote can still be explained after the rules change. Add a new version
  * alongside the old one rather than editing in place.
  *
+ * Axle and axle-set limits, and the combined axle-set ("bridge formula") table,
+ * are deliberately absent. A vehicle's total payload limit is always reached
+ * first in this operation, so carrying those limits meant modelling axle
+ * positions and tyre classes for a constraint that never binds. If that
+ * assumption ever stops holding — much heavier piles, or shorter-wheelbase
+ * units — they come back here, as a new ruleset version.
+ *
  * Sources:
  *   NZTA factsheet 13  — Vehicle dimensions and mass (May 2021)
  *   NZTA factsheet 53a — Overdimension vehicles and loads (Feb 2017)
  */
-
-export interface BridgeFormulaBand {
-  /** Inclusive lower bound on the distance from first to last axle centre. */
-  readonly fromSpan: Millimetres;
-  /** Minimum number of axles required to claim this band. */
-  readonly minAxles: number;
-  readonly limit: Kilograms;
-}
 
 export interface VdamRuleset {
   readonly version: string;
   readonly effectiveFrom: string;
   readonly maxWidth: Millimetres;
   readonly maxHeight: Millimetres;
-  /** Shortest span the combined axle-set table applies to. */
-  readonly bridgeFormulaMinSpan: Millimetres;
-  readonly bridgeFormula: readonly BridgeFormulaBand[];
-  /** Minimum share of total axle mass that must sit on the front axles. */
-  readonly minFrontAxleMassShare: number;
-  /** Gross mass of towed vehicle / gross mass of towing vehicle. */
+  /** Gross mass ceiling on an unrestricted Class 1 route. */
+  readonly maxGrossMass: Kilograms;
+  /** Gross mass of the towed vehicle over gross mass of the towing vehicle. */
   readonly maxTrailerToTruckMassRatio: number;
   /** Minimum static roll threshold, in g. */
   readonly minStaticRollThreshold: number;
@@ -47,71 +43,12 @@ export const NZ_VDAM_2016: VdamRuleset = Object.freeze({
 
   maxWidth: 2550,
   maxHeight: 4300,
+  maxGrossMass: 44000,
 
-  bridgeFormulaMinSpan: 1800,
-  bridgeFormula: Object.freeze([
-    {fromSpan: 1800, minAxles: 2, limit: 15500},
-    {fromSpan: 2500, minAxles: 2, limit: 17500},
-    {fromSpan: 3000, minAxles: 2, limit: 19000},
-    {fromSpan: 3300, minAxles: 2, limit: 20000},
-    {fromSpan: 3600, minAxles: 2, limit: 21000},
-    {fromSpan: 4000, minAxles: 2, limit: 22000},
-    {fromSpan: 4400, minAxles: 2, limit: 23000},
-    {fromSpan: 4700, minAxles: 2, limit: 24000},
-    {fromSpan: 5100, minAxles: 2, limit: 25000},
-    {fromSpan: 5400, minAxles: 2, limit: 26000},
-    {fromSpan: 5800, minAxles: 2, limit: 27000},
-    {fromSpan: 6400, minAxles: 2, limit: 28000},
-    {fromSpan: 7000, minAxles: 2, limit: 29000},
-    {fromSpan: 7600, minAxles: 2, limit: 30000},
-    {fromSpan: 8200, minAxles: 2, limit: 31000},
-    {fromSpan: 8800, minAxles: 2, limit: 32000},
-    {fromSpan: 9400, minAxles: 2, limit: 33000},
-    {fromSpan: 10000, minAxles: 2, limit: 34000},
-    {fromSpan: 10800, minAxles: 2, limit: 35000},
-    {fromSpan: 11600, minAxles: 2, limit: 36000},
-    {fromSpan: 12000, minAxles: 2, limit: 37000},
-    {fromSpan: 12500, minAxles: 2, limit: 38000},
-    {fromSpan: 13200, minAxles: 2, limit: 39000},
-    {fromSpan: 14000, minAxles: 2, limit: 40000},
-    {fromSpan: 14800, minAxles: 2, limit: 41000},
-    {fromSpan: 15200, minAxles: 2, limit: 42000},
-    {fromSpan: 15600, minAxles: 2, limit: 43000},
-    {fromSpan: 16000, minAxles: 2, limit: 44000},
-    {fromSpan: 16800, minAxles: 7, limit: 45000},
-    {fromSpan: 17400, minAxles: 8, limit: 46000},
-  ]),
-
-  minFrontAxleMassShare: 0.2,
   maxTrailerToTruckMassRatio: 1.5,
   minStaticRollThreshold: 0.35,
   trailerSrtCertificationHeight: 2800,
 });
-
-/**
- * Combined axle-set ("bridge formula") mass limit for a span.
- *
- * Returns `null` below 1.8 m, where the table does not apply and the individual
- * axle and axle-set limits govern instead. Callers must handle `null` rather
- * than treating it as unlimited.
- */
-export function bridgeFormulaLimit(
-  span: Millimetres,
-  axleCount: number,
-  ruleset: VdamRuleset = NZ_VDAM_2016,
-): Kilograms | null {
-  if (span < ruleset.bridgeFormulaMinSpan) {
-    return null;
-  }
-
-  let limit: Kilograms | null = null;
-  for (const band of ruleset.bridgeFormula) {
-    if (span >= band.fromSpan && axleCount >= band.minAxles) {
-      limit = Math.max(limit ?? 0, band.limit);
-    }
-  }
-  return limit;
-}
 
 /** Whether a loaded width is within general access, before any permit. */
 export function isOverWidth(
@@ -127,6 +64,19 @@ export function isOverHeight(
   ruleset: VdamRuleset = NZ_VDAM_2016,
 ): boolean {
   return height > ruleset.maxHeight;
+}
+
+/**
+ * Whether a gross mass is above general access and so needs an HPMV permit.
+ *
+ * Note this is the *route* limit. A vehicle's own rated gross mass may be lower,
+ * and the binding figure is whichever is smaller — see `payloadCapacity`.
+ */
+export function isOverGrossMass(
+  mass: Kilograms,
+  ruleset: VdamRuleset = NZ_VDAM_2016,
+): boolean {
+  return mass > ruleset.maxGrossMass;
 }
 
 /**

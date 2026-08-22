@@ -20,7 +20,8 @@
     "fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage"
+    "check": "pnpm typecheck && pnpm lint && pnpm test:coverage",
+    "bench": "tsx scripts/bench.ts"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
@@ -31,6 +32,7 @@
     "jest": "^30.4.2",
     "prettier": "^3.6.2",
     "ts-jest": "^29.4.12",
+    "tsx": "^4.23.12",
     "typescript": "5.9.3"
   }
 }

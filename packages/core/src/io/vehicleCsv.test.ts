@@ -31,6 +31,9 @@ describe('parseVehicleRows', () => {
       deckHeight: 1350,
       tare: 15800,
       maxGross: 44000,
+      maxFrontOverhang: 0,
+      maxRearOverhang: 0,
+      balanceTarget: null,
     });
   });
 
@@ -117,5 +120,47 @@ describe('parseVehicleEntry', () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.issues[0]!.path).toBe('id');
+  });
+});
+
+describe('the loading columns', () => {
+  it('reads overhang allowances and a stated balance target', () => {
+    const result = parseVehicleEntry({
+      ...GOOD,
+      max_front_overhang: '300',
+      max_rear_overhang: '1200',
+      balance_target: '5400',
+    });
+
+    expect(result.ok && result.value.maxFrontOverhang).toBe(300);
+    expect(result.ok && result.value.maxRearOverhang).toBe(1200);
+    expect(result.ok && result.value.balanceTarget).toBe(5400);
+  });
+
+  it('takes a sheet written before they existed at its conservative word', () => {
+    // No overhang either end, and no opinion about where the load should sit.
+    const result = parseVehicleEntry(GOOD);
+
+    expect(result.ok && result.value.maxFrontOverhang).toBe(0);
+    expect(result.ok && result.value.maxRearOverhang).toBe(0);
+    expect(result.ok && result.value.balanceTarget).toBeNull();
+  });
+
+  it('reads a blank balance target as unstated, not as the headboard', () => {
+    const result = parseVehicleEntry({...GOOD, balance_target: '   '});
+
+    expect(result.ok && result.value.balanceTarget).toBeNull();
+  });
+
+  it('rejects a balance target that is not on the deck', () => {
+    expect(
+      messages(parseVehicleRows([{...GOOD, balance_target: '13000'}])),
+    ).toEqual(['row 1 / balance_target: must be at most 12500, got 13000']);
+  });
+
+  it('rejects a negative overhang allowance', () => {
+    expect(
+      messages(parseVehicleRows([{...GOOD, max_rear_overhang: '-100'}])),
+    ).toEqual(['row 1 / max_rear_overhang: must be at least 0, got -100']);
   });
 });

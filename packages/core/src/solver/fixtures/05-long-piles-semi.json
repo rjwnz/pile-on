@@ -1,0 +1,73 @@
+{
+  "formatVersion": 6,
+  "savedAt": "2026-08-22T00:00:00.000Z",
+  "rulesetVersion": "nz-vdam-2016",
+  "options": {
+    "clearances": {
+      "shaftToShaft": 25,
+      "helixToShaft": 25,
+      "helixToHelix": 25
+    },
+    "balance": {
+      "longitudinal": 200,
+      "lateral": 50
+    },
+    "dunnageThickness": 100,
+    "endGap": 100,
+    "sideMargin": 50,
+    "headboardGap": 100,
+    "maxTiers": 4,
+    "ancillaryMassPerTier": 60
+  },
+  "catalogue": {
+    "pileTypes": [
+      {
+        "id": "SP219-D9",
+        "name": "SP219 9.0 m twin helix",
+        "length": 9000,
+        "shaftRadius": 110,
+        "mass": 396,
+        "helices": [
+          {
+            "offsetFromButt": 500,
+            "radius": 300,
+            "length": 140
+          },
+          {
+            "offsetFromButt": 1400,
+            "radius": 250,
+            "length": 140
+          }
+        ]
+      }
+    ],
+    "vehicles": [
+      {
+        "id": "SEMI-45",
+        "name": "Tractor + 4-axle semi",
+        "kind": "semi_trailer",
+        "deckLength": 12500,
+        "deckWidth": 2450,
+        "deckHeight": 1350,
+        "tare": 15800,
+        "maxGross": 44000,
+        "maxFrontOverhang": 0,
+        "maxRearOverhang": 0,
+        "balanceTarget": null
+      }
+    ]
+  },
+  "job": {
+    "name": "Bridge abutment — 9 m piles",
+    "lines": [
+      {
+        "pileTypeId": "SP219-D9",
+        "quantity": 24
+      }
+    ]
+  },
+  "plan": {
+    "consignments": [],
+    "placements": []
+  }
+}

@@ -1,6 +1,12 @@
 import {describe, expect, it} from '@jest/globals';
-import {consignmentMass, loadWidth, validatePlan} from './plan';
-import {DEFAULT_LOADING_OPTIONS} from '../domain/loading';
+import {
+  consignmentMass,
+  consignmentPayload,
+  loadOverhang,
+  loadWidth,
+  validatePlan,
+} from './plan';
+import {DEFAULT_LOADING_OPTIONS, type LoadingOptions} from '../domain/loading';
 import {arrangeNaively} from '../solver/baseline';
 import type {Catalogue, LoadPlan} from '../domain/catalogue';
 import type {Job} from '../domain/job';
@@ -29,10 +35,26 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
+  maxFrontOverhang: 0,
+  maxRearOverhang: 0,
+  balanceTarget: null,
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [SP168], vehicles: [SEMI]};
-const OPTIONS = DEFAULT_LOADING_OPTIONS;
+
+/**
+ * Balance is stood down for the rule-by-rule tests below.
+ *
+ * Nearly all of them place one or two piles to exercise one specific rule, and
+ * a two-pile load on a 12.5 m deck is unbalanced by construction — leaving the
+ * real tolerance on would add an `unbalanced` to every expectation and tell us
+ * nothing about the rule under test. The `balance` block uses the real defaults.
+ */
+const OPTIONS: LoadingOptions = {
+  ...DEFAULT_LOADING_OPTIONS,
+  balance: {longitudinal: 12500, lateral: 2450},
+};
+const STRICT = DEFAULT_LOADING_OPTIONS;
 
 function place(overrides: Partial<Placement> = {}): Placement {
   return {
@@ -59,15 +81,34 @@ function rules(plan: LoadPlan, catalogue = CATALOGUE): string[] {
 }
 
 describe('the arranger and the validator agree', () => {
-  it('accepts everything the naive arranger produces', () => {
+  it('accepts everything the naive arranger produces, balance included', () => {
     const job: Job = {
       name: 'j',
       lines: [{pileTypeId: 'SP168-D6', quantity: 95}],
     };
-    const {plan} = arrangeNaively(job, CATALOGUE, SEMI, OPTIONS);
+    const {plan} = arrangeNaively(job, CATALOGUE, SEMI, STRICT);
 
     expect(plan.consignments.length).toBeGreaterThan(1);
-    expect(validatePlan(plan, CATALOGUE, OPTIONS)).toEqual([]);
+    expect(validatePlan(plan, CATALOGUE, STRICT)).toEqual([]);
+  });
+
+  it('accepts a part-loaded last truck, which is where balance goes wrong', () => {
+    // 95 leaves the third truck 15 of a possible 40 — a full tier and a tier
+    // with five on it. That is the load the arranger has to keep on its feet.
+    const job: Job = {
+      name: 'j',
+      lines: [{pileTypeId: 'SP168-D6', quantity: 95}],
+    };
+    const {plan} = arrangeNaively(job, CATALOGUE, SEMI, STRICT);
+    const last = plan.consignments[plan.consignments.length - 1]!;
+    const onLast = plan.placements.filter(p => p.consignmentId === last.id);
+
+    expect(onLast).toHaveLength(15);
+    expect(
+      validatePlan(plan, CATALOGUE, STRICT).filter(
+        v => v.consignmentId === last.id,
+      ),
+    ).toEqual([]);
   });
 
   it('accepts a lane pitch that is exactly the required separation', () => {
@@ -75,7 +116,7 @@ describe('the arranger and the validator agree', () => {
     // point must not turn "exactly enough" into a clash.
     const plan = planWith([
       place({id: 'a', y: 0}),
-      place({id: 'b', y: 225 + 225 + OPTIONS.clearance}),
+      place({id: 'b', y: 225 + 225 + OPTIONS.clearances.helixToHelix}),
     ]);
 
     expect(rules(plan)).toEqual([]);
@@ -99,10 +140,11 @@ describe('mass', () => {
       v => v.rule === 'over-payload',
     );
 
-    // 200 × 178 = 35,600 against a 28,200 kg payload, so 7,400 kg over.
-    expect(violation!.message).toMatch(/35,600 kg/);
+    // 200 × 178 = 35,600 of pile, plus 60 kg of bearers on each of the 200
+    // tiers, against a 28,200 kg payload.
+    expect(violation!.message).toMatch(/47,600 kg/);
     expect(violation!.message).toMatch(/28,200 kg payload/);
-    expect(violation!.message).toMatch(/by 7,400 kg/);
+    expect(violation!.message).toMatch(/by 19,400 kg/);
   });
 
   it('totals only the piles it can resolve', () => {
@@ -112,6 +154,30 @@ describe('mass', () => {
         CATALOGUE,
       ),
     ).toBe(178);
+  });
+
+  it('charges bearers and lashings once per tier, not once per pile', () => {
+    const twoTiers = [
+      place({id: 'a', tier: 0}),
+      place({id: 'b', tier: 0, y: 600}),
+      place({id: 'c', tier: 1}),
+    ];
+
+    expect(consignmentPayload(twoTiers, CATALOGUE, OPTIONS)).toBe(
+      178 * 3 + 60 * 2,
+    );
+  });
+
+  it('counts a load that only fits with the bearers ignored as over', () => {
+    // 158 piles is 28,124 kg, inside the 28,200 kg payload — until the four
+    // tiers of bearers under them are counted too.
+    const heavy = Array.from({length: 158}, (_, i) =>
+      place({id: `p${i}`, tier: i % 4, y: i * 10}),
+    );
+    const found = validatePlan(planWith(heavy), CATALOGUE, OPTIONS);
+
+    expect(consignmentMass(heavy, CATALOGUE)).toBeLessThan(28200);
+    expect(found.map(v => v.rule)).toContain('over-payload');
   });
 });
 
@@ -154,26 +220,202 @@ describe('width', () => {
   });
 });
 
-describe('deck bounds', () => {
-  it('warns when a pile hangs off the back', () => {
-    const plan = planWith([place({x: 7000})]);
-    const violation = validatePlan(plan, CATALOGUE, OPTIONS)[0];
+describe('the envelope', () => {
+  /** The same semi, but with the yard willing to let a load hang out the back. */
+  const TOLERANT: Vehicle = {...SEMI, id: 'SEMI-OH', maxRearOverhang: 2000};
+  const TOLERANT_CATALOGUE: Catalogue = {
+    pileTypes: [SP168],
+    vehicles: [TOLERANT],
+  };
 
-    expect(violation!.rule).toBe('rear-overhang');
-    expect(violation!.severity).toBe('warning');
+  function onTolerant(placements: Placement[]): LoadPlan {
+    return {
+      consignments: [{id: 'C1', vehicleId: 'SEMI-OH', phase: null}],
+      placements,
+    };
+  }
+
+  it('rejects an overhang on a vehicle set to carry none', () => {
+    const violation = validatePlan(
+      planWith([place({x: 7000})]),
+      CATALOGUE,
+      OPTIONS,
+    )[0];
+
+    expect(violation!.rule).toBe('over-rear-overhang');
+    expect(violation!.severity).toBe('error');
     expect(violation!.message).toContain('500 mm');
   });
 
-  it('mentions flags and lamps once the overhang passes a metre', () => {
-    const plan = planWith([place({x: 8000})]);
+  it('rejects an overhang past what the vehicle allows, and says the allowance', () => {
+    const violation = validatePlan(
+      onTolerant([place({x: 9000})]),
+      TOLERANT_CATALOGUE,
+      OPTIONS,
+    )[0];
 
-    expect(validatePlan(plan, CATALOGUE, OPTIONS)[0]!.message).toContain(
-      'flags by day and lamps at night',
+    expect(violation!.rule).toBe('over-rear-overhang');
+    expect(violation!.message).toContain('2500 mm');
+    expect(violation!.message).toContain('2000 mm allowed');
+  });
+
+  it('only notes an overhang the vehicle is allowed', () => {
+    const violation = validatePlan(
+      onTolerant([place({x: 7000})]),
+      TOLERANT_CATALOGUE,
+      OPTIONS,
+    )[0];
+
+    expect(violation!.rule).toBe('rear-overhang');
+    expect(violation!.severity).toBe('warning');
+  });
+
+  it('mentions flags and lamps once an allowed overhang passes a metre', () => {
+    expect(
+      validatePlan(
+        onTolerant([place({x: 7600})]),
+        TOLERANT_CATALOGUE,
+        OPTIONS,
+      )[0]!.message,
+    ).toContain('flags by day and lamps at night');
+  });
+
+  it('reports an overhang as either an error or a note, never both', () => {
+    const found = validatePlan(
+      planWith([place({x: 7000})]),
+      CATALOGUE,
+      OPTIONS,
     );
+
+    expect(found.filter(v => v.rule.includes('overhang'))).toHaveLength(1);
   });
 
   it('flags a pile placed ahead of the headboard', () => {
     expect(rules(planWith([place({x: -50})]))).toContain('ahead-of-headboard');
+  });
+
+  it('flags a pile that eats into the side margin', () => {
+    // 2450 deck less two 50 mm margins leaves 1175 mm each side of the
+    // centreline; a 225 mm plate at y = 1000 reaches 1225.
+    const violation = validatePlan(
+      planWith([place({y: 1000})]),
+      CATALOGUE,
+      OPTIONS,
+    ).find(v => v.rule === 'outside-side-margin');
+
+    expect(violation!.message).toContain('1225 mm');
+    expect(violation!.message).toContain('1175 mm');
+  });
+
+  it('is happy with a pile just inside the side margin', () => {
+    expect(rules(planWith([place({y: 950})]))).toEqual([]);
+  });
+});
+
+describe('loadOverhang', () => {
+  it('is zero for a load sitting wholly on the deck', () => {
+    expect(loadOverhang([place({x: 100})], CATALOGUE, SEMI)).toEqual({
+      front: 0,
+      rear: 0,
+    });
+  });
+
+  it('measures how far the furthest pile hangs off the back', () => {
+    expect(
+      loadOverhang(
+        [place({id: 'a', x: 100}), place({id: 'b', x: 7000})],
+        CATALOGUE,
+        SEMI,
+      ),
+    ).toEqual({front: 0, rear: 500});
+  });
+
+  it('measures a load pushed out past the headboard', () => {
+    expect(loadOverhang([place({x: -250})], CATALOGUE, SEMI).front).toBe(250);
+  });
+
+  it('ignores piles whose type is not in the catalogue', () => {
+    expect(
+      loadOverhang(
+        [
+          place({id: 'a', x: 100}),
+          place({id: 'b', pileTypeId: 'GHOST', x: 90000}),
+        ],
+        CATALOGUE,
+        SEMI,
+      ),
+    ).toEqual({front: 0, rear: 0});
+  });
+
+  it('agrees with the rule that rejects it', () => {
+    // The metric and the violation have to be reading the same geometry, or a
+    // truck can show a comfortable number beside a red badge.
+    const plan = planWith([place({x: 7000})]);
+    const violation = validatePlan(plan, CATALOGUE, OPTIONS).find(
+      v => v.rule === 'over-rear-overhang',
+    );
+
+    expect(violation!.message).toContain(
+      String(loadOverhang(plan.placements, CATALOGUE, SEMI).rear),
+    );
+  });
+});
+
+describe('balance', () => {
+  function balanceRules(placements: Placement[], vehicle = SEMI): string[] {
+    return validatePlan(
+      {
+        consignments: [{id: 'C1', vehicleId: vehicle.id, phase: null}],
+        placements,
+      },
+      {pileTypes: [SP168], vehicles: [vehicle]},
+      STRICT,
+    ).map(v => v.rule);
+  }
+
+  it('flags a load bunched against the headboard', () => {
+    // One pile spanning 100–6100 has its centre of mass at 3100, and the deck
+    // wants it at 6250.
+    expect(balanceRules([place({x: 100})])).toContain('unbalanced');
+  });
+
+  it('says which way and by how much', () => {
+    const violation = validatePlan(
+      planWith([place({x: 100})]),
+      CATALOGUE,
+      STRICT,
+    ).find(v => v.rule === 'unbalanced');
+
+    expect(violation!.message).toContain('3150 mm ahead of');
+    expect(violation!.message).toContain('6250 mm balance point');
+  });
+
+  it('accepts a load sitting on the balance point', () => {
+    expect(balanceRules([place({x: 3250})])).toEqual([]);
+  });
+
+  it('respects a balance target the yard has actually stated', () => {
+    const forward: Vehicle = {...SEMI, balanceTarget: 5000};
+
+    expect(balanceRules([place({x: 2000})], forward)).toEqual([]);
+    expect(balanceRules([place({x: 3250})], forward)).toContain('unbalanced');
+  });
+
+  it('flags a load down one side of the deck', () => {
+    const violation = validatePlan(
+      planWith([
+        place({id: 'a', x: 3250, y: 900}),
+        place({id: 'b', x: 3250, y: 400}),
+      ]),
+      CATALOGUE,
+      STRICT,
+    ).find(v => v.rule === 'unbalanced');
+
+    expect(violation!.message).toContain('650 mm to the right');
+  });
+
+  it('has nothing to say about an empty truck', () => {
+    expect(balanceRules([])).toEqual([]);
   });
 });
 

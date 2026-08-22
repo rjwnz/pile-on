@@ -7,7 +7,9 @@ so a human can check it before it goes on a quote.
 
 Read [docs/00-problem-analysis.md](docs/00-problem-analysis.md) first — it covers
 the problem structure, the NZ regulatory limits, what existing software does and
-does not do, and the phased plan this repo is being built against.
+does not do, and the phased plan this repo is being built against. Then
+[docs/01-packer-design.md](docs/01-packer-design.md), which is the build plan for
+the packer and the six stages it lands in.
 
 ## Status
 
@@ -15,17 +17,104 @@ Usable end to end: the pile-type and vehicle catalogues, the piling schedule,
 and a loading plan you can look at — exploded per-tier top-down drawings and an
 isometric view of each truck, with the load checked against the NZ limits.
 
-**The packer is not written yet.** What builds the plan today is
-`arrangeNaively`, the deliberately dumb *control* from the project plan: every
-pile is a cylinder of its widest diameter for its whole length, each tier goes
-to one pile type, nothing is staggered or flipped. It exists to give the view
-something real to draw and to be the number the helix-aware packer has to beat.
-The tier drawings show the waste plainly — every helix plate lines up across
-every lane, and closing those up is the whole opportunity.
+**Packer stages 1 and 2 of 6 are in.** The helix-aware packer works, and on the
+benchmark fixtures it takes **12 trucks where the bounding-box control takes
+19**.
 
-Single phase only. Splitting a delivery across phases, and shipping early into
-storage, are deferred; the schedule is a quantity per pile type, and phase will
-become another field on the line when it lands.
+That is the whole business case, and it comes from one observation: a pile is
+not a cylinder of its widest diameter. A plate is a short fat band on a thin
+shaft, so if two neighbouring lanes put their plates at different stations along
+the deck they may close up from plate-to-plate pitch to plate-to-shaft. On a
+168 mm shaft with a 450 mm plate that is 334 mm apart instead of 475 — a sixth
+lane on a deck that fitted five.
+
+Run `pnpm bench` for the table. `pnpm bench --save` records it, so the next run
+shows what moved.
+
+The packer also does three things the control never does: it mixes pile lengths
+down a single lane, mixes types across a tier, and keeps every load balanced by
+sliding tiers along the deck and turning alternate ones round.
+
+**Stage 1** is what it rests on — the validator telling the whole truth, and the
+numbers it judges against being settable and saved with the job:
+
+- **Per-case clearances.** Shaft-to-shaft, helix-to-shaft and helix-to-helix are
+  three separate figures. Helix-to-shaft is the one staggering exploits, so it
+  is the one that decides how much there is to win.
+- **Separation in three dimensions.** Piles rest on their widest point, so two
+  diameters in one tier already sit at different heights. That vertical offset
+  is clearance the lateral rule can spend.
+- **The envelope.** Overhang against what each vehicle will actually carry, and
+  the side margins, are enforced rather than assumed — see below.
+- **Balance.** The load centre of mass against where the deck wants it, within a
+  settable tolerance — see the caveat below.
+- **Honest mass.** Bearers, chocks and lashings count against the payload.
+
+`arrangeNaively` is still there and still the control: every pile a cylinder of
+its widest diameter, one type per tier, nothing staggered or flipped. The
+"Baseline instead" button runs it, and the packer reports what it saved against
+it on every job. Being the control licenses it to pack badly, not illegally, so
+it too fills from the middle of the deck outward and slides each load onto its
+balance point.
+
+Still to come: vertical interleaving (stage 3), multi-deck vehicles and the
+solo-tractor rule (4), fleet selection and LNS (5), phases and early delivery
+(6). Single phase only until then; the schedule is a quantity per pile type.
+
+### Overhang
+
+**Default zero: the load must fit on the deck.** Past the allowance is an
+`over-rear-overhang` error, not a note, and the packer will not build one. Inside
+it the plan says so — a warning, and past a metre a reminder that it needs flags
+by day and lamps at night.
+
+The allowance is set **per vehicle**, on the Vehicles tab, not in the loading
+rules. VDAM states rear overhang as the lesser of a fixed distance and a fraction
+of the axle spacing, so how far a load may hang out is a fact about a particular
+unit rather than about a job — and it cannot be derived here, because axle
+positions were deliberately scoped out. It is what the yard says this trailer
+will carry.
+
+Because it is easy to miss when it is somewhere else, the loading rules panel
+shows the selected vehicle's figures read-only, and a truck carrying an overhang
+gets a metric reading what it uses against what it is allowed. A truck with no
+overhang and no allowance shows nothing — a column reading "0 of 0 mm" on every
+truck is the noise that stops the one that matters being noticed.
+
+### What the packer does not promise
+
+Clashes, the envelope, support and payload are absolute — property-tested over
+randomly generated catalogues, not just the cases someone thought to write down.
+
+Two things are best-effort, and it is worth knowing which:
+
+**Balance on awkward geometry.** It is a tolerance, not a fact about the steel.
+The packer spends three separate repairs on it and then leaves any remaining
+violation visible rather than hiding it. On five piles of wildly unequal mass and
+length, the best reachable answer can sit outside a 200 mm tolerance.
+
+**Beating the baseline on _every_ catalogue.** Both are heuristics. On geometry
+nobody would buy — a 9 m pile with a 476 mm plate next to a 3.3 m plain shaft —
+either can come out ahead. The comparison that means anything is `pnpm bench`
+against real jobs.
+
+### The balance tolerance is a placeholder
+
+Balance is not legally specified. It stands in for axle-set limits, the 20%
+front-axle rule and the static roll threshold, and all three need the
+deck-origin-to-axle mapping that was deliberately removed — so **no tolerance
+here can be derived to guarantee legality**, and one that claims to would be
+pretending.
+
+The defaults are therefore tight rather than generous: 200 mm along the deck,
+50 mm across it. Too tight rejects a legal load visibly and one conversation
+fixes it; too loose accepts an illegal one silently and it reaches the road.
+`docs/01-packer-design.md` §4.6 shows the ceilings that _are_ derivable and what
+the real numbers should be measured against.
+
+Where a deck wants its load is the same kind of question. A semi wants mass
+forward toward the kingpin and a rigid does not, so `balanceTarget` is left null
+— "nobody has said" — and mid-deck is assumed until the yard gives a figure.
 
 ### CSV formats
 
@@ -49,12 +138,19 @@ was once `helixN_thickness`; sheets using the old header still import.
 **Vehicles.** A deck and a mass limit — no axle data.
 
 ```
-id,name,kind,deck_length,deck_width,deck_height,tare,max_gross
-SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000
+id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,1200,
 ```
 
 `kind` is one of `rigid`, `semi_trailer`, `full_trailer`, `simple_trailer`,
 `b_train`.
+
+The last three columns are optional and default to the conservative reading —
+no overhang either end, no opinion about where the load should sit — so a sheet
+written before they existed still imports and still means what it meant. None of
+them can be derived: VDAM states rear overhang against axle spacing, and where a
+deck wants its load depends on where its axles are. A blank `balance_target`
+means unstated, which is not the same as mid-deck.
 
 **Piling schedule.** A quantity per pile type. Pile types must already exist in
 the catalogue — a schedule naming an unknown type is rejected with the id, since
@@ -87,11 +183,15 @@ current one. The tables are in
 
 ### Session files
 
-Export writes the whole session — catalogues, schedule and plan — as one
-versioned JSON. Import makes you choose: **catalogue only**, keeping the schedule
-and plan you are part-way through, or **everything**. A catalogue-only import can
-orphan the schedule, so the app lists exactly which references broke rather than
-failing silently.
+Export writes the whole session — catalogues, schedule, loading rules and plan —
+as one versioned JSON. Import makes you choose: **catalogue only**, keeping the
+schedule, rules and plan you are part-way through, or **everything**. A
+catalogue-only import can orphan the schedule, so the app lists exactly which
+references broke rather than failing silently.
+
+The loading rules travel in the file for the same reason the ruleset version
+does: a quote priced at a 25 mm helix clearance and a 200 mm balance tolerance
+cannot be re-explained six months later unless the file says so.
 
 ## Layout
 
@@ -125,14 +225,15 @@ pnpm check
 `pnpm check` is the one that matters — it runs typecheck, lint and tests with
 coverage, and is what CI runs.
 
-| Command | What it does |
-| --- | --- |
-| `pnpm dev` | Vite dev server for the web app |
-| `pnpm build` | Static production build into `apps/web/dist` |
-| `pnpm test` | Jest across all workspaces |
-| `pnpm test:coverage` | Jest with a combined coverage report in `coverage/` |
-| `pnpm typecheck` | One `tsc` pass over the whole monorepo |
-| `pnpm lint` / `pnpm fix` | GTS (Google TypeScript Style) via ESLint + Prettier |
+| Command                  | What it does                                                    |
+| ------------------------ | --------------------------------------------------------------- |
+| `pnpm dev`               | Vite dev server for the web app                                 |
+| `pnpm build`             | Static production build into `apps/web/dist`                    |
+| `pnpm test`              | Jest across all workspaces                                      |
+| `pnpm test:coverage`     | Jest with a combined coverage report in `coverage/`             |
+| `pnpm typecheck`         | One `tsc` pass over the whole monorepo                          |
+| `pnpm lint` / `pnpm fix` | GTS (Google TypeScript Style) via ESLint + Prettier             |
+| `pnpm bench`             | Trucks used and deck utilisation per fixture, packer vs control |
 
 To run one workspace: `pnpm --filter @pile-on/core test`.
 

@@ -41,6 +41,9 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
+  maxFrontOverhang: 0,
+  maxRearOverhang: 0,
+  balanceTarget: null,
 };
 
 function renderJob({

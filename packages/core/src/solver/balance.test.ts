@@ -1,0 +1,142 @@
+import {describe, expect, it} from '@jest/globals';
+import {balancingShift, shiftToBalance} from './balance';
+import {loadCentroid} from '../domain/balance';
+import type {Catalogue} from '../domain/catalogue';
+import type {PileType} from '../domain/pile';
+import type {Placement} from '../domain/placement';
+import type {Vehicle} from '../domain/vehicle';
+
+const PILE: PileType = {
+  id: 'P6',
+  name: 'Six metre',
+  length: 6000,
+  shaftRadius: 84,
+  mass: 178,
+  helices: [],
+};
+
+const SEMI: Vehicle = {
+  id: 'SEMI-45',
+  name: 'Semi',
+  kind: 'semi_trailer',
+  deckLength: 12500,
+  deckWidth: 2450,
+  deckHeight: 1350,
+  tare: 15800,
+  maxGross: 44000,
+  maxFrontOverhang: 0,
+  maxRearOverhang: 0,
+  balanceTarget: null,
+};
+
+const CATALOGUE: Catalogue = {pileTypes: [PILE], vehicles: [SEMI]};
+
+function place(overrides: Partial<Placement> = {}): Placement {
+  return {
+    id: 'p',
+    consignmentId: 'C1',
+    pileTypeId: 'P6',
+    tier: 0,
+    x: 0,
+    y: 0,
+    flipped: false,
+    ...overrides,
+  };
+}
+
+describe('balancingShift', () => {
+  it('moves a short load exactly onto the balance point', () => {
+    // One pile at 100–6100 has its centroid at 3100; mid-deck is 6250.
+    expect(balancingShift([place({x: 100})], CATALOGUE, SEMI)).toBe(3150);
+  });
+
+  it('stops at the rear of what the vehicle may carry', () => {
+    // The load already ends at 12200, leaving 300 mm before the deck runs out.
+    const full = [place({id: 'a', x: 100}), place({id: 'b', x: 6200})];
+
+    expect(balancingShift(full, CATALOGUE, SEMI)).toBe(100);
+  });
+
+  it('spends a rear overhang allowance when it has one', () => {
+    const tolerant: Vehicle = {...SEMI, maxRearOverhang: 1000};
+    const load = [place({x: 100}), place({id: 'b', x: 6200})];
+
+    // Wanted is only 100, so the extra room changes nothing here.
+    expect(balancingShift(load, CATALOGUE, tolerant)).toBe(100);
+    // Pull the target hard aft and the allowance is the whole of what is left:
+    // the load ends at 12200, and 13500 is as far back as it may go.
+    expect(
+      balancingShift(load, CATALOGUE, {...tolerant, balanceTarget: 12000}),
+    ).toBe(1300);
+  });
+
+  it('will move a load forward as readily as aft', () => {
+    expect(balancingShift([place({x: 6500})], CATALOGUE, SEMI)).toBe(-3250);
+    expect(balancingShift([place({x: 2000})], CATALOGUE, SEMI)).toBe(1250);
+  });
+
+  it('stops at the headboard on the way forward', () => {
+    // A pile at 100 wants to come 2100 mm forward to reach a 1000 mm target,
+    // and there are only 100 mm of deck in front of it.
+    const forward: Vehicle = {...SEMI, balanceTarget: 1000};
+
+    expect(balancingShift([place({x: 100})], CATALOGUE, forward)).toBe(-100);
+  });
+
+  it('does not move a load that is already where it should be', () => {
+    expect(balancingShift([place({x: 3250})], CATALOGUE, SEMI)).toBe(0);
+  });
+
+  it('gives up rather than guessing when the load cannot fit the deck', () => {
+    const overlong: PileType = {...PILE, id: 'LONG', length: 14000};
+    const catalogue: Catalogue = {pileTypes: [overlong], vehicles: [SEMI]};
+
+    expect(balancingShift([place({pileTypeId: 'LONG'})], catalogue, SEMI)).toBe(
+      0,
+    );
+  });
+
+  it('has nothing to do with an empty or unresolvable load', () => {
+    expect(balancingShift([], CATALOGUE, SEMI)).toBe(0);
+    expect(
+      balancingShift([place({pileTypeId: 'GHOST'})], CATALOGUE, SEMI),
+    ).toBe(0);
+  });
+
+  it('measures the extent from the piles it can resolve', () => {
+    // The ghost has no length, so it cannot be allowed to pin either end.
+    const mixed = [
+      place({id: 'a', x: 100}),
+      place({id: 'ghost', x: 9000, pileTypeId: 'GHOST'}),
+    ];
+
+    expect(balancingShift(mixed, CATALOGUE, SEMI)).toBe(3150);
+  });
+});
+
+describe('shiftToBalance', () => {
+  it('lands the centroid on the target when there is room', () => {
+    const shifted = shiftToBalance([place({x: 100})], CATALOGUE, SEMI);
+
+    expect(loadCentroid(shifted, CATALOGUE)!.x).toBe(6250);
+  });
+
+  it('moves every pile by the same amount, so the layout is untouched', () => {
+    const before = [
+      place({id: 'a', x: 100, y: -400, tier: 0}),
+      place({id: 'b', x: 100, y: 400, tier: 1}),
+    ];
+    const after = shiftToBalance(before, CATALOGUE, SEMI);
+
+    expect(after.map(p => p.x - 3150)).toEqual(before.map(p => p.x));
+    expect(after.map(p => [p.y, p.tier])).toEqual(
+      before.map(p => [p.y, p.tier]),
+    );
+  });
+
+  it('returns the placements unchanged when no shift helps', () => {
+    const load = [place({x: 3250})];
+
+    expect(shiftToBalance(load, CATALOGUE, SEMI)).toEqual(load);
+  });
+});

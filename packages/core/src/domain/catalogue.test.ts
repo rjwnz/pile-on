@@ -29,6 +29,9 @@ const VEHICLE: Vehicle = {
   deckHeight: 1200,
   tare: 10600,
   maxGross: 30000,
+  maxFrontOverhang: 0,
+  maxRearOverhang: 0,
+  balanceTarget: null,
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [TYPE], vehicles: [VEHICLE]};

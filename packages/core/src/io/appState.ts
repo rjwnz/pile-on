@@ -6,6 +6,8 @@ import {
   type LoadPlan,
 } from '../domain/catalogue';
 import {EMPTY_JOB, type Job, type JobLine} from '../domain/job';
+import {type BalanceTolerance, type ClearanceOptions} from '../domain/loading';
+import {DEFAULT_PACKING_OPTIONS, type PackingOptions} from '../solver/options';
 import type {PileType} from '../domain/pile';
 import type {Placement} from '../domain/placement';
 import type {Vehicle} from '../domain/vehicle';
@@ -27,8 +29,12 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  *     the arranger did not exist yet.
  * 5 — `helix.thickness` became `helix.length`, which is what it always meant.
  *     Version 4 files read cleanly: the old field is still accepted.
+ * 6 — added `options` (how the yard loads, and what makes a load legal), and
+ *     vehicles gained overhang allowances and a balance target. Version 5 files
+ *     read cleanly: every one of those defaults to the conservative reading, so
+ *     an old file means exactly what it meant.
  */
-export const STATE_FORMAT_VERSION = 5;
+export const STATE_FORMAT_VERSION = 6;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -39,6 +45,15 @@ export interface AppState {
    * priced under or it cannot be explained six months later.
    */
   readonly rulesetVersion: string;
+  /**
+   * The clearances, margins and tolerances this plan was built and checked
+   * under.
+   *
+   * Saved for the same reason as `rulesetVersion`, and it matters just as much:
+   * a quote priced at a 25 mm helix clearance and a 200 mm balance tolerance
+   * cannot be re-explained six months later unless the file says so.
+   */
+  readonly options: PackingOptions;
   readonly catalogue: Catalogue;
   readonly job: Job;
   readonly plan: LoadPlan;
@@ -49,6 +64,7 @@ export function emptyAppState(now: string): AppState {
     formatVersion: STATE_FORMAT_VERSION,
     savedAt: now,
     rulesetVersion: NZ_VDAM_2016.version,
+    options: DEFAULT_PACKING_OPTIONS,
     catalogue: EMPTY_CATALOGUE,
     job: EMPTY_JOB,
     plan: EMPTY_PLAN,
@@ -146,6 +162,11 @@ function parsePileType(value: unknown, log: IssueLog): PileType | null {
   };
 }
 
+/** A number if it is one, otherwise the fallback. Used for defaultable fields. */
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
 function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
   if (!isRecord(value)) {
     log.add('', 'must be an object');
@@ -179,6 +200,82 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     deckHeight,
     tare,
     maxGross,
+    // Absent before version 6. Zero overhang and an unstated balance target are
+    // the readings that leave an old file meaning what it meant.
+    maxFrontOverhang: numberOr(value['maxFrontOverhang'], 0),
+    maxRearOverhang: numberOr(value['maxRearOverhang'], 0),
+    balanceTarget:
+      typeof value['balanceTarget'] === 'number' &&
+      Number.isFinite(value['balanceTarget'])
+        ? value['balanceTarget']
+        : null,
+  };
+}
+
+/**
+ * Loading options, every field defaultable.
+ *
+ * Absent before version 6, so this has to read `{}` as "the defaults" without
+ * complaint. It is deliberately tolerant rather than strict: an option missing
+ * from a file is a version gap, not corruption, and refusing to open the file
+ * over it would strand a saved quote.
+ */
+function parseLoadingOptions(value: unknown): PackingOptions {
+  const source = isRecord(value) ? value : {};
+  const defaults = DEFAULT_PACKING_OPTIONS;
+
+  const clearanceSource = isRecord(source['clearances'])
+    ? source['clearances']
+    : {};
+  const clearances: ClearanceOptions = {
+    shaftToShaft: numberOr(
+      clearanceSource['shaftToShaft'],
+      defaults.clearances.shaftToShaft,
+    ),
+    helixToShaft: numberOr(
+      clearanceSource['helixToShaft'],
+      defaults.clearances.helixToShaft,
+    ),
+    helixToHelix: numberOr(
+      clearanceSource['helixToHelix'],
+      defaults.clearances.helixToHelix,
+    ),
+  };
+
+  const balanceSource = isRecord(source['balance']) ? source['balance'] : {};
+  const balance: BalanceTolerance = {
+    longitudinal: numberOr(
+      balanceSource['longitudinal'],
+      defaults.balance.longitudinal,
+    ),
+    lateral: numberOr(balanceSource['lateral'], defaults.balance.lateral),
+  };
+
+  return {
+    clearances,
+    balance,
+    dunnageThickness: numberOr(
+      source['dunnageThickness'],
+      defaults.dunnageThickness,
+    ),
+    endGap: numberOr(source['endGap'], defaults.endGap),
+    sideMargin: numberOr(source['sideMargin'], defaults.sideMargin),
+    headboardGap: numberOr(source['headboardGap'], defaults.headboardGap),
+    maxTiers: numberOr(source['maxTiers'], defaults.maxTiers),
+    ancillaryMassPerTier: numberOr(
+      source['ancillaryMassPerTier'],
+      defaults.ancillaryMassPerTier,
+    ),
+    // Added with the packer, so a version 6 file written before it has none.
+    allowFlips:
+      typeof source['allowFlips'] === 'boolean'
+        ? source['allowFlips']
+        : defaults.allowFlips,
+    beamWidth: numberOr(source['beamWidth'], defaults.beamWidth),
+    maxLanePatterns: numberOr(
+      source['maxLanePatterns'],
+      defaults.maxLanePatterns,
+    ),
   };
 }
 
@@ -338,6 +435,7 @@ export function parseAppState(raw: string): Result<AppState> {
       typeof parsed['rulesetVersion'] === 'string'
         ? parsed['rulesetVersion']
         : NZ_VDAM_2016.version,
+    options: parseLoadingOptions(parsed['options']),
     catalogue: {pileTypes, vehicles},
     job,
     plan,
@@ -354,7 +452,9 @@ export function applyImport(
   if (mode === 'catalogue-and-plan') {
     return {...imported, savedAt: now};
   }
-  // Catalogue only: the job and plan being worked on are left alone.
+  // Catalogue only: the job and plan being worked on are left alone, and so are
+  // the options — they are what the plan in progress is being checked against,
+  // so importing someone else's would silently re-judge work already done.
   return {
     ...current,
     savedAt: now,

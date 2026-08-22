@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 import {
+  axisHeightOf,
   findPileType,
-  maxRadius,
   radiusProfile,
-  tierBaseHeight,
   tierHeights,
   type Catalogue,
   type LoadingOptions,
@@ -115,10 +114,11 @@ export function buildLoadScene(input: LoadSceneInput): LoadScene {
     /*
      * The pile rests on its widest point — for a helical pile that is the
      * plates, not the shaft — so the axis sits one widest-radius above the
-     * bearers. This matches how tier height is calculated.
+     * bearers. That sum used to live here, which meant the drawing and the
+     * separation rule each had their own idea of where steel was. It is
+     * geometry, so it comes from `core` now.
      */
-    const axisZ =
-      tierBaseHeight(placement.tier, heights, options) + maxRadius(type);
+    const axisZ = axisHeightOf({type, placement}, heights, options);
     const colour = colourForPileType(type.id);
 
     const shaft = tube(

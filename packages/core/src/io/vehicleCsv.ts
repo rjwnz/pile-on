@@ -14,6 +14,12 @@ import {
  * A vehicle is a deck and a mass limit. There is no axle column: the payload
  * limit is always reached before any axle limit here, so axle positions and
  * tyre classes were data nobody had to maintain and nothing consulted.
+ *
+ * The three loading columns are optional, and all three default to the
+ * conservative reading — no overhang either end, balance point at mid-deck — so
+ * a sheet written before they existed still imports and still means what it
+ * meant. They cannot be derived: overhang limits are stated against axle
+ * spacing, and where a deck wants its load depends on where its axles are.
  */
 export const VEHICLE_CSV_HEADERS = [
   'id',
@@ -24,11 +30,14 @@ export const VEHICLE_CSV_HEADERS = [
   'deck_height',
   'tare',
   'max_gross',
+  'max_front_overhang',
+  'max_rear_overhang',
+  'balance_target',
 ] as const;
 
-export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,deck_height,tare,max_gross
-SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000
-RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000
+export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,1200,
+RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000,0,0,
 `;
 
 export function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
@@ -40,6 +49,18 @@ export function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
   const deckHeight = readNumber(row, 'deck_height', log, {min: 0});
   const tare = readNumber(row, 'tare', log, {min: 0});
   const maxGross = readNumber(row, 'max_gross', log, {min: 1});
+  const maxFrontOverhang = readNumber(row, 'max_front_overhang', log, {
+    min: 0,
+    required: false,
+  });
+  const maxRearOverhang = readNumber(row, 'max_rear_overhang', log, {
+    min: 0,
+    required: false,
+  });
+  const balanceTargetRaw = (row['balance_target'] ?? '').trim();
+  const balanceTarget = balanceTargetRaw
+    ? readNumber(row, 'balance_target', log, {min: 0, max: deckLength})
+    : null;
 
   if (maxGross > 0 && tare > 0 && maxGross <= tare) {
     log.add('max_gross', `must exceed tare (${tare}), leaving no payload`);
@@ -54,6 +75,9 @@ export function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
     deckHeight,
     tare,
     maxGross,
+    maxFrontOverhang,
+    maxRearOverhang,
+    balanceTarget,
   };
 }
 

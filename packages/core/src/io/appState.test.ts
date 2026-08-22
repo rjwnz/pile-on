@@ -31,6 +31,9 @@ const VEHICLE: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
+  maxFrontOverhang: 0,
+  maxRearOverhang: 0,
+  balanceTarget: null,
 };
 
 const POPULATED: AppState = {
@@ -298,6 +301,9 @@ describe('parseAppState — malformed entries', () => {
           deckHeight: 1200,
           tare: 10600,
           maxGross: 30000,
+          maxFrontOverhang: 0,
+          maxRearOverhang: 0,
+          balanceTarget: null,
         },
       ],
     });
@@ -331,6 +337,9 @@ describe('reading a version 1 file', () => {
           deckHeight: 1350,
           tare: 15800,
           maxGross: 44000,
+          maxFrontOverhang: 0,
+          maxRearOverhang: 0,
+          balanceTarget: null,
           axles: [
             {xFromFront: 0, tyreClass: 'SL', setId: 'steer', steering: true},
             {xFromFront: 3550, tyreClass: 'T', setId: 'drive', steering: false},
@@ -357,6 +366,9 @@ describe('reading a version 1 file', () => {
       deckHeight: 1350,
       tare: 15800,
       maxGross: 44000,
+      maxFrontOverhang: 0,
+      maxRearOverhang: 0,
+      balanceTarget: null,
     });
   });
 
@@ -513,5 +525,150 @@ describe('reading a version 4 file', () => {
     expect(
       result.ok && result.value.catalogue.pileTypes[0]!.helices[0],
     ).toEqual({offsetFromButt: 400, radius: 225, length: 110});
+  });
+});
+
+describe('loading options', () => {
+  it('round-trips the options a plan was checked under', () => {
+    const tuned: AppState = {
+      ...POPULATED,
+      options: {
+        ...POPULATED.options,
+        clearances: {shaftToShaft: 30, helixToShaft: 45, helixToHelix: 60},
+        balance: {longitudinal: 150, lateral: 25},
+        ancillaryMassPerTier: 80,
+      },
+    };
+    const result = parseAppState(serialiseAppState(tuned));
+
+    expect(result.ok && result.value.options).toEqual(tuned.options);
+  });
+
+  it('gives a file written before options existed the defaults', () => {
+    const v5 = JSON.stringify({
+      formatVersion: 5,
+      catalogue: {pileTypes: [], vehicles: []},
+    });
+    const result = parseAppState(v5);
+
+    expect(result.ok && result.value.options).toEqual(
+      emptyAppState(NOW).options,
+    );
+  });
+
+  it('fills in only the options a partial file is missing', () => {
+    const partial = JSON.stringify({
+      formatVersion: STATE_FORMAT_VERSION,
+      options: {clearances: {helixToShaft: 45}, maxTiers: 3},
+      catalogue: {pileTypes: [], vehicles: []},
+    });
+    const result = parseAppState(partial);
+    const defaults = emptyAppState(NOW).options;
+
+    expect(result.ok && result.value.options.clearances).toEqual({
+      shaftToShaft: defaults.clearances.shaftToShaft,
+      helixToShaft: 45,
+      helixToHelix: defaults.clearances.helixToHelix,
+    });
+    expect(result.ok && result.value.options.maxTiers).toBe(3);
+    expect(result.ok && result.value.options.balance).toEqual(defaults.balance);
+  });
+
+  it('ignores an options field that is not an object', () => {
+    const odd = JSON.stringify({
+      formatVersion: STATE_FORMAT_VERSION,
+      options: 'nope',
+      catalogue: {pileTypes: [], vehicles: []},
+    });
+    const result = parseAppState(odd);
+
+    expect(result.ok && result.value.options).toEqual(
+      emptyAppState(NOW).options,
+    );
+  });
+
+  it('keeps the options in play when only a catalogue is imported', () => {
+    // They are what the plan on screen is being judged against, so taking
+    // someone else's would silently re-judge work already done.
+    const mine: AppState = {
+      ...POPULATED,
+      options: {
+        ...POPULATED.options,
+        balance: {longitudinal: 150, lateral: 25},
+      },
+    };
+    const theirs: AppState = {
+      ...POPULATED,
+      options: {
+        ...POPULATED.options,
+        balance: {longitudinal: 900, lateral: 900},
+      },
+    };
+
+    expect(
+      applyImport(mine, theirs, 'catalogue-only', NOW).options.balance,
+    ).toEqual({longitudinal: 150, lateral: 25});
+    expect(
+      applyImport(mine, theirs, 'catalogue-and-plan', NOW).options.balance,
+    ).toEqual({longitudinal: 900, lateral: 900});
+  });
+});
+
+describe('reading a version 5 vehicle', () => {
+  it('defaults the loading fields it does not carry', () => {
+    const v5 = JSON.stringify({
+      formatVersion: 5,
+      catalogue: {
+        pileTypes: [],
+        vehicles: [
+          {
+            id: 'SEMI-45',
+            kind: 'semi_trailer',
+            deckLength: 12500,
+            deckWidth: 2450,
+            deckHeight: 1350,
+            tare: 15800,
+            maxGross: 44000,
+          },
+        ],
+      },
+    });
+    const result = parseAppState(v5);
+
+    expect(result.ok && result.value.catalogue.vehicles[0]).toMatchObject({
+      maxFrontOverhang: 0,
+      maxRearOverhang: 0,
+      balanceTarget: null,
+    });
+  });
+
+  it('keeps a balance target that is there, and rejects a nonsensical one', () => {
+    const withTarget = (balanceTarget: unknown) =>
+      JSON.stringify({
+        formatVersion: STATE_FORMAT_VERSION,
+        catalogue: {
+          pileTypes: [],
+          vehicles: [
+            {
+              id: 'S',
+              kind: 'semi_trailer',
+              deckLength: 12500,
+              deckWidth: 2450,
+              deckHeight: 1350,
+              tare: 15800,
+              maxGross: 44000,
+              balanceTarget,
+            },
+          ],
+        },
+      });
+
+    const good = parseAppState(withTarget(5400));
+    expect(good.ok && good.value.catalogue.vehicles[0]!.balanceTarget).toBe(
+      5400,
+    );
+
+    const bad = parseAppState(withTarget('halfway'));
+    expect(bad.ok && bad.value.catalogue.vehicles[0]!.balanceTarget).toBeNull();
   });
 });

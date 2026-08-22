@@ -14,6 +14,9 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
+  maxFrontOverhang: 0,
+  maxRearOverhang: 0,
+  balanceTarget: null,
 };
 
 function renderWith(vehicles: Vehicle[] = []) {
@@ -125,5 +128,54 @@ describe('VehicleSection', () => {
     expect(
       screen.getByRole('heading', {name: /Vehicles \(0\)/}),
     ).toBeInTheDocument();
+  });
+});
+
+describe('the loading fields', () => {
+  it('round-trips overhang allowances and a stated balance point', async () => {
+    const user = userEvent.setup();
+    renderWith([SEMI]);
+
+    await user.click(screen.getByRole('button', {name: /Add vehicle/}));
+    await user.type(screen.getByLabelText(/^Id/), 'RIGID-8');
+    await user.type(screen.getByLabelText(/Deck length/), '7200');
+    await user.type(screen.getByLabelText(/Deck width/), '2450');
+    await user.type(screen.getByLabelText(/Deck height above road/), '1200');
+    await user.type(screen.getByLabelText(/Tare/), '10600');
+    await user.type(screen.getByLabelText(/Max gross/), '30000');
+    await user.clear(screen.getByLabelText(/Rear overhang allowed/));
+    await user.type(screen.getByLabelText(/Rear overhang allowed/), '900');
+    await user.type(
+      screen.getByLabelText(/Balance point from headboard/),
+      '3000',
+    );
+    await user.click(screen.getByRole('button', {name: /^Add vehicle$/}));
+
+    const row = await screen.findByRole('row', {name: /RIGID-8/});
+    expect(row).toBeInTheDocument();
+
+    await user.click(within(row).getByRole('button', {name: /Edit/}));
+    expect(screen.getByLabelText(/Rear overhang allowed/)).toHaveValue(900);
+    expect(screen.getByLabelText(/Balance point from headboard/)).toHaveValue(
+      3000,
+    );
+  });
+
+  it('shows an unstated balance point as blank, not as mid-deck', () => {
+    render(
+      <AppStateProvider
+        initialState={{
+          ...emptyAppState('2026-08-22T00:00:00.000Z'),
+          catalogue: {pileTypes: [], vehicles: [SEMI]},
+        }}
+        storage={undefined}
+      >
+        <VehicleSection />
+      </AppStateProvider>,
+    );
+
+    expect(
+      screen.queryByLabelText(/Balance point from headboard/),
+    ).not.toBeInTheDocument();
   });
 });

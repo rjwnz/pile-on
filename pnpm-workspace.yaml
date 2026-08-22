@@ -3,5 +3,7 @@ packages:
   - 'apps/*'
 # unrs-resolver is the native module resolver behind eslint-plugin-n (pulled in
 # by gts). It only needs its build script when a prebuilt binary is unavailable.
+# esbuild is what tsx compiles `scripts/bench.ts` with; both are dev-only.
 allowBuilds:
+  esbuild: true
   unrs-resolver: true

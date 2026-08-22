@@ -1,8 +1,10 @@
 import {Suspense, lazy} from 'react';
 import {
-  consignmentMass,
+  balanceOffset,
+  consignmentPayload,
   findVehicle,
   loadHeight,
+  loadOverhang,
   loadWidth,
   payloadCapacity,
   tiersOf,
@@ -90,11 +92,25 @@ export function ConsignmentView({
     );
   }
 
-  const mass = consignmentMass(placements, catalogue);
+  // Bearers and lashings included: this is the number the payload limit
+  // applies to, and showing the piles alone would flatter the load.
+  const mass = consignmentPayload(placements, catalogue, options);
   const payload = payloadCapacity(vehicle);
   const height =
     vehicle.deckHeight + loadHeight(placements, catalogue, options);
   const width = loadWidth(placements, catalogue);
+  const offset = balanceOffset(placements, catalogue, vehicle);
+  const overhang = loadOverhang(placements, catalogue, vehicle);
+  /*
+   * Shown only when there is something to say — either the load is hanging out
+   * or the yard has said it may. A column reading "0 of 0 mm" on every truck is
+   * noise, and noise is what stops the one that matters being noticed.
+   */
+  const showOverhang =
+    overhang.front > 0 ||
+    overhang.rear > 0 ||
+    vehicle.maxFrontOverhang > 0 ||
+    vehicle.maxRearOverhang > 0;
   const tiers = tiersOf(placements);
   const errors = violations.filter(v => v.severity === 'error');
   const warnings = violations.filter(v => v.severity === 'warning');
@@ -122,7 +138,11 @@ export function ConsignmentView({
         )}
       </header>
 
-      <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+      <dl
+        className={`grid grid-cols-2 gap-3 text-sm ${
+          showOverhang ? 'sm:grid-cols-4 lg:grid-cols-7' : 'sm:grid-cols-6'
+        }`}
+      >
         <Metric label="Piles" value={String(placements.length)} />
         <Metric
           label="Load mass"
@@ -146,6 +166,39 @@ export function ConsignmentView({
           detail="of 2.55 m"
           over={width > 2550}
         />
+        <Metric
+          label="Balance"
+          value={
+            offset
+              ? `${offset.longitudinal >= 0 ? '+' : '−'}${Math.abs(Math.round(offset.longitudinal))} mm`
+              : '—'
+          }
+          detail={
+            offset
+              ? `${offset.longitudinal >= 0 ? 'aft' : 'fwd'} · ${Math.abs(Math.round(offset.lateral))} mm off centre`
+              : 'nothing loaded'
+          }
+          over={
+            offset !== null &&
+            (Math.abs(offset.longitudinal) > options.balance.longitudinal ||
+              Math.abs(offset.lateral) > options.balance.lateral)
+          }
+        />
+        {showOverhang ? (
+          <Metric
+            label="Overhang"
+            value={`${Math.round(overhang.rear)} mm`}
+            detail={
+              overhang.front > 0
+                ? `rear, of ${vehicle.maxRearOverhang} allowed · ${Math.round(overhang.front)} mm past the headboard`
+                : `rear, of ${vehicle.maxRearOverhang} mm allowed`
+            }
+            over={
+              overhang.rear > vehicle.maxRearOverhang ||
+              overhang.front > vehicle.maxFrontOverhang
+            }
+          />
+        ) : null}
       </dl>
 
       {violations.length > 0 ? (

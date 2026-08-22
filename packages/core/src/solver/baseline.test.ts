@@ -1,5 +1,6 @@
 import {describe, expect, it} from '@jest/globals';
-import {arrangeNaively, lanesFor, pilesPerLane} from './baseline';
+import {arrangeNaively, cellsFor, lanesFor, pilesPerLane} from './baseline';
+import {balanceOffset} from '../domain/balance';
 import {DEFAULT_LOADING_OPTIONS} from '../domain/loading';
 import type {Catalogue} from '../domain/catalogue';
 import type {Job} from '../domain/job';
@@ -36,6 +37,9 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
+  maxFrontOverhang: 0,
+  maxRearOverhang: 0,
+  balanceTarget: null,
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [SP168, SP139], vehicles: [SEMI]};
@@ -298,7 +302,14 @@ describe('arrangeNaively', () => {
     expect(second.plan.placements.map(p => p.id)).toEqual(ids);
   });
 
-  it('never places a pile ahead of the headboard gap', () => {
+  /*
+   * `headboardGap` is where the arranger starts laying piles, not a bound it
+   * has to hold. Balancing the load may spend some of it, and that is allowed:
+   * the Truck Loading Code has the front tier butted up to the headboard for
+   * pipe loads. What may never happen is a pile projecting *past* the headboard
+   * on a vehicle whose yard has not allowed a front overhang.
+   */
+  it('never projects a pile past the headboard', () => {
     const {plan} = arrangeNaively(
       job(['SP168-D6', 25]),
       CATALOGUE,
@@ -307,7 +318,59 @@ describe('arrangeNaively', () => {
     );
 
     for (const placement of plan.placements) {
-      expect(placement.x).toBeGreaterThanOrEqual(OPTIONS.headboardGap);
+      expect(placement.x).toBeGreaterThanOrEqual(-SEMI.maxFrontOverhang);
     }
+  });
+
+  it('stays within the rear overhang the vehicle allows', () => {
+    const {plan} = arrangeNaively(
+      job(['SP168-D6', 25]),
+      CATALOGUE,
+      SEMI,
+      OPTIONS,
+    );
+
+    for (const placement of plan.placements) {
+      expect(placement.x + SP168.length).toBeLessThanOrEqual(
+        SEMI.deckLength + SEMI.maxRearOverhang,
+      );
+    }
+  });
+
+  it('leaves every truck it builds balanced', () => {
+    // A part-loaded last truck is the case that goes wrong: full tiers balance
+    // themselves, a truncated one does not.
+    const {plan} = arrangeNaively(
+      job(['SP168-D6', 95]),
+      CATALOGUE,
+      SEMI,
+      OPTIONS,
+    );
+
+    for (const consignment of plan.consignments) {
+      const offset = balanceOffset(
+        plan.placements.filter(p => p.consignmentId === consignment.id),
+        CATALOGUE,
+        SEMI,
+      );
+      expect(Math.abs(offset!.longitudinal)).toBeLessThanOrEqual(
+        OPTIONS.balance.longitudinal,
+      );
+      expect(Math.abs(offset!.lateral)).toBeLessThanOrEqual(
+        OPTIONS.balance.lateral,
+      );
+    }
+  });
+
+  it('fits the same number of piles per truck as filling row by row would', () => {
+    // The centre-out fill order exists for balance, not for capacity. If it
+    // ever changed how much fits, it would be quietly rewriting the control.
+    const cells = cellsFor(SEMI, SP168, OPTIONS);
+    const lanes = lanesFor(SEMI, SP168, OPTIONS);
+
+    expect(cells).toHaveLength(
+      lanes.length * pilesPerLane(SEMI, SP168, OPTIONS),
+    );
+    expect(new Set(cells.map(c => `${c.x}:${c.y}`)).size).toBe(cells.length);
   });
 });

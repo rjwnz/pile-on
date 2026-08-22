@@ -1,0 +1,62 @@
+[
+  {
+    "fixture": "01-single-type-semi",
+    "piles": 95,
+    "baselineTrucks": 3,
+    "packedTrucks": 2,
+    "noFlipTrucks": 2,
+    "deckUsed": 39,
+    "massUsed": 31,
+    "worstBalance": 0,
+    "errors": 0,
+    "millis": 97
+  },
+  {
+    "fixture": "02-two-types-semi",
+    "piles": 100,
+    "baselineTrucks": 3,
+    "packedTrucks": 2,
+    "noFlipTrucks": 2,
+    "deckUsed": 33,
+    "massUsed": 25,
+    "worstBalance": 0,
+    "errors": 0,
+    "millis": 171
+  },
+  {
+    "fixture": "03-four-types-semi",
+    "piles": 232,
+    "baselineTrucks": 8,
+    "packedTrucks": 5,
+    "noFlipTrucks": 6,
+    "deckUsed": 35,
+    "massUsed": 23,
+    "worstBalance": 16,
+    "errors": 0,
+    "millis": 525
+  },
+  {
+    "fixture": "04-short-deck-rigid",
+    "piles": 96,
+    "baselineTrucks": 3,
+    "packedTrucks": 2,
+    "noFlipTrucks": 2,
+    "deckUsed": 31,
+    "massUsed": 18,
+    "worstBalance": 0,
+    "errors": 0,
+    "millis": 86
+  },
+  {
+    "fixture": "05-long-piles-semi",
+    "piles": 24,
+    "baselineTrucks": 2,
+    "packedTrucks": 1,
+    "noFlipTrucks": 2,
+    "deckUsed": 52,
+    "massUsed": 34,
+    "worstBalance": 0,
+    "errors": 0,
+    "millis": 11
+  }
+]

@@ -6,6 +6,7 @@ import {
   EMPTY_PLAN,
   type AppState,
   type JobLine,
+  type PackingOptions,
   type LoadPlan,
   type PileType,
   type Vehicle,
@@ -45,6 +46,7 @@ export type AppAction =
       readonly replace: boolean;
     }
   | {readonly type: 'clearJob'}
+  | {readonly type: 'setOptions'; readonly options: PackingOptions}
   | {readonly type: 'setPlan'; readonly plan: LoadPlan}
   | {readonly type: 'clearPlan'}
   | {readonly type: 'replaceState'; readonly state: AppState};
@@ -157,6 +159,15 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'clearJob':
       return {...state, job: {...state.job, lines: []}};
+
+    /*
+     * Changing an option does not clear the plan, even though it can change
+     * whether that plan is legal. Seeing the violations appear is the point:
+     * tightening a clearance and watching a truck go red is how you find out
+     * what the tolerance was buying you.
+     */
+    case 'setOptions':
+      return {...state, options: action.options};
 
     case 'setPlan':
       return {...state, plan: action.plan};

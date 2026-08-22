@@ -39,6 +39,9 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
+  maxFrontOverhang: 0,
+  maxRearOverhang: 0,
+  balanceTarget: null,
 };
 
 function renderPlan({
@@ -88,7 +91,7 @@ describe('arranging', () => {
     expect(screen.getByText(/No plan yet/)).toBeInTheDocument();
   });
 
-  it('is honest that this is the baseline and not the packer', () => {
+  it('says what the baseline is for, before anything is packed', () => {
     renderPlan();
 
     expect(
@@ -100,7 +103,7 @@ describe('arranging', () => {
     const user = userEvent.setup();
     renderPlan();
 
-    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
     expect(
       screen.getByRole('heading', {name: /Loading plan — 1 truck/}),
@@ -114,10 +117,10 @@ describe('arranging', () => {
       job: {name: '', lines: [{pileTypeId: 'SP168-D6', quantity: 95}]},
     });
 
-    await user.click(screen.getByRole('button', {name: /Arrange 95 piles/}));
+    await user.click(screen.getByRole('button', {name: /Pack 95 piles/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan — 3 trucks/}),
+      screen.getByRole('heading', {name: /Loading plan — 2 trucks/}),
     ).toBeInTheDocument();
   });
 
@@ -125,7 +128,7 @@ describe('arranging', () => {
     const user = userEvent.setup();
     renderPlan();
 
-    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
     // 25 piles at 10 per tier — three tiers.
     expect(screen.getByTestId('tier-plan-0')).toBeInTheDocument();
@@ -139,7 +142,7 @@ describe('arranging', () => {
     const user = userEvent.setup();
     renderPlan();
 
-    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
     // jsdom has no WebGL, which is exactly the degraded case: the tier plans
     // still carry the load, so this must inform rather than break.
@@ -153,11 +156,13 @@ describe('arranging', () => {
     const user = userEvent.setup();
     renderPlan();
 
-    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
     const truck = screen.getByTestId('consignment-C1');
-    // 25 × 178 kg = 4,450 kg of a 28,200 kg payload.
-    expect(within(truck).getByText('4.45 t')).toBeInTheDocument();
+    // 25 × 178 kg of pile, plus 60 kg of bearers under each of the three
+    // tiers, against a 28,200 kg payload. The bearers are shown because the
+    // payload limit charges for them.
+    expect(within(truck).getByText('4.63 t')).toBeInTheDocument();
     expect(within(truck).getByText('16%')).toBeInTheDocument();
   });
 
@@ -165,7 +170,7 @@ describe('arranging', () => {
     const user = userEvent.setup();
     renderPlan();
 
-    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
     expect(screen.getByText('Legal')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -175,7 +180,7 @@ describe('arranging', () => {
     const user = userEvent.setup();
     renderPlan();
 
-    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
     await user.click(screen.getByRole('button', {name: 'Clear plan'}));
 
     expect(screen.getByText(/No plan yet/)).toBeInTheDocument();
@@ -190,10 +195,206 @@ describe('what will not fit', () => {
       job: {name: '', lines: [{pileTypeId: 'SP219-D14', quantity: 4}]},
     });
 
-    await user.click(screen.getByRole('button', {name: /Arrange 4 piles/}));
+    await user.click(screen.getByRole('button', {name: /Pack 4 piles/}));
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('Could not place 1 pile type');
     expect(alert).toHaveTextContent('too long for the deck');
+  });
+});
+
+describe('the loading rules drive what the plan is judged against', () => {
+  it('turns a legal plan red when a clearance is tightened past it', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
+    expect(
+      within(screen.getByTestId('consignment-C1')).getByText(/^Legal/),
+    ).toBeInTheDocument();
+
+    /*
+     * Helix-to-shaft, not helix-to-helix, and that is the point. The packer
+     * staggered these lanes so no two plates share a station, which means the
+     * helix-to-helix figure no longer binds on them at all — tightening it does
+     * nothing. What holds this layout together is a plate clearing a shaft, so
+     * that is the number that turns it red.
+     */
+    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+    await user.clear(screen.getByLabelText(/Helix to shaft/));
+    await user.type(screen.getByLabelText(/Helix to shaft/), '200');
+
+    expect(
+      within(screen.getByTestId('consignment-C1')).getByText(/problem/),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/but need/).length).toBeGreaterThan(0);
+  });
+
+  it('survives an absurd longitudinal tolerance, because the shift is exact', async () => {
+    // Sliding a whole load moves its centroid one-for-one, so the arranger can
+    // put it *on* the balance point rather than near it. A 1 mm tolerance is
+    // the cheapest way to prove that is really happening.
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
+    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+    await user.clear(screen.getByLabelText(/Along the deck/));
+    await user.type(screen.getByLabelText(/Along the deck/), '1');
+
+    expect(screen.queryByText(/ahead of the/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/aft of the/)).not.toBeInTheDocument();
+  });
+
+  it('flags the lateral drift a part-filled baseline tier leaves behind', async () => {
+    // The control fills lanes from the middle out and then stops, so an odd
+    // number of piles on the top tier leaves a real residue. The packer does
+    // not have this problem — it turns alternate tiers round to cancel it —
+    // which is why this is measured on the baseline.
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Baseline instead/}));
+    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+    await user.clear(screen.getByLabelText(/Across the deck/));
+    await user.type(screen.getByLabelText(/Across the deck/), '5');
+
+    expect(screen.getAllByText(/centre of mass is/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/19 mm to the/)).toBeInTheDocument();
+  });
+
+  it('leaves the packer balanced where the baseline is not', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
+    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+    await user.clear(screen.getByLabelText(/Across the deck/));
+    await user.type(screen.getByLabelText(/Across the deck/), '5');
+
+    expect(screen.queryByText(/centre of mass is/)).not.toBeInTheDocument();
+  });
+
+  it('reports how far off the balance point each truck sits', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
+
+    const truck = screen.getByTestId('consignment-C1');
+    expect(within(truck).getByText('Balance')).toBeInTheDocument();
+    expect(within(truck).getByText(/mm off centre/)).toBeInTheDocument();
+  });
+});
+
+describe('the packer against the control', () => {
+  it('reports how many trucks the bounding box would have needed', async () => {
+    const user = userEvent.setup();
+    renderPlan({
+      job: {name: '', lines: [{pileTypeId: 'SP168-D6', quantity: 95}]},
+    });
+
+    await user.click(screen.getByRole('button', {name: /Pack 95 piles/}));
+
+    expect(screen.getByText(/1 truck saved/)).toBeInTheDocument();
+    expect(screen.getByText(/this job fits on 2/)).toBeInTheDocument();
+  });
+
+  it('says so plainly when staggering wins nothing', async () => {
+    const user = userEvent.setup();
+    renderPlan({
+      job: {name: '', lines: [{pileTypeId: 'SP168-D6', quantity: 4}]},
+    });
+
+    await user.click(screen.getByRole('button', {name: /Pack 4 piles/}));
+
+    expect(screen.getByText(/No saving on this job/)).toBeInTheDocument();
+  });
+
+  it('still offers the control, and drops the comparison when it is used', async () => {
+    const user = userEvent.setup();
+    renderPlan({
+      job: {name: '', lines: [{pileTypeId: 'SP168-D6', quantity: 95}]},
+    });
+
+    await user.click(screen.getByRole('button', {name: /Baseline instead/}));
+
+    expect(
+      screen.getByRole('heading', {name: /Loading plan — 3 trucks/}),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/This is the naive baseline, not the packer/),
+    ).toBeInTheDocument();
+  });
+
+  it('fits more piles per tier than the baseline does', async () => {
+    const user = userEvent.setup();
+    renderPlan({
+      job: {name: '', lines: [{pileTypeId: 'SP168-D6', quantity: 12}]},
+    });
+
+    await user.click(screen.getByRole('button', {name: /Pack 12 piles/}));
+    // Six staggered lanes hold all twelve on the deck; the baseline needs two
+    // tiers for the same job because it only fits five lanes.
+    expect(screen.getByTestId('tier-plan-0')).toBeInTheDocument();
+    expect(screen.queryByTestId('tier-plan-1')).not.toBeInTheDocument();
+  });
+
+  it('turns flipping off from the loading rules', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+    await user.click(screen.getByLabelText(/Allow head-to-toe flipping/));
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
+
+    expect(screen.getByText(/Truck 1 of 1/)).toBeInTheDocument();
+  });
+});
+
+describe('the overhang each vehicle allows', () => {
+  const TOLERANT: Vehicle = {...SEMI, maxRearOverhang: 1200};
+
+  it('stays out of the way when nothing hangs out and nothing may', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
+
+    expect(screen.queryByText('Overhang')).not.toBeInTheDocument();
+  });
+
+  it('shows what the load uses against what the vehicle allows', async () => {
+    const user = userEvent.setup();
+    renderPlan({vehicles: [TOLERANT]});
+
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
+
+    const truck = screen.getByTestId('consignment-C1');
+    expect(within(truck).getByText('Overhang')).toBeInTheDocument();
+    expect(within(truck).getByText(/of 1200 mm allowed/)).toBeInTheDocument();
+  });
+
+  it('says in the loading rules that overhang lives on the vehicle', async () => {
+    const user = userEvent.setup();
+    renderPlan({vehicles: [TOLERANT]});
+
+    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+
+    expect(
+      screen.getByText(/Set per vehicle on the Vehicles tab/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Rear allowed')).toBeInTheDocument();
+    expect(screen.getByText('1200 mm')).toBeInTheDocument();
+  });
+
+  it('shows the zero default rather than hiding it, once the panel is open', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+
+    expect(screen.getByText('Front allowed')).toBeInTheDocument();
+    expect(screen.getAllByText('0 mm')).toHaveLength(2);
   });
 });

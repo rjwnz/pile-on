@@ -16,6 +16,9 @@ const coreSrc = fileURLToPath(
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
+  // Honour PORT so more than one dev server can run at once; Vite would
+  // otherwise take 5173 and refuse to share it.
+  server: {port: Number(process.env['PORT']) || 5173},
   resolve: {
     alias: {
       '@pile-on/core': coreSrc,

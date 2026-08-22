@@ -19,6 +19,9 @@ interface Draft {
   readonly deckHeight: string;
   readonly tare: string;
   readonly maxGross: string;
+  readonly maxFrontOverhang: string;
+  readonly maxRearOverhang: string;
+  readonly balanceTarget: string;
 }
 
 const BLANK: Draft = {
@@ -30,6 +33,9 @@ const BLANK: Draft = {
   deckHeight: '',
   tare: '',
   maxGross: '',
+  maxFrontOverhang: '0',
+  maxRearOverhang: '0',
+  balanceTarget: '',
 };
 
 function toDraft(vehicle: Vehicle): Draft {
@@ -42,6 +48,12 @@ function toDraft(vehicle: Vehicle): Draft {
     deckHeight: String(vehicle.deckHeight),
     tare: String(vehicle.tare),
     maxGross: String(vehicle.maxGross),
+    maxFrontOverhang: String(vehicle.maxFrontOverhang),
+    maxRearOverhang: String(vehicle.maxRearOverhang),
+    // Blank means unstated, which is not the same as mid-deck — it is the
+    // absence of an opinion, and the form has to be able to express that.
+    balanceTarget:
+      vehicle.balanceTarget === null ? '' : String(vehicle.balanceTarget),
   };
 }
 
@@ -60,6 +72,9 @@ export function draftToRow(draft: Draft): CsvRow {
     deck_height: draft.deckHeight,
     tare: draft.tare,
     max_gross: draft.maxGross,
+    max_front_overhang: draft.maxFrontOverhang,
+    max_rear_overhang: draft.maxRearOverhang,
+    balance_target: draft.balanceTarget,
   };
 }
 
@@ -150,7 +165,37 @@ export function VehicleForm({
           value={draft.maxGross}
           onChange={v => set('maxGross', v)}
         />
+        <Field
+          label="Front overhang allowed"
+          suffix="mm"
+          type="number"
+          value={draft.maxFrontOverhang}
+          onChange={v => set('maxFrontOverhang', v)}
+        />
+        <Field
+          label="Rear overhang allowed"
+          suffix="mm"
+          type="number"
+          value={draft.maxRearOverhang}
+          onChange={v => set('maxRearOverhang', v)}
+        />
+        <Field
+          label="Balance point from headboard"
+          suffix="mm"
+          type="number"
+          value={draft.balanceTarget}
+          placeholder="mid-deck"
+          onChange={v => set('balanceTarget', v)}
+        />
       </div>
+
+      <p className="text-sm text-slate-600">
+        Overhang allowances are what this unit will actually carry, not a rule —
+        VDAM states rear overhang against axle spacing, and axles are not
+        modelled. Leave the balance point blank unless the yard has a figure for
+        it: a semi wants its mass forward toward the kingpin and a rigid does
+        not, and mid-deck is a guess standing in for the answer.
+      </p>
 
       {Number.isFinite(payload) && payload > 0 ? (
         <p className="text-sm text-slate-600">

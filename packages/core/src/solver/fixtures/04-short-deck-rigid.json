@@ -1,0 +1,86 @@
+{
+  "formatVersion": 6,
+  "savedAt": "2026-08-22T00:00:00.000Z",
+  "rulesetVersion": "nz-vdam-2016",
+  "options": {
+    "clearances": {
+      "shaftToShaft": 25,
+      "helixToShaft": 25,
+      "helixToHelix": 25
+    },
+    "balance": {
+      "longitudinal": 200,
+      "lateral": 50
+    },
+    "dunnageThickness": 100,
+    "endGap": 100,
+    "sideMargin": 50,
+    "headboardGap": 100,
+    "maxTiers": 4,
+    "ancillaryMassPerTier": 60
+  },
+  "catalogue": {
+    "pileTypes": [
+      {
+        "id": "SP139-S4",
+        "name": "SP139 4.5 m single helix",
+        "length": 4500,
+        "shaftRadius": 70,
+        "mass": 96,
+        "helices": [
+          {
+            "offsetFromButt": 350,
+            "radius": 175,
+            "length": 90
+          }
+        ]
+      },
+      {
+        "id": "SP114-S3",
+        "name": "SP114 3.0 m single helix",
+        "length": 3000,
+        "shaftRadius": 57,
+        "mass": 52,
+        "helices": [
+          {
+            "offsetFromButt": 300,
+            "radius": 150,
+            "length": 80
+          }
+        ]
+      }
+    ],
+    "vehicles": [
+      {
+        "id": "RIGID-8",
+        "name": "8-wheeler rigid",
+        "kind": "rigid",
+        "deckLength": 7200,
+        "deckWidth": 2450,
+        "deckHeight": 1200,
+        "tare": 10600,
+        "maxGross": 30000,
+        "maxFrontOverhang": 0,
+        "maxRearOverhang": 0,
+        "balanceTarget": null
+      }
+    ]
+  },
+  "job": {
+    "name": "Kerbside infill — 8-wheeler only",
+    "lines": [
+      {
+        "pileTypeId": "SP139-S4",
+        "quantity": 36
+      },
+      {
+        "pileTypeId": "SP114-S3",
+        "quantity": 60
+      }
+    ]
+  },
+  "plan": {
+    "consignments": [],
+    "placements": []
+  }
+}

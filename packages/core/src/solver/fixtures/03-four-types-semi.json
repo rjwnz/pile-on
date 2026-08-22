@@ -1,0 +1,132 @@
+{
+  "formatVersion": 6,
+  "savedAt": "2026-08-22T00:00:00.000Z",
+  "rulesetVersion": "nz-vdam-2016",
+  "options": {
+    "clearances": {
+      "shaftToShaft": 25,
+      "helixToShaft": 25,
+      "helixToHelix": 25
+    },
+    "balance": {
+      "longitudinal": 200,
+      "lateral": 50
+    },
+    "dunnageThickness": 100,
+    "endGap": 100,
+    "sideMargin": 50,
+    "headboardGap": 100,
+    "maxTiers": 4,
+    "ancillaryMassPerTier": 60
+  },
+  "catalogue": {
+    "pileTypes": [
+      {
+        "id": "SP219-D9",
+        "name": "SP219 9.0 m twin helix",
+        "length": 9000,
+        "shaftRadius": 110,
+        "mass": 396,
+        "helices": [
+          {
+            "offsetFromButt": 500,
+            "radius": 300,
+            "length": 140
+          },
+          {
+            "offsetFromButt": 1400,
+            "radius": 250,
+            "length": 140
+          }
+        ]
+      },
+      {
+        "id": "SP168-D6",
+        "name": "SP168 6.0 m twin helix",
+        "length": 6000,
+        "shaftRadius": 84,
+        "mass": 178,
+        "helices": [
+          {
+            "offsetFromButt": 400,
+            "radius": 225,
+            "length": 110
+          },
+          {
+            "offsetFromButt": 1100,
+            "radius": 175,
+            "length": 110
+          }
+        ]
+      },
+      {
+        "id": "SP139-S4",
+        "name": "SP139 4.5 m single helix",
+        "length": 4500,
+        "shaftRadius": 70,
+        "mass": 96,
+        "helices": [
+          {
+            "offsetFromButt": 350,
+            "radius": 175,
+            "length": 90
+          }
+        ]
+      },
+      {
+        "id": "SP114-S3",
+        "name": "SP114 3.0 m single helix",
+        "length": 3000,
+        "shaftRadius": 57,
+        "mass": 52,
+        "helices": [
+          {
+            "offsetFromButt": 300,
+            "radius": 150,
+            "length": 80
+          }
+        ]
+      }
+    ],
+    "vehicles": [
+      {
+        "id": "SEMI-45",
+        "name": "Tractor + 4-axle semi",
+        "kind": "semi_trailer",
+        "deckLength": 12500,
+        "deckWidth": 2450,
+        "deckHeight": 1350,
+        "tare": 15800,
+        "maxGross": 44000,
+        "maxFrontOverhang": 0,
+        "maxRearOverhang": 0,
+        "balanceTarget": null
+      }
+    ]
+  },
+  "job": {
+    "name": "Hobsonville stage 3 — mixed schedule",
+    "lines": [
+      {
+        "pileTypeId": "SP219-D9",
+        "quantity": 18
+      },
+      {
+        "pileTypeId": "SP168-D6",
+        "quantity": 64
+      },
+      {
+        "pileTypeId": "SP139-S4",
+        "quantity": 110
+      },
+      {
+        "pileTypeId": "SP114-S3",
+        "quantity": 40
+      }
+    ]
+  },
+  "plan": {
+    "consignments": [],
+    "placements": []
+  }
+}

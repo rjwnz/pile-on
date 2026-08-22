@@ -3,9 +3,15 @@ import {tierHeightFor, type LoadingOptions} from '../domain/loading';
 import type {Job, JobLine} from '../domain/job';
 import {maxRadius, type PileType} from '../domain/pile';
 import type {Placement} from '../domain/placement';
-import {payloadCapacity, type Vehicle} from '../domain/vehicle';
+import {
+  balanceTargetOf,
+  payloadCapacity,
+  type Vehicle,
+} from '../domain/vehicle';
 import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
 import type {Millimetres} from '../units';
+import {shiftToBalance} from './balance';
+import {unplaceableReason} from './feasibility';
 
 /**
  * The naive bounding-box arranger — the *control*, not the packer.
@@ -18,6 +24,11 @@ import type {Millimetres} from '../units';
  *
  * Because it ignores staggering, a lane pitch here is helix-OD plus clearance
  * rather than the helix-to-shaft pitch the real geometry allows.
+ *
+ * Being the control licenses it to pack badly. It does not license it to pack
+ * *illegally* — a baseline that fails `validatePlan` measures nothing — so it
+ * does respect balance, by filling from the middle of the deck outward and
+ * sliding each finished load onto its balance point.
  */
 
 export interface Lane {
@@ -45,7 +56,9 @@ export function lanesFor(
   if (usable < halfWidth * 2) {
     return [];
   }
-  const pitch = halfWidth * 2 + options.clearance;
+  // Every pile is its widest all the way along, so neighbouring lanes always
+  // present plate to plate. Nothing here ever staggers them apart.
+  const pitch = halfWidth * 2 + options.clearances.helixToHelix;
   const count = Math.floor((usable - halfWidth * 2) / pitch) + 1;
   const span = (count - 1) * pitch;
   return Array.from({length: count}, (_, index) => ({
@@ -64,6 +77,70 @@ export function pilesPerLane(
     return 0;
   }
   return Math.floor((usable + options.endGap) / (type.length + options.endGap));
+}
+
+/** A place one pile can go in a tier given over to a single type. */
+interface Cell {
+  readonly x: Millimetres;
+  readonly y: Millimetres;
+}
+
+/**
+ * Every slot in a single-type tier, ordered so that *any* prefix is balanced.
+ *
+ * A full tier uses all of them, so this changes nothing about how much fits —
+ * truck counts are identical either way. What it decides is where the leftovers
+ * sit when a tier is partly filled, and the obvious orderings both go wrong:
+ * filling row by row bunches a part-load against the headboard, and taking the
+ * slots nearest the balance point puts every leftover in the same row, which
+ * drags the whole truck to one end.
+ *
+ * So the cells are chosen greedily, each one picked to keep the running centre
+ * of mass closest to where the deck wants it. Every prefix is then about as
+ * balanced as that many piles can be, which matters because the tier that gets
+ * truncated is whichever one the demand happens to run out in.
+ */
+export function cellsFor(
+  vehicle: Vehicle,
+  type: PileType,
+  options: LoadingOptions,
+): Cell[] {
+  const lanes = lanesFor(vehicle, type, options);
+  const slots = pilesPerLane(vehicle, type, options);
+  const targetX = balanceTargetOf(vehicle);
+
+  const remaining: Cell[] = [];
+  for (let slot = 0; slot < slots; slot++) {
+    for (const lane of lanes) {
+      remaining.push({
+        x: options.headboardGap + slot * (type.length + options.endGap),
+        y: lane.y,
+      });
+    }
+  }
+
+  const chosen: Cell[] = [];
+  let sumX = 0;
+  let sumY = 0;
+  while (remaining.length > 0) {
+    let bestIndex = 0;
+    let bestScore = Infinity;
+    for (const [index, cell] of remaining.entries()) {
+      const count = chosen.length + 1;
+      const meanX = (sumX + cell.x + type.length / 2) / count;
+      const meanY = (sumY + cell.y) / count;
+      const score = Math.hypot(meanX - targetX, meanY);
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    }
+    const [cell] = remaining.splice(bestIndex, 1) as [Cell];
+    sumX += cell.x + type.length / 2;
+    sumY += cell.y;
+    chosen.push(cell);
+  }
+  return chosen;
 }
 
 interface OpenTruck {
@@ -108,43 +185,19 @@ export function arrangeNaively(
     .sort((a, b) => b.type.length - a.type.length || b.type.mass - a.type.mass);
 
   for (const {line, type} of demand) {
-    const lanes = lanesFor(vehicle, type, options);
-    const perLane = pilesPerLane(vehicle, type, options);
+    const cells = cellsFor(vehicle, type, options);
     const tierHeight = tierHeightFor(type, options);
-    const tierCapacity = lanes.length * perLane;
 
     // Reasons a pile can never go on this vehicle, checked once rather than
-    // discovered by looping forever.
-    if (lanes.length === 0) {
-      unplaced.push({
-        pileTypeId: type.id,
-        quantity: line.quantity,
-        reason: `too wide for the deck — needs ${maxRadius(type) * 2} mm plus margins, deck is ${vehicle.deckWidth} mm`,
-      });
-      continue;
-    }
-    if (perLane === 0) {
-      unplaced.push({
-        pileTypeId: type.id,
-        quantity: line.quantity,
-        reason: `too long for the deck — ${type.length} mm on a ${vehicle.deckLength} mm deck`,
-      });
-      continue;
-    }
-    if (tierHeight > maxLoadHeight) {
-      unplaced.push({
-        pileTypeId: type.id,
-        quantity: line.quantity,
-        reason: `a single tier is ${tierHeight} mm, over the ${maxLoadHeight} mm available under the height limit`,
-      });
-      continue;
-    }
-    if (type.mass > payload) {
-      unplaced.push({
-        pileTypeId: type.id,
-        quantity: line.quantity,
-        reason: `one pile is ${type.mass} kg, over the ${payload} kg payload`,
-      });
+    // discovered by looping forever. The baseline stops at the tailgate — it
+    // does not know how to use an overhang allowance — so the usable length it
+    // reports is the deck alone.
+    const reason = unplaceableReason(type, vehicle, options, ruleset, {
+      length: vehicle.deckLength - options.headboardGap,
+      width: vehicle.deckWidth - options.sideMargin * 2,
+    });
+    if (reason) {
+      unplaced.push({pileTypeId: type.id, quantity: line.quantity, reason});
       continue;
     }
 
@@ -154,30 +207,31 @@ export function arrangeNaively(
         truck === null ||
         truck.tier >= options.maxTiers ||
         truck.heightUsed + tierHeight > maxLoadHeight ||
-        truck.massUsed + type.mass > payload
+        truck.massUsed + type.mass + options.ancillaryMassPerTier > payload
       ) {
         truck = openTruck();
       }
 
-      const byMass = Math.floor((payload - truck.massUsed) / type.mass);
-      const take = Math.min(remaining, tierCapacity, byMass);
+      // The bearers for this tier land on the payload before any pile does.
+      const spare = payload - truck.massUsed - options.ancillaryMassPerTier;
+      const byMass = Math.floor(spare / type.mass);
+      const take = Math.min(remaining, cells.length, byMass);
 
       for (let index = 0; index < take; index++) {
-        const lane = index % lanes.length;
-        const slot = Math.floor(index / lanes.length);
+        const cell = cells[index]!;
         placements.push({
-          id: `${truck.id}-T${truck.tier}-L${lane}-${slot}`,
+          id: `${truck.id}-T${truck.tier}-${index}`,
           consignmentId: truck.id,
           pileTypeId: type.id,
           tier: truck.tier,
-          x: options.headboardGap + slot * (type.length + options.endGap),
-          y: lanes[lane]!.y,
+          x: cell.x,
+          y: cell.y,
           flipped: false,
         });
       }
 
       remaining -= take;
-      truck.massUsed += take * type.mass;
+      truck.massUsed += take * type.mass + options.ancillaryMassPerTier;
       truck.heightUsed += tierHeight;
       truck.tier += 1;
 
@@ -188,11 +242,25 @@ export function arrangeNaively(
        * would be resting on nothing. `validatePlan` enforces this, and the
        * arranger must not knowingly produce a plan it would reject.
        */
-      if (take < tierCapacity) {
+      if (take < cells.length) {
         truck = null;
       }
     }
   }
 
-  return {plan: {consignments, placements}, unplaced};
+  /*
+   * Slide each finished load onto its balance point. Done per consignment at
+   * the end rather than while placing, because the shift depends on the whole
+   * load and every tier moves together — which is what makes it free of any
+   * effect on separation or support.
+   */
+  const balanced = consignments.flatMap(consignment =>
+    shiftToBalance(
+      placements.filter(p => p.consignmentId === consignment.id),
+      catalogue,
+      vehicle,
+    ),
+  );
+
+  return {plan: {consignments, placements: balanced}, unplaced};
 }

@@ -23,6 +23,9 @@ function vehicle(id: string): Vehicle {
     deckHeight: 1200,
     tare: 10600,
     maxGross: 30000,
+    maxFrontOverhang: 0,
+    maxRearOverhang: 0,
+    balanceTarget: null,
   };
 }
 
@@ -258,5 +261,38 @@ describe('job', () => {
     });
 
     expect(next.catalogue.pileTypes).toHaveLength(1);
+  });
+});
+
+describe('loading options', () => {
+  it('replaces the options wholesale', () => {
+    const next = appReducer(BASE, {
+      type: 'setOptions',
+      options: {
+        ...BASE.options,
+        balance: {longitudinal: 150, lateral: 25},
+      },
+    });
+
+    expect(next.options.balance).toEqual({longitudinal: 150, lateral: 25});
+    expect(next.options.clearances).toEqual(BASE.options.clearances);
+  });
+
+  it('keeps the plan, so tightening a rule shows what it costs', () => {
+    // Clearing the plan on every option change would hide the one thing worth
+    // seeing: which trucks go red when the tolerance moves.
+    const withPlan = appReducer(BASE, {
+      type: 'setPlan',
+      plan: {
+        consignments: [{id: 'C1', vehicleId: 'RIGID-8', phase: null}],
+        placements: [],
+      },
+    });
+    const next = appReducer(withPlan, {
+      type: 'setOptions',
+      options: {...BASE.options, sideMargin: 120},
+    });
+
+    expect(next.plan.consignments).toHaveLength(1);
   });
 });

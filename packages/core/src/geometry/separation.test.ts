@@ -2,6 +2,7 @@ import {describe, expect, it} from '@jest/globals';
 import {
   lateralSeparationOk,
   pilesConflict,
+  requiredAxisDistance,
   requiredLateralSeparation,
   type SeparationOptions,
 } from './separation';
@@ -17,7 +18,16 @@ import {
   place,
 } from './testFixtures';
 
-const NO_CLEARANCE: SeparationOptions = {clearance: 0};
+/** One clearance for every case, unless a test cares about the difference. */
+function clearances(
+  shaftToShaft: number,
+  helixToShaft = shaftToShaft,
+  helixToHelix = shaftToShaft,
+): SeparationOptions {
+  return {clearances: {shaftToShaft, helixToShaft, helixToHelix}};
+}
+
+const NO_CLEARANCE = clearances(0);
 
 const SHAFT_TO_SHAFT = SHAFT_RADIUS * 2; // 120
 const HELIX_TO_HELIX = HELIX_RADIUS * 2; // 400
@@ -145,13 +155,63 @@ describe('requiredLateralSeparation', () => {
     });
   });
 
-  it('adds the clearance once, not once per station', () => {
-    const a = place(DOUBLE);
-    const b = place(DOUBLE);
+  describe('per-case clearances', () => {
+    it('adds one clearance, not one per station', () => {
+      const a = place(DOUBLE);
+      const b = place(DOUBLE);
 
-    expect(requiredLateralSeparation(a, b, {clearance: 25})).toBe(
-      HELIX_TO_HELIX + 25,
-    );
+      expect(requiredLateralSeparation(a, b, clearances(25))).toBe(
+        HELIX_TO_HELIX + 25,
+      );
+    });
+
+    it('charges helix-to-helix where two plates share a station', () => {
+      const a = place(DOUBLE, {x: 0});
+      const b = place(DOUBLE, {x: 0});
+
+      expect(requiredLateralSeparation(a, b, clearances(0, 10, 40))).toBe(
+        HELIX_TO_HELIX + 40,
+      );
+    });
+
+    it('charges helix-to-shaft where a plate passes a bare shaft', () => {
+      const a = place(DOUBLE, {x: 0});
+      const b = place(DOUBLE, {x: 350});
+
+      expect(requiredLateralSeparation(a, b, clearances(0, 10, 40))).toBe(
+        HELIX_TO_SHAFT + 10,
+      );
+    });
+
+    it('charges helix-to-shaft for interleaved single-helix plates', () => {
+      // The plates overlap each other freely; what they must not touch is the
+      // neighbour's shaft, so this is a helix-to-shaft situation on each side.
+      const a = place(SINGLE);
+      const b = place(SINGLE);
+
+      expect(requiredLateralSeparation(a, b, clearances(0, 10, 40))).toBe(
+        HELIX_TO_SHAFT + 10,
+      );
+    });
+
+    it('applies the shaft clearance to the floor even when plates are free', () => {
+      const stubby = pileType('stubby', [helixAt(500, {radius: 40})]);
+      const a = place(stubby);
+      const b = place(stubby);
+
+      expect(requiredLateralSeparation(a, b, clearances(30, 0, 0))).toBe(
+        SHAFT_TO_SHAFT + 30,
+      );
+    });
+
+    it('reproduces the single-clearance answer when all three are equal', () => {
+      const a = place(DOUBLE, {x: 0});
+      const b = place(SINGLE, {x: 350});
+
+      expect(requiredLateralSeparation(a, b, clearances(25))).toBe(
+        requiredLateralSeparation(a, b, NO_CLEARANCE) + 25,
+      );
+    });
   });
 
   it('only considers the overlapping span of two offset piles', () => {
@@ -170,10 +230,56 @@ describe('requiredLateralSeparation', () => {
       requiredLateralSeparation(b, a, NO_CLEARANCE),
     );
   });
+
+  describe('with a vertical offset between the axes', () => {
+    it('matches the axis distance when the axes are level', () => {
+      const a = place(DOUBLE);
+      const b = place(DOUBLE);
+
+      expect(requiredLateralSeparation(a, b, NO_CLEARANCE, 0)).toBe(
+        requiredAxisDistance(a, b, NO_CLEARANCE),
+      );
+    });
+
+    it('spends height as lateral room, by Pythagoras', () => {
+      // Axis distance 400; a 240 mm height difference leaves 320 across.
+      const a = place(DOUBLE);
+      const b = place(DOUBLE);
+
+      expect(requiredLateralSeparation(a, b, NO_CLEARANCE, 240)).toBeCloseTo(
+        320,
+        6,
+      );
+    });
+
+    it('is sign-blind about which pile is higher', () => {
+      const a = place(DOUBLE);
+      const b = place(DOUBLE);
+
+      expect(requiredLateralSeparation(a, b, NO_CLEARANCE, -240)).toBeCloseTo(
+        requiredLateralSeparation(a, b, NO_CLEARANCE, 240),
+        6,
+      );
+    });
+
+    it('needs no lateral room at all once the height difference covers it', () => {
+      const a = place(DOUBLE);
+      const b = place(DOUBLE);
+
+      expect(requiredLateralSeparation(a, b, NO_CLEARANCE, 1000)).toBe(0);
+    });
+
+    it('leaves non-overlapping piles at zero rather than inventing a requirement', () => {
+      const a = place(PLAIN, {x: 0});
+      const b = place(PLAIN, {x: PILE_LENGTH + 1});
+
+      expect(requiredLateralSeparation(a, b, NO_CLEARANCE, 500)).toBe(0);
+    });
+  });
 });
 
 describe('lateralSeparationOk', () => {
-  const options: SeparationOptions = {clearance: 20};
+  const options = clearances(20);
 
   it('accepts a gap exactly on the limit', () => {
     const a = place(PLAIN, {y: 0});
@@ -194,6 +300,14 @@ describe('lateralSeparationOk', () => {
     const b = place(PLAIN, {y: 500 - (SHAFT_TO_SHAFT + 20)});
 
     expect(lateralSeparationOk(a, b, options)).toBe(true);
+  });
+
+  it('accepts a gap that only works because one pile sits higher', () => {
+    const a = place(PLAIN, {y: 0});
+    const b = place(PLAIN, {y: 100});
+
+    expect(lateralSeparationOk(a, b, options)).toBe(false);
+    expect(lateralSeparationOk(a, b, options, 120)).toBe(true);
   });
 });
 

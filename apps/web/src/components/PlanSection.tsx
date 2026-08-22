@@ -1,18 +1,18 @@
 import {useMemo, useState} from 'react';
 import {
-  DEFAULT_LOADING_OPTIONS,
   arrangeNaively,
+  pack,
   totalPileCount,
   validatePlan,
 } from '@pile-on/core';
 import {useAppState} from '../state/AppStateProvider';
 import {ConsignmentView} from './ConsignmentView';
+import {PackingOptionsPanel} from './PackingOptionsPanel';
 import {Button, EmptyState, Panel, SelectField} from './ui';
 
 export function PlanSection() {
   const {state, dispatch} = useAppState();
-  const {catalogue, job, plan} = state;
-  const options = DEFAULT_LOADING_OPTIONS;
+  const {catalogue, job, plan, options} = state;
 
   const [vehicleId, setVehicleId] = useState(
     () => catalogue.vehicles[0]?.id ?? '',
@@ -20,6 +20,8 @@ export function PlanSection() {
   const [unplaced, setUnplaced] = useState<
     readonly {pileTypeId: string; quantity: number; reason: string}[]
   >([]);
+  /** What the control needed for the same job. The business case, live. */
+  const [baselineTrucks, setBaselineTrucks] = useState<number | null>(null);
 
   const violations = useMemo(
     () => validatePlan(plan, catalogue, options),
@@ -29,13 +31,21 @@ export function PlanSection() {
   const scheduled = totalPileCount(job);
   const vehicle = catalogue.vehicles.find(entry => entry.id === vehicleId);
 
-  function arrange() {
+  function build(useBaseline: boolean) {
     if (!vehicle) {
       return;
     }
-    const result = arrangeNaively(job, catalogue, vehicle, options);
+    const result = useBaseline
+      ? arrangeNaively(job, catalogue, vehicle, options)
+      : pack(job, catalogue, vehicle, options);
     dispatch({type: 'setPlan', plan: result.plan});
     setUnplaced(result.unplaced);
+    setBaselineTrucks(
+      useBaseline
+        ? null
+        : arrangeNaively(job, catalogue, vehicle, options).plan.consignments
+            .length,
+    );
   }
 
   if (catalogue.vehicles.length === 0 || scheduled === 0) {
@@ -80,18 +90,64 @@ export function PlanSection() {
             }))}
           />
         </div>
-        <Button variant="primary" onClick={arrange} disabled={!vehicle}>
-          Arrange {scheduled} piles
+        <Button
+          variant="primary"
+          onClick={() => build(false)}
+          disabled={!vehicle}
+        >
+          Pack {scheduled} piles
+        </Button>
+        <Button onClick={() => build(true)} disabled={!vehicle}>
+          Baseline instead
         </Button>
       </div>
 
-      <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-        <strong>This is the naive baseline, not the packer.</strong> Every pile
-        is treated as a cylinder of its widest diameter for its whole length,
-        each tier is given over to one pile type, and nothing is staggered or
-        flipped. It exists to give this view something real to draw and to be
-        the number the helix-aware packer has to beat.
-      </p>
+      <PackingOptionsPanel
+        options={options}
+        vehicle={vehicle}
+        onChange={next => dispatch({type: 'setOptions', options: next})}
+      />
+
+      {baselineTrucks === null ? (
+        <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <strong>This is the naive baseline, not the packer.</strong> Every
+          pile is treated as a cylinder of its widest diameter for its whole
+          length, each tier is given over to one pile type, and nothing is
+          staggered or flipped. It is the control — the number the helix-aware
+          packer has to beat.
+        </p>
+      ) : (
+        <p
+          className={`rounded border p-3 text-sm ${
+            baselineTrucks > plan.consignments.length
+              ? 'border-green-300 bg-green-50 text-green-900'
+              : 'border-slate-300 bg-slate-50 text-slate-700'
+          }`}
+        >
+          {baselineTrucks > plan.consignments.length ? (
+            <>
+              <strong>
+                {baselineTrucks - plan.consignments.length}{' '}
+                {baselineTrucks - plan.consignments.length === 1
+                  ? 'truck'
+                  : 'trucks'}{' '}
+                saved.
+              </strong>{' '}
+              Treating each pile as a cylinder of its widest diameter needs{' '}
+              {baselineTrucks}. Staggering the plates so they miss each other
+              lets neighbouring lanes close from plate-to-plate pitch to
+              plate-to-shaft, and this job fits on {plan.consignments.length}.
+            </>
+          ) : (
+            <>
+              <strong>No saving on this job.</strong> The baseline also needs{' '}
+              {baselineTrucks}. Staggering buys deck width, so it shows up when
+              width is what runs out — a job bounded by mass, height or tier
+              count has nothing for it to win back.
+            </>
+          )}
+        </p>
+      )}
 
       {unplaced.length > 0 ? (
         <ul
@@ -114,7 +170,7 @@ export function PlanSection() {
 
       {plan.consignments.length === 0 ? (
         <EmptyState>
-          No plan yet. Pick a vehicle and arrange the schedule onto it.
+          No plan yet. Pick a vehicle and pack the schedule onto it.
         </EmptyState>
       ) : (
         <div className="space-y-6">

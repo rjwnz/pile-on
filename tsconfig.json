@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  /*
+   * The whole-monorepo view. Two consumers:
+   *   1. `pnpm typecheck` — one pass over every source file.
+   *   2. ESLint — gts points type-aware rules at `./tsconfig.json`, so every
+   *      file we lint (including tests and vite.config.ts) must appear here.
+   * Per-package tsconfigs exist for editors and for Vite; they mirror this.
+   */
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/src/**/*.tsx",
+    "apps/*/src/**/*.ts",
+    "apps/*/src/**/*.tsx",
+    "apps/*/vite.config.ts"
+  ],
+  "exclude": ["node_modules", "**/dist", "**/coverage"]
+}

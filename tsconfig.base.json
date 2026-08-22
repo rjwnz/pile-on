@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./node_modules/gts/tsconfig-google.json",
+  "compilerOptions": {
+    /*
+     * gts/tsconfig-google.json gives us the Google style baseline (strict,
+     * noImplicitReturns, noFallthroughCasesInSwitch, allowUnreachableCode: false).
+     * Everything below overrides it for a bundler-targeted monorepo.
+     */
+    "composite": false,
+    "noEmit": true,
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+
+    /* Beyond the Google baseline — this codebase is geometry and money, so be strict. */
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "useUnknownInCatchVariables": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@pile-on/core": ["./packages/core/src/index.ts"],
+      "@pile-on/core/*": ["./packages/core/src/*"]
+    }
+  }
+}

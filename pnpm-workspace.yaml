@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+# unrs-resolver is the native module resolver behind eslint-plugin-n (pulled in
+# by gts). It only needs its build script when a prebuilt binary is unavailable.
+allowBuilds:
+  unrs-resolver: true

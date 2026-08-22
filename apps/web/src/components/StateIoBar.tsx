@@ -12,7 +12,6 @@ import {
   type Issue,
 } from '@pile-on/core';
 import {useAppState} from '../state/AppStateProvider';
-import {readFileText} from '../lib/csv';
 import {downloadText, stateFilename} from '../lib/download';
 import {Button, IssueList} from './ui';
 
@@ -56,7 +55,7 @@ export function StateIoBar() {
     }
     setNotice(null);
     setWarnings([]);
-    const result = parseAppState(await readFileText(file));
+    const result = parseAppState(await file.text());
     if (!result.ok) {
       setIssues(result.issues);
       setPending(null);

@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import type {CsvRow, Issue, Result} from '@pile-on/core';
-import {parseCsvText, readFileText} from '../lib/csv';
+import {parseCsvText} from '../lib/csv';
 import {Button, IssueList} from './ui';
 
 /**
@@ -41,7 +41,7 @@ export function CsvImportPanel<T>({
     if (!file) {
       return;
     }
-    handleParseAndImport(await readFileText(file));
+    handleParseAndImport(await file.text());
   }
 
   return (

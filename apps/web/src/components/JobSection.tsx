@@ -1,9 +1,11 @@
 import {
   JOB_CSV_EXAMPLE,
+  NZ_VDAM_2016,
+  combinationsOf,
   isSingleHelix,
   jobQuantity,
+  movementPayloadCapacity,
   parseJobRows,
-  payloadCapacity,
   toMetres,
   toTonnes,
   totalPileCount,
@@ -19,21 +21,23 @@ import {Button, EmptyState, Field, Panel} from './ui';
 
 export function JobSection() {
   const {state, dispatch} = useAppState();
-  const {pileTypes, vehicles} = state.catalogue;
+  const {pileTypes} = state.catalogue;
   const {job} = state;
 
   const pileCount = totalPileCount(job);
   const mass = totalPileMass(job, state.catalogue);
 
   /*
-   * The largest payload in the fleet, used only to say how heavy this job is in
-   * truck terms. It is not a truck-count estimate — geometry decides that, and
-   * for small-diameter piles a deck runs out of room long before it runs out of
+   * The largest movement payload in the fleet — truck plus trailer, capped by
+   * the route limit — used only to say how heavy this job is in truck terms.
+   * It is not a movement-count estimate — geometry decides that, and for
+   * small-diameter piles a deck runs out of room long before it runs out of
    * tonnes. Showing the share is what tells a quoter which of the two they are
    * up against.
    */
-  const largestPayload = vehicles.reduce(
-    (most, vehicle) => Math.max(most, payloadCapacity(vehicle)),
+  const largestPayload = combinationsOf(state.catalogue).reduce(
+    (most, combo) =>
+      Math.max(most, movementPayloadCapacity(combo, NZ_VDAM_2016)),
     0,
   );
   const massShare = largestPayload > 0 ? mass / largestPayload : null;

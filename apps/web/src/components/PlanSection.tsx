@@ -1,88 +1,106 @@
 import {useMemo, useState} from 'react';
 import {
   arrangeNaively,
+  combinationsOf,
   groupBy,
+  isTrailer,
   pack,
   totalPileCount,
   validatePlan,
+  type Placement,
 } from '@pile-on/core';
 import {useAppState} from '../state/AppStateProvider';
 import {ConsignmentView} from './ConsignmentView';
 import {PackingOptionsPanel} from './PackingOptionsPanel';
-import {Button, EmptyState, Panel, SelectField} from './ui';
+import {Button, EmptyState, Panel} from './ui';
 
-/** One shared empty, so a truck with nothing on it still gets a stable prop. */
+/** One shared empty, so a deck with nothing on it still gets a stable prop. */
 const NONE: readonly never[] = [];
+
+interface MovementDecks {
+  readonly truck: readonly Placement[];
+  readonly trailer: readonly Placement[];
+}
 
 export function PlanSection() {
   const {state, dispatch} = useAppState();
   const {catalogue, job, plan, options} = state;
 
-  const [vehicleId, setVehicleId] = useState(
-    () => catalogue.vehicles[0]?.id ?? '',
-  );
   const [unplaced, setUnplaced] = useState<
     readonly {pileTypeId: string; quantity: number; reason: string}[]
   >([]);
   /** What the control needed for the same job. The business case, live. */
-  const [baselineTrucks, setBaselineTrucks] = useState<number | null>(null);
+  const [baselineMovements, setBaselineMovements] = useState<number | null>(
+    null,
+  );
 
   const violations = useMemo(
     () => validatePlan(plan, catalogue, options),
     [plan, catalogue, options],
   );
 
-  // Grouped once so the arrays keep their identity between renders — the 3D
-  // view rebuilds its scene when its placements array changes.
-  const placementsPerTruck = useMemo(
-    () => groupBy(plan.placements, placement => placement.consignmentId),
-    [plan.placements],
-  );
-  const violationsPerTruck = useMemo(
+  // Grouped once, per movement and per deck, so the arrays keep their identity
+  // between renders — the 3D view rebuilds its scene when its array changes.
+  const decksPerMovement = useMemo(() => {
+    const map = new Map<string, {truck: Placement[]; trailer: Placement[]}>();
+    for (const placement of plan.placements) {
+      let entry = map.get(placement.consignmentId);
+      if (!entry) {
+        entry = {truck: [], trailer: []};
+        map.set(placement.consignmentId, entry);
+      }
+      entry[placement.deck].push(placement);
+    }
+    return map as ReadonlyMap<string, MovementDecks>;
+  }, [plan.placements]);
+  const violationsPerMovement = useMemo(
     () => groupBy(violations, violation => violation.consignmentId),
     [violations],
   );
 
   const scheduled = totalPileCount(job);
-  const vehicle = catalogue.vehicles.find(entry => entry.id === vehicleId);
+  const combinations = useMemo(() => combinationsOf(catalogue), [catalogue]);
+  const trucks = catalogue.vehicles.filter(v => !isTrailer(v)).length;
+  const trailers = catalogue.vehicles.length - trucks;
 
   function build(useBaseline: boolean) {
-    if (!vehicle) {
-      return;
-    }
     const result = useBaseline
       ? arrangeNaively(job, catalogue, options)
       : pack(job, catalogue, options);
     dispatch({type: 'setPlan', plan: result.plan});
     setUnplaced(result.unplaced);
-    setBaselineTrucks(
+    setBaselineMovements(
       useBaseline
         ? null
         : arrangeNaively(job, catalogue, options).plan.consignments.length,
     );
   }
 
-  if (catalogue.vehicles.length === 0 || scheduled === 0) {
+  if (combinations.length === 0 || scheduled === 0) {
     return (
       <Panel title="Loading plan">
         <EmptyState>
-          {catalogue.vehicles.length === 0
-            ? 'Add a vehicle on the Vehicles tab first.'
+          {combinations.length === 0
+            ? catalogue.vehicles.length === 0
+              ? 'Add a vehicle on the Vehicles tab first.'
+              : 'No self-propelled truck in the catalogue — every vehicle is a trailer. Add a truck on the Vehicles tab.'
             : 'Set some quantities on the Piling schedule tab first.'}
         </EmptyState>
       </Panel>
     );
   }
 
+  const movements = plan.consignments.length;
+
   return (
     <Panel
       title={
-        plan.consignments.length > 0
-          ? `Loading plan — ${plan.consignments.length} ${plan.consignments.length === 1 ? 'truck' : 'trucks'}`
+        movements > 0
+          ? `Loading plan — ${movements} ${movements === 1 ? 'movement' : 'movements'}`
           : 'Loading plan'
       }
       actions={
-        plan.consignments.length > 0 ? (
+        movements > 0 ? (
           <Button
             variant="danger"
             onClick={() => dispatch({type: 'clearPlan'})}
@@ -92,72 +110,59 @@ export function PlanSection() {
         ) : null
       }
     >
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-56">
-          <SelectField
-            label="Load onto"
-            value={vehicleId}
-            onChange={setVehicleId}
-            options={catalogue.vehicles.map(entry => ({
-              value: entry.id,
-              label: `${entry.name} (${entry.id})`,
-            }))}
-          />
-        </div>
-        <Button
-          variant="primary"
-          onClick={() => build(false)}
-          disabled={!vehicle}
-        >
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="primary" onClick={() => build(false)}>
           Pack {scheduled} piles
         </Button>
-        <Button onClick={() => build(true)} disabled={!vehicle}>
-          Baseline instead
-        </Button>
+        <Button onClick={() => build(true)}>Baseline instead</Button>
+        <p className="text-sm text-slate-600">
+          Packing draws on the whole fleet: {trucks}{' '}
+          {trucks === 1 ? 'truck' : 'trucks'}
+          {trailers > 0
+            ? `, ${trailers} ${trailers === 1 ? 'trailer' : 'trailers'}`
+            : ''}{' '}
+          — {combinations.length}{' '}
+          {combinations.length === 1 ? 'combination' : 'combinations'}.
+        </p>
       </div>
 
       <PackingOptionsPanel
         options={options}
-        vehicle={vehicle}
         onChange={next => dispatch({type: 'setOptions', options: next})}
       />
 
-      {baselineTrucks === null ? (
+      {baselineMovements === null ? (
         <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           <strong>This is the naive baseline, not the packer.</strong> Every
           pile is treated as a cylinder of its widest diameter for its whole
-          length, each tier is given over to one pile type, and nothing is
-          staggered or flipped. It is the control — the number the helix-aware
-          packer has to beat.
+          length, each tier is given over to one pile type, nothing is staggered
+          or flipped, and every movement uses the biggest combination in the
+          fleet. It is the control — the number the packer has to beat.
         </p>
       ) : (
         <p
           className={`rounded border p-3 text-sm ${
-            baselineTrucks > plan.consignments.length
+            baselineMovements > movements
               ? 'border-green-300 bg-green-50 text-green-900'
               : 'border-slate-300 bg-slate-50 text-slate-700'
           }`}
         >
-          {baselineTrucks > plan.consignments.length ? (
+          {baselineMovements > movements ? (
             <>
               <strong>
-                {baselineTrucks - plan.consignments.length}{' '}
-                {baselineTrucks - plan.consignments.length === 1
-                  ? 'truck'
-                  : 'trucks'}{' '}
+                {baselineMovements - movements}{' '}
+                {baselineMovements - movements === 1 ? 'movement' : 'movements'}{' '}
                 saved.
               </strong>{' '}
-              Treating each pile as a cylinder of its widest diameter needs{' '}
-              {baselineTrucks}. Staggering the plates so they miss each other
-              lets neighbouring lanes close from plate-to-plate pitch to
-              plate-to-shaft, and this job fits on {plan.consignments.length}.
+              The naive control needs {baselineMovements}. Staggering plates so
+              they miss each other, mixing types, and choosing the right
+              combination for each load fits this job on {movements}.
             </>
           ) : (
             <>
               <strong>No saving on this job.</strong> The baseline also needs{' '}
-              {baselineTrucks}. Staggering buys deck width, so it shows up when
-              width is what runs out — a job bounded by mass, height or tier
-              count has nothing for it to win back.
+              {baselineMovements}. The packer wins back deck width and picks the
+              fleet mix, so it shows up when those are what run out.
             </>
           )}
         </p>
@@ -170,8 +175,8 @@ export function PlanSection() {
         >
           <li className="font-medium">
             Could not place {unplaced.length}{' '}
-            {unplaced.length === 1 ? 'pile type' : 'pile types'} on this
-            vehicle:
+            {unplaced.length === 1 ? 'pile type' : 'pile types'} anywhere in the
+            fleet:
           </li>
           {unplaced.map(entry => (
             <li key={entry.pileTypeId}>
@@ -182,24 +187,26 @@ export function PlanSection() {
         </ul>
       ) : null}
 
-      {plan.consignments.length === 0 ? (
-        <EmptyState>
-          No plan yet. Pick a vehicle and pack the schedule onto it.
-        </EmptyState>
+      {movements === 0 ? (
+        <EmptyState>No plan yet. Pack the schedule onto the fleet.</EmptyState>
       ) : (
         <div className="space-y-6">
-          {plan.consignments.map((consignment, index) => (
-            <ConsignmentView
-              key={consignment.id}
-              consignment={consignment}
-              index={index}
-              total={plan.consignments.length}
-              catalogue={catalogue}
-              options={options}
-              placements={placementsPerTruck.get(consignment.id) ?? NONE}
-              violations={violationsPerTruck.get(consignment.id) ?? NONE}
-            />
-          ))}
+          {plan.consignments.map((consignment, index) => {
+            const decks = decksPerMovement.get(consignment.id);
+            return (
+              <ConsignmentView
+                key={consignment.id}
+                consignment={consignment}
+                index={index}
+                total={movements}
+                catalogue={catalogue}
+                options={options}
+                truckPlacements={decks?.truck ?? NONE}
+                trailerPlacements={decks?.trailer ?? NONE}
+                violations={violationsPerMovement.get(consignment.id) ?? NONE}
+              />
+            );
+          })}
         </div>
       )}
     </Panel>

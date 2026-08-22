@@ -100,19 +100,19 @@ describe('arranging', () => {
     ).toBeInTheDocument();
   });
 
-  it('builds a plan and reports the truck count', async () => {
+  it('builds a plan and reports the movement count', async () => {
     const user = userEvent.setup();
     renderPlan();
 
     await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan — 1 truck/}),
+      screen.getByRole('heading', {name: /Loading plan — 1 movement/}),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Truck 1 of 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Movement 1 of 1/)).toBeInTheDocument();
   });
 
-  it('opens more trucks than one when the job needs them', async () => {
+  it('opens more movements than one when the job needs them', async () => {
     const user = userEvent.setup();
     renderPlan({
       job: {name: '', lines: [{pileTypeId: 'SP168-D6', quantity: 95}]},
@@ -121,7 +121,7 @@ describe('arranging', () => {
     await user.click(screen.getByRole('button', {name: /Pack 95 piles/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan — 2 trucks/}),
+      screen.getByRole('heading', {name: /Loading plan — 2 movements/}),
     ).toBeInTheDocument();
   });
 
@@ -330,8 +330,8 @@ describe('the packer against the control', () => {
 
     await user.click(screen.getByRole('button', {name: /Pack 95 piles/}));
 
-    expect(screen.getByText(/1 truck saved/)).toBeInTheDocument();
-    expect(screen.getByText(/this job fits on 2/)).toBeInTheDocument();
+    expect(screen.getByText(/1 movement saved/)).toBeInTheDocument();
+    expect(screen.getByText(/fits this job on 2/)).toBeInTheDocument();
   });
 
   it('says so plainly when staggering wins nothing', async () => {
@@ -354,7 +354,7 @@ describe('the packer against the control', () => {
     await user.click(screen.getByRole('button', {name: /Baseline instead/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan — 3 trucks/}),
+      screen.getByRole('heading', {name: /Loading plan — 3 movements/}),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/This is the naive baseline, not the packer/),
@@ -382,7 +382,7 @@ describe('the packer against the control', () => {
     await user.click(screen.getByLabelText(/Allow head-to-toe flipping/));
     await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
-    expect(screen.getByText(/Truck 1 of 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Movement 1 of 1/)).toBeInTheDocument();
   });
 });
 
@@ -408,27 +408,89 @@ describe('the overhang each vehicle allows', () => {
     expect(within(truck).getByText('Overhang')).toBeInTheDocument();
     expect(within(truck).getByText(/of 1200 mm allowed/)).toBeInTheDocument();
   });
+});
 
-  it('says in the loading rules that overhang lives on the vehicle', async () => {
-    const user = userEvent.setup();
-    renderPlan({vehicles: [TOLERANT]});
+describe('the fleet', () => {
+  const RIGID: Vehicle = {
+    ...SEMI,
+    id: 'RIGID-8',
+    name: '8-wheeler rigid',
+    kind: 'rigid',
+    deckLength: 7200,
+    deckHeight: 1200,
+    tare: 10600,
+    maxGross: 30000,
+  };
+  const TRAILER: Vehicle = {
+    ...SEMI,
+    id: 'TRAILER-4A',
+    name: '4-axle full trailer',
+    kind: 'full_trailer',
+    deckLength: 8100,
+    deckHeight: 1150,
+    tare: 6800,
+    maxGross: 22000,
+    towableBy: ['RIGID-8'],
+  };
 
-    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+  it('has no vehicle selector — packing draws on the whole fleet', () => {
+    renderPlan({vehicles: [SEMI, RIGID]});
 
+    expect(screen.queryByLabelText(/Load onto/)).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Set per vehicle on the Vehicles tab/),
+      screen.getByText(/Packing draws on the whole fleet: 2 trucks/),
     ).toBeInTheDocument();
-    expect(screen.getByText('Rear allowed')).toBeInTheDocument();
-    expect(screen.getByText('1200 mm')).toBeInTheDocument();
   });
 
-  it('shows the zero default rather than hiding it, once the panel is open', async () => {
+  it('counts trailers and combinations in the fleet summary', () => {
+    renderPlan({vehicles: [RIGID, TRAILER]});
+
+    expect(
+      screen.getByText(/1 truck, 1 trailer — 2 combinations/),
+    ).toBeInTheDocument();
+  });
+
+  it('asks for a truck when the catalogue is all trailers', () => {
+    renderPlan({vehicles: [TRAILER]});
+
+    expect(
+      screen.getByText(/No self-propelled truck in the catalogue/),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a towed movement as two decks under one header', async () => {
+    const user = userEvent.setup();
+    renderPlan({
+      vehicles: [RIGID, TRAILER],
+      job: {name: '', lines: [{pileTypeId: 'SP168-D6', quantity: 40}]},
+    });
+
+    await user.click(screen.getByRole('button', {name: /Pack 40 piles/}));
+
+    const movement = screen.getByTestId('consignment-C1');
+    expect(
+      within(movement).getByText(/8-wheeler rigid \+ 4-axle full trailer/),
+    ).toBeInTheDocument();
+    expect(within(movement).getByText(/Truck deck —/)).toBeInTheDocument();
+    expect(within(movement).getByText(/Trailer deck —/)).toBeInTheDocument();
+    expect(within(movement).getByText('Combination gross')).toBeInTheDocument();
+    expect(
+      within(movement).getByText(/of 44 t route limit/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no combination strip for a truck running solo', async () => {
     const user = userEvent.setup();
     renderPlan();
 
-    await user.click(screen.getByRole('button', {name: /Loading rules/}));
+    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
-    expect(screen.getByText('Front allowed')).toBeInTheDocument();
-    expect(screen.getAllByText('0 mm')).toHaveLength(2);
+    const movement = screen.getByTestId('consignment-C1');
+    expect(
+      within(movement).queryByText('Combination gross'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(movement).queryByText(/Truck deck —/),
+    ).not.toBeInTheDocument();
   });
 });

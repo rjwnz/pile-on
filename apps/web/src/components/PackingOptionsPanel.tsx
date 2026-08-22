@@ -1,9 +1,5 @@
 import {useState} from 'react';
-import {
-  DEFAULT_PACKING_OPTIONS,
-  type PackingOptions,
-  type Vehicle,
-} from '@pile-on/core';
+import {DEFAULT_PACKING_OPTIONS, type PackingOptions} from '@pile-on/core';
 import {Button, Field} from './ui';
 
 function NumberField({
@@ -44,12 +40,9 @@ function NumberField({
  */
 export function PackingOptionsPanel({
   options,
-  vehicle,
   onChange,
 }: {
   readonly options: PackingOptions;
-  /** The vehicle the plan is being built for, for the overhang it allows. */
-  readonly vehicle?: Vehicle | undefined;
   readonly onChange: (options: PackingOptions) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -141,37 +134,6 @@ export function PackingOptionsPanel({
               />
             </div>
           </section>
-
-          {vehicle ? (
-            <section className="space-y-2">
-              <h4 className="text-sm font-semibold text-slate-900">Overhang</h4>
-              <p className="text-xs text-slate-500">
-                Set per vehicle on the Vehicles tab, not here. VDAM states rear
-                overhang against axle spacing, so how far a load may hang out is
-                a fact about a particular unit rather than about this job — and
-                it cannot be derived, because axles are not modelled. Zero means
-                the load must fit on the deck.
-              </p>
-              <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-                <div>
-                  <dt className="text-xs text-slate-500">Vehicle</dt>
-                  <dd className="text-slate-900">{vehicle.name}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Front allowed</dt>
-                  <dd className="tabular-nums text-slate-900">
-                    {vehicle.maxFrontOverhang} mm
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Rear allowed</dt>
-                  <dd className="tabular-nums text-slate-900">
-                    {vehicle.maxRearOverhang} mm
-                  </dd>
-                </div>
-              </dl>
-            </section>
-          ) : null}
 
           <section className="space-y-2">
             <h4 className="text-sm font-semibold text-slate-900">Packing</h4>

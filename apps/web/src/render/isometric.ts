@@ -33,6 +33,86 @@ export function project(
   return {x: (x - y) * COS30, y: (x + y) * SIN30 - z};
 }
 
+/**
+ * Screen-space direction perpendicular to a pile lying along the deck,
+ * pointing at its lit side. (SVG y grows downward, hence the negative.)
+ *
+ * It is the unit normal to the projected deck axis (cos30, sin30).
+ */
+const UP: Point2 = {x: SIN30, y: -COS30};
+
+/**
+ * A circle in the deck's cross-section plane projects to an ellipse.
+ *
+ * Working the projection through, its major axis lands exactly along UP with
+ * semi-axis r·√(1+sin30), and its minor axis is r·√(1−sin30). The major
+ * semi-axis is also the cylinder's silhouette half-width, so the body and the
+ * end cap are governed by the same number — which is why the cap always meets
+ * the body cleanly, at any radius.
+ */
+const CAP_MAJOR = Math.sqrt(1 + SIN30);
+const CAP_MINOR = Math.sqrt(1 - SIN30);
+// Rounded: atan2 leaves float noise that would otherwise land in the markup of
+// every exported or printed drawing.
+const CAP_ROTATION_DEG = Number(
+  ((Math.atan2(UP.y, UP.x) * 180) / Math.PI).toFixed(4),
+);
+
+export interface Cylinder {
+  /** Upper, lit half of the body. */
+  readonly lit: string;
+  /** Lower, shaded half — the two together read as round. */
+  readonly shaded: string;
+  /**
+   * Outline of the whole body. Stroked separately from the two halves so the
+   * shared edge between them does not draw a false seam down the pile's axis.
+   */
+  readonly silhouette: string;
+  readonly capCx: number;
+  readonly capCy: number;
+  readonly capRx: number;
+  readonly capRy: number;
+  readonly capRotation: number;
+}
+
+/**
+ * A cylinder lying along the deck: shaft, or — with a big radius and a short
+ * length — a helix plate. Both are the same shape, so both use this.
+ */
+export function cylinderAlongDeck(
+  x0: Millimetres,
+  x1: Millimetres,
+  y: Millimetres,
+  z: Millimetres,
+  radius: Millimetres,
+): Cylinder {
+  const start = project(x0, y, z);
+  const end = project(x1, y, z);
+  const halfWidth = radius * CAP_MAJOR;
+  const offset = {x: UP.x * halfWidth, y: UP.y * halfWidth};
+
+  const corner = (base: Point2, sign: number): Point2 => ({
+    x: base.x + offset.x * sign,
+    y: base.y + offset.y * sign,
+  });
+
+  return {
+    lit: points(start, end, corner(end, 1), corner(start, 1)),
+    shaded: points(start, end, corner(end, -1), corner(start, -1)),
+    silhouette: points(
+      corner(start, 1),
+      corner(end, 1),
+      corner(end, -1),
+      corner(start, -1),
+    ),
+    capCx: end.x,
+    capCy: end.y,
+    capRx: halfWidth,
+    capRy: radius * CAP_MINOR,
+    capRotation: CAP_ROTATION_DEG,
+  };
+}
+
 export interface Box {
   readonly x0: Millimetres;
   readonly x1: Millimetres;

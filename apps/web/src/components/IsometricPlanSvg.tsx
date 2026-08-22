@@ -1,6 +1,7 @@
 import {
   findPileType,
   maxRadius,
+  radiusProfile,
   tierBaseHeight,
   tierHeights,
   type Catalogue,
@@ -8,16 +9,66 @@ import {
   type Placement,
   type Vehicle,
 } from '@pile-on/core';
-import {boxFaces, depthOrder, projectedBounds} from '../render/isometric';
+import {
+  boxFaces,
+  cylinderAlongDeck,
+  depthOrder,
+  projectedBounds,
+  type Cylinder,
+} from '../render/isometric';
 import {colourForPileType} from '../render/palette';
+
+/**
+ * One cylinder: a lit upper half, a shaded lower half and an elliptical end
+ * cap. Two flat tones rather than a gradient — it reads as round at a glance,
+ * survives being printed in greyscale, and needs no `<defs>` plumbing.
+ */
+function Tube({
+  cylinder,
+  lit,
+  shaded,
+  cap,
+  outline,
+  testId,
+}: {
+  readonly cylinder: Cylinder;
+  readonly lit: string;
+  readonly shaded: string;
+  readonly cap: string;
+  readonly outline: string;
+  readonly testId?: string;
+}) {
+  return (
+    <g data-testid={testId ?? undefined}>
+      <polygon points={cylinder.shaded} fill={shaded} />
+      <polygon points={cylinder.lit} fill={lit} />
+      <polygon
+        points={cylinder.silhouette}
+        fill="none"
+        stroke={outline}
+        strokeWidth={6}
+      />
+      <ellipse
+        cx={cylinder.capCx}
+        cy={cylinder.capCy}
+        rx={cylinder.capRx}
+        ry={cylinder.capRy}
+        transform={`rotate(${cylinder.capRotation} ${cylinder.capCx} ${cylinder.capCy})`}
+        fill={cap}
+        stroke={outline}
+        strokeWidth={6}
+      />
+    </g>
+  );
+}
 
 /**
  * The whole truck in one axonometric view.
  *
- * Piles are drawn as boxes of their widest diameter rather than as cylinders:
- * at this scale a 168 mm shaft on a 12.5 m deck is a few pixels, and the value
- * of the view is seeing how the tiers stack, not admiring the round ends.
- * The exploded top-down views are where the real geometry gets checked.
+ * Piles are drawn as what they are: a shaft cylinder with helix plates on it,
+ * each plate a short fat cylinder at its own station. Drawing the plates
+ * matters — the whole reason a load packs the way it does is where they sit,
+ * and a stack of featureless boxes hides exactly the thing worth looking at.
  */
 export function IsometricPlanSvg({
   vehicle,
@@ -59,23 +110,41 @@ export function IsometricPlanSvg({
     if (!type) {
       return [];
     }
-    const radius = maxRadius(type);
-    const base = tierBaseHeight(placement.tier, heights, options);
+    /*
+     * The pile rests on the tier below, so its axis sits one widest-radius up.
+     * Using the widest radius rather than the shaft radius keeps a helix plate
+     * from cutting through the deck.
+     */
+    const axisZ =
+      tierBaseHeight(placement.tier, heights, options) + maxRadius(type);
+
     return [
       {
         placement,
         x: placement.x,
         y: placement.y,
         tier: placement.tier,
-        faces: boxFaces({
-          x0: placement.x,
-          x1: placement.x + type.length,
-          y0: placement.y - radius,
-          y1: placement.y + radius,
-          z0: base,
-          z1: base + radius * 2,
-        }),
         colour: colourForPileType(type.id),
+        shaft: cylinderAlongDeck(
+          placement.x,
+          placement.x + type.length,
+          placement.y,
+          axisZ,
+          type.shaftRadius,
+        ),
+        // Plates ordered along the deck, so the nearer ones are drawn last.
+        plates: radiusProfile({type, placement})
+          .filter(segment => segment.kind === 'helix')
+          .sort((a, b) => a.start - b.start)
+          .map(segment =>
+            cylinderAlongDeck(
+              segment.start,
+              segment.end,
+              placement.y,
+              axisZ,
+              segment.radius,
+            ),
+          ),
       },
     ];
   });
@@ -113,24 +182,24 @@ export function IsometricPlanSvg({
 
         {depthOrder(drawable).map(item => (
           <g key={item.placement.id} data-testid="iso-pile">
-            <polygon
-              points={item.faces.side}
-              fill={item.colour.helix}
-              stroke={item.colour.outline}
-              strokeWidth={6}
+            <Tube
+              cylinder={item.shaft}
+              lit={item.colour.shaft}
+              shaded={item.colour.helix}
+              cap={item.colour.end}
+              outline={item.colour.outline}
             />
-            <polygon
-              points={item.faces.end}
-              fill={item.colour.end}
-              stroke={item.colour.outline}
-              strokeWidth={6}
-            />
-            <polygon
-              points={item.faces.top}
-              fill={item.colour.shaft}
-              stroke={item.colour.outline}
-              strokeWidth={6}
-            />
+            {item.plates.map((plate, index) => (
+              <Tube
+                key={index}
+                cylinder={plate}
+                lit={item.colour.helix}
+                shaded={item.colour.end}
+                cap={item.colour.end}
+                outline={item.colour.outline}
+                testId="iso-helix"
+              />
+            ))}
           </g>
         ))}
       </svg>

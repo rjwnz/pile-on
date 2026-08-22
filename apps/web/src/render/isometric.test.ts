@@ -1,5 +1,11 @@
 import {describe, expect, it} from '@jest/globals';
-import {boxFaces, depthOrder, project, projectedBounds} from './isometric';
+import {
+  boxFaces,
+  cylinderAlongDeck,
+  depthOrder,
+  project,
+  projectedBounds,
+} from './isometric';
 
 const COS30 = Math.cos(Math.PI / 6);
 
@@ -131,5 +137,82 @@ describe('depthOrder', () => {
     depthOrder(items);
 
     expect(items[0]!.id).toBe('a');
+  });
+});
+
+describe('cylinderAlongDeck', () => {
+  const cylinder = cylinderAlongDeck(0, 6000, 0, 500, 100);
+
+  it('caps the near end of the pile, not the far one', () => {
+    const nearEnd = project(6000, 0, 500);
+
+    expect(cylinder.capCx).toBeCloseTo(nearEnd.x);
+    expect(cylinder.capCy).toBeCloseTo(nearEnd.y);
+  });
+
+  it('makes the cap an ellipse taller than it is wide across the view', () => {
+    // A circle seen at this angle is foreshortened along the line of sight.
+    expect(cylinder.capRx).toBeCloseTo(100 * Math.sqrt(1.5));
+    expect(cylinder.capRy).toBeCloseTo(100 * Math.sqrt(0.5));
+    expect(cylinder.capRx).toBeGreaterThan(cylinder.capRy);
+  });
+
+  it('lays the cap major axis along the screen-up direction', () => {
+    // Exact, not close: float noise here ends up in every printed drawing.
+    expect(cylinder.capRotation).toBe(-60);
+  });
+
+  it('splits the body into a lit and a shaded half, four corners each', () => {
+    expect(cylinder.lit.split(' ')).toHaveLength(4);
+    expect(cylinder.shaded.split(' ')).toHaveLength(4);
+  });
+
+  it('shares the axis line between the two halves, so they meet exactly', () => {
+    const litStart = cylinder.lit.split(' ').slice(0, 2);
+    const shadedStart = cylinder.shaded.split(' ').slice(0, 2);
+
+    expect(litStart).toEqual(shadedStart);
+  });
+
+  it('puts the lit half above the shaded half on screen', () => {
+    const yOf = (poly: string) =>
+      poly.split(' ').map(pair => Number(pair.split(',')[1]));
+
+    expect(Math.min(...yOf(cylinder.lit))).toBeLessThan(
+      Math.min(...yOf(cylinder.shaded)),
+    );
+  });
+
+  it('makes the body half-width match the cap, so the two meet cleanly', () => {
+    // Silhouette half-width and cap major semi-axis are the same number; if
+    // they ever diverge the cap either floats free of the body or bulges out.
+    const [axisX, axisY] = cylinder.lit.split(' ')[1]!.split(',').map(Number);
+    const [edgeX, edgeY] = cylinder.lit.split(' ')[2]!.split(',').map(Number);
+    const halfWidth = Math.hypot(edgeX! - axisX!, edgeY! - axisY!);
+
+    expect(halfWidth).toBeCloseTo(cylinder.capRx);
+  });
+
+  it('scales with radius, so a helix plate uses the same shape as a shaft', () => {
+    const plate = cylinderAlongDeck(400, 510, 0, 500, 225);
+
+    expect(plate.capRx / cylinder.capRx).toBeCloseTo(225 / 100);
+    expect(plate.capRotation).toBeCloseTo(cylinder.capRotation);
+  });
+});
+
+describe('cylinder outline', () => {
+  const cylinder = cylinderAlongDeck(0, 6000, 0, 500, 100);
+
+  it('traces the whole body, not one half', () => {
+    expect(cylinder.silhouette.split(' ')).toHaveLength(4);
+  });
+
+  it('avoids the axis, so no seam is drawn down the middle of a pile', () => {
+    const axisPoints = new Set(cylinder.lit.split(' ').slice(0, 2));
+
+    for (const corner of cylinder.silhouette.split(' ')) {
+      expect(axisPoints.has(corner)).toBe(false);
+    }
   });
 });

@@ -144,6 +144,17 @@ describe('arranging', () => {
     expect(screen.getAllByTestId('iso-pile')).toHaveLength(25);
   });
 
+  it('draws the helix plates in the 3D view, not just the shafts', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+
+    await user.click(screen.getByRole('button', {name: /Arrange 25 piles/}));
+
+    // Two plates on every SP168 — where they sit is the whole story of the
+    // load, so the 3D view has to show them.
+    expect(screen.getAllByTestId('iso-helix')).toHaveLength(50);
+  });
+
   it('reports the load against the truck limits', async () => {
     const user = userEvent.setup();
     renderPlan();

@@ -24,7 +24,7 @@ become another field on the line when it lands.
 ### CSV formats
 
 Headers are case-insensitive and a block pasted from Excel works (tabs are
-detected). Both importers offer merge — update matching ids — or replace.
+detected). Every importer offers merge or replace.
 
 **Pile types.** Helices are flat numbered columns, because this catalogue is
 maintained in a spreadsheet. Any number of helices works; the parser scans
@@ -45,6 +45,18 @@ SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000
 `kind` is one of `rigid`, `semi_trailer`, `full_trailer`, `simple_trailer`,
 `b_train`.
 
+**Piling schedule.** A quantity per pile type. Pile types must already exist in
+the catalogue — a schedule naming an unknown type is rejected with the id, since
+that is the most likely thing to be wrong with it. Repeated types are summed
+rather than overwritten, because schedules routinely list a type once per
+building or grid line.
+
+```
+pile_type_id,quantity
+SP168-D6,120
+SP139-S4,64
+```
+
 ### Why there are no axle limits
 
 Axle positions, tyre classes and the VDAM bridge formula were modelled and then
@@ -62,24 +74,13 @@ the limits come back as a new `VdamRuleset` version, not as an edit to the
 current one. The tables are in
 [docs/00-problem-analysis.md](docs/00-problem-analysis.md).
 
-**Piling schedule.** A quantity per pile type. Pile types must already exist in
-the catalogue — a schedule naming an unknown type is rejected with the id, since
-that is the most likely thing to be wrong with it. Repeated types are summed
-rather than overwritten, because schedules routinely list a type once per
-building or grid line.
-
-```
-pile_type_id,quantity
-SP168-D6,120
-SP139-S4,64
-```
-
 ### Session files
 
-Export writes catalogues *and* plan as one versioned JSON. Import makes you
-choose: **catalogue only**, keeping the plan you are part-way through, or
-**catalogue and plan**. A catalogue-only import can orphan the current plan, so
-the app lists exactly which references broke rather than failing silently.
+Export writes the whole session — catalogues, schedule and plan — as one
+versioned JSON. Import makes you choose: **catalogue only**, keeping the schedule
+and plan you are part-way through, or **everything**. A catalogue-only import can
+orphan the schedule, so the app lists exactly which references broke rather than
+failing silently.
 
 ## Layout
 

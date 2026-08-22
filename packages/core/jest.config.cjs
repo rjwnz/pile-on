@@ -12,6 +12,17 @@ module.exports = {
   rootDir: __dirname,
   testEnvironment: 'node',
   testMatch: ['<rootDir>/src/**/*.test.ts'],
+  /*
+   * `*.hunt.test.ts` is held back from the default run.
+   *
+   * A hunt is a randomised property search: it draws a fresh seed every time
+   * and spends thousands of them, because covering ground it was not told
+   * about is the entire point. That makes it the opposite of what `pnpm test`
+   * and CI need — a green hunt is evidence rather than proof, a red one may
+   * not reproduce, and either takes minutes. Run them deliberately, with
+   * `pnpm hunt`.
+   */
+  testPathIgnorePatterns: ['/node_modules/', '\\.hunt\\.test\\.ts$'],
   transform: {
     '^.+\\.ts$': [
       'ts-jest',

@@ -229,13 +229,27 @@ coverage, and is what CI runs.
 | ------------------------ | --------------------------------------------------------------- |
 | `pnpm dev`               | Vite dev server for the web app                                 |
 | `pnpm build`             | Static production build into `apps/web/dist`                    |
-| `pnpm test`              | Jest across all workspaces                                      |
+| `pnpm test`              | Jest across all workspaces, hunts excluded                      |
 | `pnpm test:coverage`     | Jest with a combined coverage report in `coverage/`             |
+| `pnpm hunt`              | The randomised property searches, on purpose and on their own   |
 | `pnpm typecheck`         | One `tsc` pass over the whole monorepo                          |
 | `pnpm lint` / `pnpm fix` | GTS (Google TypeScript Style) via ESLint + Prettier             |
 | `pnpm bench`             | Trucks used and deck utilisation per fixture, packer vs control |
 
 To run one workspace: `pnpm --filter @pile-on/core test`.
+
+### Hunts
+
+A file named `*.hunt.test.ts` is a hunt: a randomised property search that
+draws a fresh seed every run and spends thousands of them looking for inputs
+nobody thought to write down. The packer's picometre rounding bug was found by
+one.
+
+They are left out of `pnpm test` and therefore out of CI, because they are the
+opposite of a gate. A green hunt is evidence, not proof; a red one may not
+reproduce; and either takes minutes. Run them when you mean to, with `pnpm
+hunt`, and when one does find something, pin it with an ordinary test next to
+the code it broke.
 
 ## Conventions
 

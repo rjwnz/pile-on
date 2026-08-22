@@ -1,12 +1,8 @@
 import {useState} from 'react';
 
 /**
- * A quantity input that keeps its own draft text.
- *
- * Binding a number input straight to state makes clearing the field impossible
- * — backspacing to empty parses as 0 and rewrites the box. Holding the draft
- * locally lets the field be empty or mid-edit while only committing values that
- * are actually whole pile counts, and says so when they are not.
+ * A quantity input that keeps its own draft text, so the field can be empty or
+ * mid-edit while only whole pile counts are committed.
  */
 export function QuantityCell({
   label,
@@ -19,22 +15,19 @@ export function QuantityCell({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
 
+  const wholePiles = (text: string) => {
+    const parsed = text.trim() === '' ? 0 : Number(text);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  };
+
   const shown = draft ?? (value === 0 ? '' : String(value));
-  const parsed = draft === null || draft.trim() === '' ? 0 : Number(draft);
-  const invalid =
-    draft !== null &&
-    draft.trim() !== '' &&
-    (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0);
+  const invalid = draft !== null && wholePiles(draft) === null;
 
   function change(next: string) {
     setDraft(next);
-    const asNumber = next.trim() === '' ? 0 : Number(next);
-    if (
-      Number.isFinite(asNumber) &&
-      Number.isInteger(asNumber) &&
-      asNumber >= 0
-    ) {
-      onCommit(asNumber);
+    const parsed = wholePiles(next);
+    if (parsed !== null) {
+      onCommit(parsed);
     }
   }
 

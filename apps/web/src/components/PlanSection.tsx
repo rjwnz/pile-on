@@ -32,12 +32,8 @@ export function PlanSection() {
     [plan, catalogue, options],
   );
 
-  /*
-   * Grouped once, rather than filtered per truck. The saving is not the
-   * arithmetic — it is that these arrays keep their identity between renders.
-   * The 3D view rebuilds its scene when its placements change, and a fresh
-   * `.filter()` on every render told it they always had.
-   */
+  // Grouped once so the arrays keep their identity between renders — the 3D
+  // view rebuilds its scene when its placements array changes.
   const placementsPerTruck = useMemo(
     () => groupBy(plan.placements, placement => placement.consignmentId),
     [plan.placements],

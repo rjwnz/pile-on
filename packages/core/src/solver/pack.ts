@@ -25,19 +25,11 @@ import {withoutFlips, type PackingOptions} from './options';
 import {packTier, type TierPlacement} from './tier';
 
 /**
- * The helix-aware packer.
- *
- * What separates it from `arrangeNaively` is that it knows a pile is not a
- * cylinder of its widest diameter. A plate is a short fat band on a thin shaft,
- * and if two neighbouring lanes put their plates at different stations they may
- * close up to shaft pitch instead of plate pitch. On a 168 mm shaft with a
- * 450 mm plate that is 334 mm apart instead of 475 — a sixth lane on a deck
- * that fits five.
- *
- * Getting there needs three things, in `stagger.ts`, `lane.ts` and `tier.ts`
- * respectively: the exact set of offsets a lane is worth sliding to, the ways
- * one lane can be filled end to end, and a sweep that puts lanes down as close
- * together as the geometry allows.
+ * The helix-aware packer. Unlike `arrangeNaively` it knows a pile is not a
+ * cylinder of its widest diameter: stagger neighbouring lanes so their plates
+ * miss and they close from plate pitch to shaft pitch — a sixth lane on a deck
+ * that fits five. The pieces live in `stagger.ts` (exact offsets), `lane.ts`
+ * (fill patterns) and `tier.ts` (the sweep).
  */
 
 export interface PackedType {
@@ -84,12 +76,8 @@ interface TierChoice {
  * Pack a job onto trucks of one type.
  *
  * With flipping allowed the job is packed twice, once each way, and the better
- * answer kept. That looks like belt and braces and is not: the sweep is greedy,
- * and a greedy search is not monotone in the size of its candidate set. Handing
- * it more options changes which lane looks best at step one, and occasionally
- * the new favourite is the start of a worse tier. Measured on the fixtures,
- * flipping saves a truck on one job and costs one on another; running both and
- * taking the winner turns an extra lever into an extra lever.
+ * answer kept: the greedy sweep is not monotone in its candidate set, so on
+ * some jobs the extra flip options steer it into a worse tier.
  */
 export function pack(
   job: Job,
@@ -179,18 +167,10 @@ function packOnce(
       }
 
       /*
-       * Try each remaining diameter as the tier's ceiling and keep whichever
-       * fits the most piles into the height it costs. A tier is as tall as its
-       * widest pile, so a narrow tier that holds nearly as much is worth more
-       * than a tall one that holds a little more.
-       *
-       * The ceiling never rises going up the stack — widest and heaviest at the
-       * bottom is how a load is built, and it keeps the centre of gravity down
-       * without needing a roll model to say so. Which is exactly why the bottom
-       * tier does not get a vote: a narrow tier is always denser per millimetre
-       * of height, so left to choose it would take one every time, and then no
-       * wide pile could ever go on this truck at all. The widest thing still
-       * wanted sets the ceiling, and narrower piles fill the lanes it leaves.
+       * Try each remaining diameter as the tier's ceiling and keep the densest
+       * per millimetre of height. The ceiling never rises going up the stack,
+       * and the bottom tier gets no vote — the widest thing still wanted sets
+       * it, else no wide pile could ever board.
        */
       const classes = widthClasses(remaining, catalogue);
       const allowed = tier === 0 ? classes.slice(0, 1) : classes;
@@ -277,14 +257,9 @@ function packOnce(
     }
 
     consignments.push({id: truckId, vehicleId: vehicle.id, phase: null});
-    /*
-     * Settling tiers is an optimisation, and it is checked like one. Moving a
-     * tier can leave the one above it hanging over an edge that used to be
-     * under it — the bound each tier is given only knows about the tier below,
-     * not the ones still to come — so the result is verified and thrown away if
-     * it is worse than useless. What the sweep produced was already supported,
-     * so falling back to it is always safe.
-     */
+    // Settling is an optimisation and is checked like one: verified, and
+    // thrown away for the sweep's own (already supported) layout if it broke
+    // support.
     const settled = settleTiers(
       mirrorTiers(onTruck, catalogue),
       catalogue,
@@ -326,14 +301,10 @@ function intersect(
 }
 
 /**
- * How far a whole tier may slide along the deck.
- *
- * Every pile has to stay inside the vehicle and, above the bottom tier, inside
- * one of the stretches the tier below covers. Which stretch is not fixed in
- * advance — a pile short enough could sit in either of two — so this is a set of
- * intervals intersected pile by pile rather than a single clamp. Clamping is
- * what a first attempt does, and it fails exactly when the tier below has moved
- * out from under this one, which is the case this exists to handle.
+ * How far a whole tier may slide along the deck: every pile must stay on the
+ * vehicle and, above the bottom tier, inside a stretch the tier below covers.
+ * A set of intervals rather than a single clamp, because a short pile could
+ * sit in either of two stretches.
  */
 function shiftRange(
   inTier: readonly Placement[],
@@ -376,23 +347,10 @@ function shiftRange(
 
 /**
  * Slide each tier along the deck to bring the truck onto its balance point.
- *
- * Lanes are laid from the headboard back, so a tier of 4.5 m piles on a 12.5 m
- * deck comes out bunched against the front. Sliding the *whole load* cannot fix
- * that — one tier of 6 m piles pins both ends and the short tiers stay where
- * they were — so each tier moves on its own.
- *
- * Every pile in a tier moves by the same amount, which is what makes it free:
- * relative positions are untouched, so no separation and no stagger the sweep
- * worked out can be disturbed. Tiers settle bottom up, because moving one moves
- * the ground the next one rests on. That is also why this waits until the whole
- * truck is packed rather than happening inside the sweep: shifting a tier out
- * from under the tier being built leaves it nowhere to go.
- *
- * Each tier aims at what the truck needs *so far*, not at the balance point.
- * Aiming every tier at the same mark sounds equivalent and is not: a tier
- * hemmed in by the deck or by the tier below cannot reach it, and if the ones
- * that follow do not know that, nothing ever makes the shortfall up.
+ * Tiers move whole (so nothing inside them is disturbed), settle bottom up
+ * (moving one moves the ground of the next), and each aims at what the truck
+ * needs *so far* — a hemmed-in tier's shortfall is then made up by the ones
+ * above it.
  */
 function settleTiers(
   onTruck: readonly Placement[],
@@ -449,18 +407,10 @@ function settleTiers(
 }
 
 /**
- * Turn tiers back to front across the deck until the truck sits level.
- *
- * The sweep lays lanes from one side, so a tier of unequal diameters comes out
- * with its mass a little biased that way, and the lateral centring inside the
- * tier can only move it as far as the side margins allow — on a tier that fills
- * the deck, barely at all. Four tiers of the same bias make a truck that leans.
- *
- * Flipping the sign of y is the one lateral move that is always free: distances
- * between piles are unchanged, so every separation still holds, and the margins
- * are symmetric so they still hold too. Simply alternating would cancel a pair
- * of identical tiers and nothing else; choosing each tier's side to undo what
- * the tiers below it did handles the general case for the same cost.
+ * Mirror tiers across the deck centreline until the truck sits level. The
+ * sweep biases each tier's mass toward the side it builds from; flipping the
+ * sign of y is free (distances and margins are symmetric), and each tier picks
+ * the side that best undoes the bias of the tiers below it.
  */
 function mirrorTiers(
   onTruck: readonly Placement[],
@@ -489,17 +439,10 @@ function mirrorTiers(
 }
 
 /**
- * Move single lanes, once moving whole tiers has run out of road.
- *
- * Sliding a tier is free because nothing inside it changes. Sliding one lane is
- * not: it re-aims that lane's plates against its neighbours', and a stagger the
- * sweep worked out can come undone. So each nudge is applied, checked against
- * every rule it could break, and rolled back if it broke one.
- *
- * This is the last resort and it only runs when the load is genuinely out of
- * tolerance, which on a real catalogue is rare. It earns its place on the
- * awkward ones — a lane holding three piles where four fit, or a lane of unequal
- * lengths whose mass sits away from its middle.
+ * Move single lanes, once moving whole tiers has run out of road. Unlike a
+ * tier shift this can undo a stagger, so each nudge is applied, checked, and
+ * rolled back if it broke anything. Last resort; only runs when the load is
+ * genuinely out of tolerance.
  */
 function nudgeLanes(
   onTruck: readonly Placement[],
@@ -607,11 +550,13 @@ function laneStillClears(
 
   const moved = load
     .filter(p => `${p.tier}:${p.y}` === lane)
-    .flatMap(p => (resolve(p) ? [resolve(p)!] : []));
+    .map(resolve)
+    .filter(placed => placed !== null);
   const tier = moved[0]?.placement.tier;
   const others = load
     .filter(p => p.tier === tier && `${p.tier}:${p.y}` !== lane)
-    .flatMap(p => (resolve(p) ? [resolve(p)!] : []));
+    .map(resolve)
+    .filter(placed => placed !== null);
 
   for (const mine of moved) {
     for (const other of others) {
@@ -670,11 +615,8 @@ function consume(
 }
 
 /**
- * Where a tier has material, along the deck.
- *
- * `coveredSpans` is the validator's own merge, imported rather than
- * reimplemented — if the packer had its own idea of when bearers bridge a gap
- * it would build tiers the support rule then rejects.
+ * Where a tier has material, along the deck. Uses the validator's own
+ * `coveredSpans` so the packer cannot build tiers the support rule rejects.
  */
 function spansOf(
   placed: readonly (TierPlacement | Placement)[],

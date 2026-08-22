@@ -11,16 +11,10 @@ import {colourForPileType} from '../render/palette';
 const LABEL_BAND = 420;
 
 /**
- * One tier of one truck, seen from above, drawn in deck millimetres.
- *
- * The viewBox is the deck itself, so nothing is ever scaled by hand and the
- * drawing stays exact at any size — which matters, because this is the drawing
- * a yard hand holds up against a real truck.
- *
- * Piles come from their radius profile rather than a bounding box, so the
- * plates appear where they actually are. Seeing whether plates line up or
- * stagger is the entire reason this view is exploded per tier instead of
- * overlaid.
+ * One tier of one truck, seen from above, drawn in deck millimetres — the
+ * viewBox is the deck itself, so the drawing stays exact at any size. Piles
+ * come from their radius profile, so the plates appear where they actually
+ * are; seeing them stagger is the point of the exploded view.
  */
 export function TierPlanSvg({
   vehicle,

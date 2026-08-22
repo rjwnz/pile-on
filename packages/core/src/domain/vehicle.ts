@@ -18,17 +18,9 @@ export const VEHICLE_KIND_LABELS: Readonly<Record<VehicleKind, string>> = {
 };
 
 /**
- * A deck to load, and the mass it may carry.
- *
- * Deliberately no axles. In this operation the total payload limit is always
- * reached before any individual axle or axle-set limit, so modelling axle
- * positions, tyre classes and the VDAM bridge formula bought complexity — and a
- * deck-origin-to-axle coordinate mapping — for a constraint that never binds.
- * Mass compliance is `payloadCapacity`, and nothing else.
- *
- * Even distribution is still required, but that is a load-balance question
- * (centroid against the deck centre and the centreline) and does not need axle
- * geometry to answer.
+ * A deck to load, and the mass it may carry. Deliberately no axles: payload is
+ * always reached before any axle limit in this operation, so mass compliance
+ * is `payloadCapacity` and nothing else.
  */
 export interface Vehicle {
   readonly id: string;
@@ -41,25 +33,14 @@ export interface Vehicle {
   readonly tare: Kilograms;
   /** GVM for a rigid, GCM for a combination. */
   readonly maxGross: Kilograms;
-  /**
-   * How far a load may hang past the front of the deck, and past the rear.
-   *
-   * VDAM states rear overhang as the lesser of a fixed distance and a fraction
-   * of the axle spacing — which needs axle positions, and those were removed on
-   * purpose. So this is not derived: it is what the yard will accept on this
-   * unit, and zero (the load must fit on the deck) is the safe default.
-   */
+  /** How far a load may hang past each end of the deck. Not derived — VDAM
+   * states it against axle spacing, which is not modelled — but what the yard
+   * accepts on this unit. Zero is the safe default. */
   readonly maxFrontOverhang: Millimetres;
   readonly maxRearOverhang: Millimetres;
-  /**
-   * Where this deck wants its load centroid, measured from the headboard.
-   *
-   * Null means nobody has said, and mid-length is assumed. That is a default,
-   * not a truth — a semi wants mass forward toward the kingpin and a rigid with
-   * a rear axle group does not, and without axle positions there is no way to
-   * work out which. Recording "unstated" separately from a real figure keeps the
-   * assumption visible instead of baking it in.
-   */
+  /** Where this deck wants its load centroid, from the headboard. Null means
+   * unstated (mid-length assumed) — kept separate so the assumption stays
+   * visible. */
   readonly balanceTarget: Millimetres | null;
 }
 

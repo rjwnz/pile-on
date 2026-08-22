@@ -1,5 +1,5 @@
-import type {ReactNode} from 'react';
-import type {Issue} from '@pile-on/core';
+import {useState, type ReactNode} from 'react';
+import type {Issue, Result} from '@pile-on/core';
 
 /* Minimal shared primitives. Deliberately plain — this is a working tool. */
 
@@ -157,5 +157,65 @@ export function EmptyState({children}: {readonly children: ReactNode}) {
     <p className="rounded border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
       {children}
     </p>
+  );
+}
+
+/**
+ * Validate on submit through the same parser an import would use — there is no
+ * second, weaker validator living in the UI.
+ */
+export function useValidatedSubmit<T>(
+  parse: () => Result<T>,
+  onSave: (value: T) => void,
+) {
+  const [issues, setIssues] = useState<readonly Issue[]>([]);
+  return {
+    issues,
+    submit() {
+      const result = parse();
+      if (!result.ok) {
+        setIssues(result.issues);
+        return;
+      }
+      setIssues([]);
+      onSave(result.value);
+    },
+  };
+}
+
+/** The add/edit form chrome shared by the catalogue editors. */
+export function EntityForm({
+  title,
+  submitLabel,
+  issues,
+  onSubmit,
+  onCancel,
+  children,
+}: {
+  readonly title: string;
+  readonly submitLabel: string;
+  readonly issues: readonly Issue[];
+  readonly onSubmit: () => void;
+  readonly onCancel: () => void;
+  readonly children: ReactNode;
+}) {
+  return (
+    <form
+      className="space-y-4 rounded border border-sky-300 bg-sky-50/50 p-4"
+      onSubmit={event => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      {children}
+      <IssueList issues={issues} />
+      <div className="flex gap-2">
+        <Button type="submit" variant="primary">
+          {submitLabel}
+        </Button>
+        <Button onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
   );
 }

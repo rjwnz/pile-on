@@ -3,10 +3,9 @@ import {
   maxRadius,
   parsePileTypeEntry,
   type CsvRow,
-  type Issue,
   type PileType,
 } from '@pile-on/core';
-import {Button, Field, IssueList} from './ui';
+import {Button, EntityForm, Field, useValidatedSubmit} from './ui';
 
 interface HelixDraft {
   readonly offset: string;
@@ -47,11 +46,7 @@ function toDraft(type: PileType): Draft {
   };
 }
 
-/**
- * Flatten the draft into the same CSV row shape the importer consumes, so the
- * form is validated by exactly the rules a CSV would be. There is no second,
- * weaker validator living in the UI.
- */
+/** Flatten the draft into the CSV row shape the importer's validator consumes. */
 export function draftToRow(draft: Draft): CsvRow {
   const row: Record<string, string> = {
     id: draft.id,
@@ -78,7 +73,10 @@ export function PileTypeForm({
   readonly onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(editing ? toDraft(editing) : BLANK);
-  const [issues, setIssues] = useState<readonly Issue[]>([]);
+  const {issues, submit} = useValidatedSubmit(
+    () => parsePileTypeEntry(draftToRow(draft)),
+    onSave,
+  );
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft(current => ({...current, [key]: value}));
@@ -93,30 +91,16 @@ export function PileTypeForm({
     }));
   }
 
-  function submit() {
-    const result = parsePileTypeEntry(draftToRow(draft));
-    if (!result.ok) {
-      setIssues(result.issues);
-      return;
-    }
-    setIssues([]);
-    onSave(result.value);
-  }
-
   const helixCount = draft.helices.filter(h => h.radius.trim() !== '').length;
 
   return (
-    <form
-      className="space-y-4 rounded border border-sky-300 bg-sky-50/50 p-4"
-      onSubmit={event => {
-        event.preventDefault();
-        submit();
-      }}
+    <EntityForm
+      title={editing ? `Edit ${editing.id}` : 'New pile type'}
+      submitLabel={editing ? 'Save changes' : 'Add pile type'}
+      issues={issues}
+      onSubmit={submit}
+      onCancel={onCancel}
     >
-      <h3 className="text-sm font-semibold text-slate-900">
-        {editing ? `Edit ${editing.id}` : 'New pile type'}
-      </h3>
-
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Id" value={draft.id} onChange={v => set('id', v)} />
         <Field label="Name" value={draft.name} onChange={v => set('name', v)} />
@@ -204,16 +188,7 @@ export function PileTypeForm({
           Add a plate
         </Button>
       </fieldset>
-
-      <IssueList issues={issues} />
-
-      <div className="flex gap-2">
-        <Button type="submit" variant="primary">
-          {editing ? 'Save changes' : 'Add pile type'}
-        </Button>
-        <Button onClick={onCancel}>Cancel</Button>
-      </div>
-    </form>
+    </EntityForm>
   );
 }
 

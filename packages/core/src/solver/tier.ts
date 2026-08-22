@@ -1,3 +1,4 @@
+import {groupBy} from '../collections';
 import type {Catalogue} from '../domain/catalogue';
 import {findPileType} from '../domain/catalogue';
 import {maxRadius, type PileType} from '../domain/pile';
@@ -46,12 +47,8 @@ export interface TierInput {
 }
 
 /**
- * How much room two piles need between their axes, given they share a tier.
- *
- * Both rest on their own widest point, so their axes sit at different heights
- * whenever their diameters differ — and the tier's base height cancels, so the
- * offset is just the difference in widest radius. That is height the lateral
- * requirement gets to spend.
+ * Height difference between two axes sharing a tier: each pile rests on its
+ * widest point, so the offset is just the difference in widest radius.
  */
 function verticalOffset(a: PileType, b: PileType): Millimetres {
   return maxRadius(a) - maxRadius(b);
@@ -190,12 +187,8 @@ function candidatesFor(state: SweepState, input: TierInput): Candidate[] {
 
   const neighbourPlates: Interval[] = helixIntervals(state.placed);
 
-  /*
-   * Scored in two passes. The cheap pass measures each offset against the last
-   * lane placed, which is nearly always the one that binds; only the shortlist
-   * is then measured against every pile in the tier. Skipping that split makes
-   * the sweep tens of times slower for the same answer.
-   */
+  // Two passes: score cheaply against the last lane (which nearly always
+  // binds), then measure only the shortlist against the whole tier.
   const lastLaneY = state.placed.reduce(
     (highest, pile) => Math.max(highest, pile.placement.y),
     -Infinity,
@@ -227,17 +220,10 @@ function candidatesFor(state: SweepState, input: TierInput): Candidate[] {
         OFFSETS_TRIED,
       );
 
-      /*
-       * One more offset, which staggering would never think of: the one that
-       * puts this lane's own centre of mass on the balance point.
-       *
-       * It matters for the lane that is not full. A lane holding three piles
-       * where four fit has metres of slack, and every offset in it staggers
-       * just as well, so without a reason to prefer one the lane sits against
-       * the headboard and drags the whole truck forward with it. Nothing later
-       * can undo that: sliding the finished tier is bounded by the full lanes
-       * beside it, which are already at both ends of the deck.
-       */
+      // One extra offset staggering would never propose: centre this lane's
+      // mass on the balance point. A part-full lane has metres of slack that
+      // stagger equally well, and without this it sits at the headboard and
+      // drags the truck forward in a way nothing later can undo.
       const centring = target - laneCentre(zeroOffset);
       offsets.push(Math.min(Math.max(centring, 0), variant.slack));
 
@@ -259,21 +245,10 @@ function candidatesFor(state: SweepState, input: TierInput): Candidate[] {
   }
 
   /*
-   * Shortlisted per width class, not overall.
-   *
-   * Sorting the whole rough list by how far across the deck it lands and
-   * keeping the front of it looks reasonable and is quietly fatal: a narrow
-   * lane always lands closer in, so the wide lanes are all cut before anything
-   * gets to weigh them — and then a lane too narrow to be worth its height wins
-   * by default. Keeping the best few of *each* diameter means both the wide
-   * option and the fill-in option reach the scoring below.
+   * Shortlisted per width class, not overall: narrow lanes always land closer
+   * in, so a single shortlist would cut every wide lane before scoring sees it.
    */
-  const byClass = new Map<Millimetres, typeof rough>();
-  for (const entry of rough) {
-    const group = byClass.get(entry.pattern.halfWidth) ?? [];
-    group.push(entry);
-    byClass.set(entry.pattern.halfWidth, group);
-  }
+  const byClass = groupBy(rough, entry => entry.pattern.halfWidth);
   const shortlist = [...byClass.values()].flatMap(group =>
     group
       .sort(
@@ -308,18 +283,9 @@ function candidatesFor(state: SweepState, input: TierInput): Candidate[] {
   }
 
   /*
-   * Widest first, then densest.
-   *
-   * Density alone reads correctly and packs badly. A narrow lane always carries
-   * more piles per millimetre of deck width, so a sweep that only chases
-   * density fills every tier with the small stuff and leaves the wide piles for
-   * a later truck — and wide piles are the scarce resource, because they are
-   * the ones that need the width. Deferring them never saves a truck and
-   * regularly costs one.
-   *
-   * So a lane carrying the widest thing still wanted goes down first. Once
-   * those run out, or stop fitting the strip that is left, density takes over
-   * and the narrow piles fill in around them.
+   * Widest first, then densest. Density alone fills every tier with narrow
+   * lanes and defers the wide piles — the scarce resource — to a later truck,
+   * which regularly costs one.
    */
   const widest = Math.max(...candidates.map(entry => entry.pattern.halfWidth));
   const rank = (entry: Candidate) =>
@@ -350,16 +316,11 @@ function apply(state: SweepState, candidate: Candidate): SweepState {
 }
 
 /**
- * Fill one tier, sweeping lanes across the deck.
- *
- * Each step picks a lane — which piles, laid out how, slid how far along, and
- * flipped or not — and drops it at the leftmost y that clears everything
- * already down. The offsets it tries are exact rather than sampled, so the best
- * stagger against the current neighbour is always among them.
- *
- * A beam of part-built tiers is carried rather than one, because the densest
- * lane to place now sometimes leaves a strip too narrow for anything, and a
- * slightly worse lane would have left it usable.
+ * Fill one tier, sweeping lanes across the deck. Each step picks a lane and
+ * drops it at the leftmost y that clears everything already down; offsets are
+ * exact, not sampled. A beam of part-built tiers is carried because the
+ * densest lane now sometimes strands a strip a worse lane would have kept
+ * usable.
  */
 export function packTier(input: TierInput): TierResult {
   const {options, vehicle} = input;
@@ -411,20 +372,9 @@ function clamp(value: number, low: number, high: number): number {
 }
 
 /**
- * Slide the finished tier across the deck onto the centreline.
- *
- * The sweep builds from the kerb side outward, so what it produces is pressed
- * against one edge. Moving the whole tier at once is what makes this free:
- * every pile keeps its position relative to every other, so no separation and
- * no stagger the sweep worked out can be disturbed by it.
- *
- * Centring by *mass* rather than by extent is what keeps the truck balanced,
- * clamped to whatever still leaves both side margins intact — the margin is a
- * hard bound and the balance is a tolerance.
- *
- * Settling the tier *along* the deck is the same idea and is deliberately not
- * done here. It has to wait until every tier of the truck is packed, because
- * moving one tier moves the ground the next one is checked against.
+ * Slide the finished tier across the deck onto the centreline — by mass, not
+ * extent, clamped to the side margins. Moving the whole tier keeps every
+ * relative position, so no separation or stagger can be disturbed.
  */
 function centred(state: SweepState, halfDeck: Millimetres): TierResult {
   if (state.placed.length === 0) {

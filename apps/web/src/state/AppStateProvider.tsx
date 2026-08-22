@@ -24,11 +24,7 @@ interface AppStateContextValue {
 
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
-/**
- * Restore the last session. A corrupt or stale entry starts a fresh session
- * rather than crashing the app — nothing here is the system of record, the
- * exported JSON file is.
- */
+/** Restore the last session; a corrupt entry starts fresh rather than crashing. */
 function loadPersistedState(storage: Storage | undefined): AppState {
   const fallback = emptyAppState('');
   if (!storage) {

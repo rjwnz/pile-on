@@ -24,24 +24,13 @@ export interface SeparationOptions {
  *      may overlap in plan. Then rule 2 binds on each side and the requirement
  *      relaxes to `max(helixA + shaftB, shaftA + helixB) + helixToShaft`.
  *
- * A double-helix pile gets no relaxation against any neighbour, single or
- * double.
+ * A double-helix pile gets no relaxation against any neighbour. Rule 2 is what
+ * makes staggering worth doing: plates that miss each other drop the
+ * requirement from plate-to-plate to plate-to-shaft.
  *
- * Rule 2 is what makes longitudinal staggering worth doing: sliding one pile so
- * its plates miss the neighbour's plates drops the requirement from
- * `helixA + helixB` to `max(helixA + shaftB, shaftA + helixB)` — for a 400 mm
- * helix on a 100 mm shaft, from 400 mm apart to 250 mm apart.
- *
- * The clearance is added *inside* the max rather than once at the end, because
- * which clearance applies depends on which case the station is in. With all
- * three set equal this is arithmetically identical to adding one at the end.
- *
- * This is a distance between axes, not a lateral gap: two piles of different
- * diameter sit at different heights in the same tier, and that vertical offset
- * counts. `requiredLateralSeparation` turns it into a `Δy` for a known `Δz`.
- *
- * Returns 0 when the piles never overlap longitudinally, meaning they may share
- * a lane end-to-end at the same `y`.
+ * This is a distance between axes, not a lateral gap —
+ * `requiredLateralSeparation` turns it into a `Δy` for a known `Δz`. Returns 0
+ * when the piles never overlap longitudinally.
  */
 export function requiredAxisDistance(
   a: PlacedPile,
@@ -76,18 +65,10 @@ export function requiredAxisDistance(
   );
 
   for (const [index, point] of points.entries()) {
-    /*
-     * Skip stations too narrow to be real.
-     *
-     * The packer staggers plates so they just miss, and the exact answer is
-     * plates that abut — zero overlap. Ask for that in floating point, after a
-     * lane has been centred on the deck by some non-terminating fraction, and
-     * what comes back is an overlap of a picometre or so. Sampled naively, that
-     * sliver reads as "both piles present a plate here" and demands the full
-     * plate-to-plate pitch, condemning a load the packer had every right to
-     * build. Nothing narrower than the tolerance every other comparison in this
-     * file already works to is a station worth separating for.
-     */
+    // Skip stations too narrow to be real: exactly-abutting plates come back
+    // from float arithmetic overlapping by a picometre, and sampling that
+    // sliver would demand plate-to-plate pitch for a stagger the packer got
+    // right.
     const until = points[index + 1] ?? overlapEnd;
     if (until - point <= GEOMETRIC_EPSILON) {
       continue;
@@ -119,14 +100,9 @@ export function requiredAxisDistance(
 }
 
 /**
- * The minimum `|Δy|` two piles may be placed at, given a known vertical offset
- * between their axes.
- *
- * Piles are parallel cylinders, so what has to be respected is the distance
- * between their axes. Any height difference is distance already spent: a pile
- * whose plates put its axis 275 mm higher than its neighbour's needs
- * correspondingly less room across the deck. At `deltaZ = 0` this is exactly
- * `requiredAxisDistance`.
+ * The minimum `|Δy|` two piles may sit at, given a known vertical offset
+ * between their axes: height difference is axis distance already spent. At
+ * `deltaZ = 0` this is exactly `requiredAxisDistance`.
  */
 export function requiredLateralSeparation(
   a: PlacedPile,

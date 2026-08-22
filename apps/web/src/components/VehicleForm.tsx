@@ -4,11 +4,10 @@ import {
   VEHICLE_KIND_LABELS,
   parseVehicleEntry,
   type CsvRow,
-  type Issue,
   type Vehicle,
   type VehicleKind,
 } from '@pile-on/core';
-import {Button, Field, IssueList, SelectField} from './ui';
+import {EntityForm, Field, SelectField, useValidatedSubmit} from './ui';
 
 interface Draft {
   readonly id: string;
@@ -57,11 +56,7 @@ function toDraft(vehicle: Vehicle): Draft {
   };
 }
 
-/**
- * Flatten the draft into the same CSV row shape the importer consumes, so the
- * form is validated by exactly the rules a CSV would be. There is no second,
- * weaker validator living in the UI.
- */
+/** Flatten the draft into the CSV row shape the importer's validator consumes. */
 export function draftToRow(draft: Draft): CsvRow {
   return {
     id: draft.id,
@@ -88,36 +83,25 @@ export function VehicleForm({
   readonly onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(editing ? toDraft(editing) : BLANK);
-  const [issues, setIssues] = useState<readonly Issue[]>([]);
+  const {issues, submit} = useValidatedSubmit(
+    () => parseVehicleEntry(draftToRow(draft)),
+    onSave,
+  );
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft(current => ({...current, [key]: value}));
   }
 
-  function submit() {
-    const result = parseVehicleEntry(draftToRow(draft));
-    if (!result.ok) {
-      setIssues(result.issues);
-      return;
-    }
-    setIssues([]);
-    onSave(result.value);
-  }
-
   const payload = Number(draft.maxGross) - Number(draft.tare);
 
   return (
-    <form
-      className="space-y-4 rounded border border-sky-300 bg-sky-50/50 p-4"
-      onSubmit={event => {
-        event.preventDefault();
-        submit();
-      }}
+    <EntityForm
+      title={editing ? `Edit ${editing.id}` : 'New vehicle'}
+      submitLabel={editing ? 'Save changes' : 'Add vehicle'}
+      issues={issues}
+      onSubmit={submit}
+      onCancel={onCancel}
     >
-      <h3 className="text-sm font-semibold text-slate-900">
-        {editing ? `Edit ${editing.id}` : 'New vehicle'}
-      </h3>
-
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Id" value={draft.id} onChange={v => set('id', v)} />
         <Field label="Name" value={draft.name} onChange={v => set('name', v)} />
@@ -205,15 +189,6 @@ export function VehicleForm({
           first.
         </p>
       ) : null}
-
-      <IssueList issues={issues} />
-
-      <div className="flex gap-2">
-        <Button type="submit" variant="primary">
-          {editing ? 'Save changes' : 'Add vehicle'}
-        </Button>
-        <Button onClick={onCancel}>Cancel</Button>
-      </div>
-    </form>
+    </EntityForm>
   );
 }

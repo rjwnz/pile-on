@@ -5,13 +5,9 @@ import type {Catalogue} from './catalogue';
 import {findPileType} from './catalogue';
 
 /**
- * Minimum steel-to-steel gaps, by which two surfaces are meeting.
- *
- * Three numbers rather than one, because the cases are physically different:
- * two shafts touching is a hard clash, a plate passing a shaft is the one
- * staggering is meant to exploit, and two plates at the same station is what a
- * double-helix pile can never avoid. The yard sets them independently, and
- * setting them equal collapses this back to a single clearance.
+ * Minimum steel-to-steel gaps, by which two surfaces are meeting. Three
+ * numbers because the cases are physically different; equal values collapse to
+ * a single clearance.
  */
 export interface ClearanceOptions {
   /** Shaft to shaft — the absolute floor, wherever two piles overlap. */
@@ -23,14 +19,10 @@ export interface ClearanceOptions {
 }
 
 /**
- * How far the load centroid may sit from where the deck wants it.
- *
- * Balance is not legally specified. It stands in for axle-set limits, the 20%
- * front-axle rule and the static roll threshold — all of which need the
- * deck-origin-to-axle mapping this model deliberately does not carry. So no
- * tolerance here can be *derived* to guarantee legality, and the defaults err
- * tight on purpose: too tight rejects a legal load visibly, too loose accepts an
- * illegal one silently. See docs/01-packer-design.md §4.6.
+ * How far the load centroid may sit from where the deck wants it. Stands in
+ * for axle-set limits this model deliberately does not carry, so the defaults
+ * err tight: too tight rejects visibly, too loose accepts silently. See
+ * docs/01-packer-design.md §4.6.
  */
 export interface BalanceTolerance {
   /** Along the deck, from the vehicle's balance target. */
@@ -40,12 +32,9 @@ export interface BalanceTolerance {
 }
 
 /**
- * How this yard loads a truck, and what makes a load legal.
- *
- * Shared by the arranger, the packer and the validator, so that what gets built
- * and what gets checked cannot drift apart. Everything here bears on whether a
- * plan is *valid*; options that only shape what the search is allowed to try
- * live in `PackingOptions` instead.
+ * How this yard loads a truck, and what makes a load legal. Shared by the
+ * arranger, the packer and the validator so what gets built and what gets
+ * checked cannot drift apart; search-only knobs live in `PackingOptions`.
  */
 export interface LoadingOptions {
   readonly clearances: ClearanceOptions;
@@ -60,13 +49,8 @@ export interface LoadingOptions {
   readonly headboardGap: Millimetres;
   /** Practical ceiling on tiers, whatever the height limit allows. */
   readonly maxTiers: number;
-  /**
-   * Bearers, chocks and lashings for one tier.
-   *
-   * Small against a 28 t payload, but it is the difference between under the
-   * limit on paper and under the limit at the weighbridge, so the packer
-   * reserves it and the validator counts it.
-   */
+  /** Bearers, chocks and lashings for one tier — counted against the payload,
+   * because the weighbridge counts them. */
   readonly ancillaryMassPerTier: Kilograms;
 }
 
@@ -76,15 +60,7 @@ const DEFAULT_CLEARANCES: ClearanceOptions = Object.freeze({
   helixToHelix: 25,
 });
 
-/**
- * Placeholders, and tight on purpose — see `BalanceTolerance`.
- *
- * 200 mm longitudinal is about five times the finest adjustment a single pile
- * can make on a full deck, so it is reliably reachable, and it stays inside the
- * range where the rule can still fire even on a short rigid deck. 50 mm lateral
- * costs almost nothing, because lanes are generated symmetric about the
- * centreline and a load lands near-balanced by construction.
- */
+// Placeholders, tight on purpose — see `BalanceTolerance`.
 const DEFAULT_BALANCE_TOLERANCE: BalanceTolerance = Object.freeze({
   longitudinal: 200,
   lateral: 50,
@@ -116,13 +92,7 @@ export function tiersOf(placements: readonly Placement[]): number[] {
   );
 }
 
-/**
- * Height of each tier, keyed by tier index.
- *
- * A tier is as tall as its widest pile — mixing diameters in one tier wastes
- * the difference, which is exactly the sort of thing the view should make
- * visible.
- */
+/** Height of each tier, keyed by tier index. A tier is as tall as its widest pile. */
 export function tierHeights(
   placements: readonly Placement[],
   catalogue: Catalogue,
@@ -160,15 +130,9 @@ function tierBaseHeight(
 }
 
 /**
- * Height of a placed pile's axis above the deck.
- *
- * A pile rests on its widest point — for a helical pile that is the plates, not
- * the shaft — so its axis sits one widest-radius above the bearers. Two piles of
- * different diameter therefore sit at *different* heights in the same tier, and
- * that vertical offset is real clearance the lateral separation rule can spend.
- *
- * It lives here, not in the renderer, so the drawing cannot quietly disagree
- * with the packer and the validator about where steel actually is.
+ * Height of a placed pile's axis above the deck. A pile rests on its widest
+ * point, so piles of different diameter sit at different heights in one tier —
+ * offset the lateral separation rule gets to spend.
  */
 export function axisHeightOf(
   placed: PlacedPile,

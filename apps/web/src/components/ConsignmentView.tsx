@@ -16,11 +16,7 @@ import {
   type Placement,
   type Violation,
 } from '@pile-on/core';
-/*
- * three.js is most of the bundle, and plenty of sessions never leave the
- * catalogue tabs. Loading it only when a plan is actually on screen keeps that
- * weight off everyone else.
- */
+// three.js is most of the bundle; load it only when a plan is on screen.
 const IsometricPlanCanvas = lazy(async () => ({
   default: (await import('./IsometricPlanCanvas')).IsometricPlanCanvas,
 }));
@@ -29,12 +25,7 @@ import {TierPlanSvg} from './TierPlanSvg';
 
 const ISOMETRIC_TITLE = 'Loaded truck';
 
-/**
- * The box the 3D view will occupy, held open before it arrives.
- *
- * Same dimensions as the real thing, so a truck coming into view does not shove
- * the rest of the page down as it builds.
- */
+/** The 3D view's box, held open at full size so its arrival shifts nothing. */
 function IsometricPlaceholder({note}: {readonly note: string}) {
   return (
     <figure className="space-y-1">
@@ -78,11 +69,7 @@ function Metric({
 
 /**
  * One truck: the numbers, then the exploded per-tier plans, then the 3D view.
- *
- * Tiers are stacked down the page rather than literally side by side. On a
- * 12.5 m × 2.45 m deck the panels are five times wider than they are tall, so
- * placing them abreast would shrink each one past the point of being checkable
- * — the point of exploding them is that each tier gets the full width.
+ * Tiers stack down the page — abreast, each would be too small to check.
  */
 function Truck({
   consignment,
@@ -101,12 +88,8 @@ function Truck({
   readonly options: LoadingOptions;
   readonly violations: readonly Violation[];
 }) {
-  /*
-   * The 3D view is built only once this truck is scrolled to. A plan is a tall
-   * page and only one truck is on screen at a time, so building all of them on
-   * arrival is work done for nobody. Declared before the early return below,
-   * because hooks cannot be conditional.
-   */
+  // The 3D view is built only once this truck is scrolled to. Declared before
+  // the early return below, because hooks cannot be conditional.
   const stageRef = useRef<HTMLDivElement>(null);
   const showIsometric = useInView(stageRef);
 
@@ -132,11 +115,8 @@ function Truck({
   const width = loadWidth(placements, catalogue);
   const offset = balanceOffset(placements, catalogue, vehicle);
   const overhang = loadOverhang(placements, catalogue, vehicle);
-  /*
-   * Shown only when there is something to say — either the load is hanging out
-   * or the yard has said it may. A column reading "0 of 0 mm" on every truck is
-   * noise, and noise is what stops the one that matters being noticed.
-   */
+  // Shown only when the load hangs out or the yard has said it may — a
+  // "0 of 0 mm" column on every truck is noise.
   const showOverhang =
     overhang.front > 0 ||
     overhang.rear > 0 ||
@@ -290,12 +270,6 @@ function Truck({
   );
 }
 
-/**
- * Memoised, and it earns its keep.
- *
- * Rebuilding a truck means rebuilding its 3D scene, which is the expensive
- * thing on this page. Now that the caller hands over arrays that keep their
- * identity, this stops a change elsewhere in the panel — picking a different
- * vehicle to pack onto, say — from touching trucks whose load has not moved.
- */
+// Memoised: rebuilding a truck rebuilds its 3D scene, the expensive thing on
+// this page, and unrelated panel edits must not touch unmoved trucks.
 export const ConsignmentView = memo(Truck);

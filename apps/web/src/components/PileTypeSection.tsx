@@ -1,4 +1,3 @@
-import {useState} from 'react';
 import {
   PILE_TYPE_CSV_EXAMPLE,
   isSingleHelix,
@@ -6,6 +5,7 @@ import {
   toMetres,
   type PileType,
 } from '@pile-on/core';
+import {useEditor} from '../lib/useEditor';
 import {useAppState} from '../state/AppStateProvider';
 import {CsvImportPanel} from './CsvImportPanel';
 import {PileTypeForm, describeWidth} from './PileTypeForm';
@@ -13,24 +13,20 @@ import {Button, EmptyState, Panel} from './ui';
 
 export function PileTypeSection() {
   const {state, dispatch} = useAppState();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-
   const pileTypes = state.catalogue.pileTypes;
-  const editing = pileTypes.find(type => type.id === editingId);
+  const editor = useEditor(pileTypes);
 
   function save(pileType: PileType) {
     dispatch({type: 'upsertPileType', pileType});
-    setAdding(false);
-    setEditingId(null);
+    editor.close();
   }
 
   return (
     <Panel
       title={`Pile types (${pileTypes.length})`}
       actions={
-        !adding && !editing ? (
-          <Button variant="primary" onClick={() => setAdding(true)}>
+        !editor.adding && !editor.editing ? (
+          <Button variant="primary" onClick={editor.startAdd}>
             Add pile type
           </Button>
         ) : null
@@ -98,10 +94,7 @@ export function PileTypeSection() {
                   <td className="py-2 text-right whitespace-nowrap">
                     <Button
                       variant="quiet"
-                      onClick={() => {
-                        setEditingId(type.id);
-                        setAdding(false);
-                      }}
+                      onClick={() => editor.startEdit(type.id)}
                     >
                       Edit
                     </Button>
@@ -121,14 +114,11 @@ export function PileTypeSection() {
         </div>
       )}
 
-      {adding || editing ? (
+      {editor.adding || editor.editing ? (
         <PileTypeForm
-          editing={editing}
+          editing={editor.editing}
           onSave={save}
-          onCancel={() => {
-            setAdding(false);
-            setEditingId(null);
-          }}
+          onCancel={editor.close}
         />
       ) : null}
 

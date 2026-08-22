@@ -14,21 +14,10 @@ import {shiftToBalance} from './balance';
 import {unplaceableReason} from './feasibility';
 
 /**
- * The naive bounding-box arranger — the *control*, not the packer.
- *
- * It treats every pile as a cylinder of its widest diameter for its whole
- * length, gives each tier over to a single pile type, and never staggers or
- * flips anything. That is deliberately wasteful: it is what a generic load
- * planner with no helix model would produce, and the number the helix-aware
- * packer has to beat.
- *
- * Because it ignores staggering, a lane pitch here is helix-OD plus clearance
- * rather than the helix-to-shaft pitch the real geometry allows.
- *
- * Being the control licenses it to pack badly. It does not license it to pack
- * *illegally* — a baseline that fails `validatePlan` measures nothing — so it
- * does respect balance, by filling from the middle of the deck outward and
- * sliding each finished load onto its balance point.
+ * The naive bounding-box arranger — the *control* the packer has to beat.
+ * Every pile is a cylinder of its widest diameter, one type per tier, nothing
+ * staggered or flipped. Licensed to pack badly, not illegally: a baseline that
+ * fails `validatePlan` measures nothing.
  */
 
 export interface Lane {
@@ -86,19 +75,10 @@ interface Cell {
 }
 
 /**
- * Every slot in a single-type tier, ordered so that *any* prefix is balanced.
- *
- * A full tier uses all of them, so this changes nothing about how much fits —
- * truck counts are identical either way. What it decides is where the leftovers
- * sit when a tier is partly filled, and the obvious orderings both go wrong:
- * filling row by row bunches a part-load against the headboard, and taking the
- * slots nearest the balance point puts every leftover in the same row, which
- * drags the whole truck to one end.
- *
- * So the cells are chosen greedily, each one picked to keep the running centre
- * of mass closest to where the deck wants it. Every prefix is then about as
- * balanced as that many piles can be, which matters because the tier that gets
- * truncated is whichever one the demand happens to run out in.
+ * Every slot in a single-type tier, ordered so that *any* prefix is balanced —
+ * each cell greedily picked to keep the running centre of mass on target. A
+ * full tier uses all of them either way; this decides where the leftovers sit
+ * when demand runs out mid-tier.
  */
 export function cellsFor(
   vehicle: Vehicle,
@@ -188,10 +168,8 @@ export function arrangeNaively(
     const cells = cellsFor(vehicle, type, options);
     const tierHeight = tierHeightFor(type, options);
 
-    // Reasons a pile can never go on this vehicle, checked once rather than
-    // discovered by looping forever. The baseline stops at the tailgate — it
-    // does not know how to use an overhang allowance — so the usable length it
-    // reports is the deck alone.
+    // The baseline stops at the tailgate — it does not use overhang — so the
+    // usable length it reports is the deck alone.
     const reason = unplaceableReason(type, vehicle, options, ruleset, {
       length: vehicle.deckLength - options.headboardGap,
       width: vehicle.deckWidth - options.sideMargin * 2,
@@ -235,25 +213,16 @@ export function arrangeNaively(
       truck.heightUsed += tierHeight;
       truck.tier += 1;
 
-      /*
-       * A partly filled tier closes the truck. Nothing may be stacked on a
-       * layer that does not cover the deck: the bearers for the tier above
-       * would sit on fresh air over the empty part, and the piles on them
-       * would be resting on nothing. `validatePlan` enforces this, and the
-       * arranger must not knowingly produce a plan it would reject.
-       */
+      // A partly filled tier closes the truck: nothing may stack on a layer
+      // that does not cover the deck, and `validatePlan` enforces it.
       if (take < cells.length) {
         truck = null;
       }
     }
   }
 
-  /*
-   * Slide each finished load onto its balance point. Done per consignment at
-   * the end rather than while placing, because the shift depends on the whole
-   * load and every tier moves together — which is what makes it free of any
-   * effect on separation or support.
-   */
+  // Slide each finished load onto its balance point, whole — so the shift
+  // cannot affect separation or support.
   const balanced = consignments.flatMap(consignment =>
     shiftToBalance(
       placements.filter(p => p.consignmentId === consignment.id),

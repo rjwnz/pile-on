@@ -1,19 +1,10 @@
 import * as THREE from 'three';
 
 /**
- * One WebGL context for every load view on the page.
- *
- * Constructing a `WebGLRenderer` costs the better part of a second, and costs
- * that whether the truck carries fifty piles or five. One per truck would put
- * that on the main thread once per truck, before anything drew — so the context
- * is shared, and the cost is paid once for the page.
- *
- * Each view draws through it in turn and copies the result into a 2D canvas of
- * its own. The copy is a blit, and does not register against a render measured
- * in milliseconds.
- *
- * Sharing also keeps the page to a single context. Browsers cap how many they
- * will hold, and a plan is as long as the job needs.
+ * One WebGL context for every load view on the page. Constructing a
+ * `WebGLRenderer` costs the better part of a second regardless of load size,
+ * and browsers cap live contexts — so each view draws through this one and
+ * blits the result into a 2D canvas of its own.
  */
 
 /** Past 2x the extra pixels cost more than they show. */
@@ -21,10 +12,7 @@ const MAX_PIXEL_RATIO = 2;
 
 let renderer: THREE.WebGLRenderer | null = null;
 let holders = 0;
-/**
- * A machine without WebGL will not have grown it by the second view, and a
- * failed construction is not free. Ask once, then remember the answer.
- */
+/** WebGL missing is permanent; ask once and remember. */
 let unavailable = false;
 
 /** Views to nudge when the driver takes the context away and hands it back. */
@@ -44,9 +32,7 @@ function handleContextRestored() {
 
 /**
  * Take a share of the renderer, creating it if this is the first caller.
- *
- * Returns false when the browser has no WebGL at all — callers are expected to
- * say so rather than show an empty box.
+ * Returns false when the browser has no WebGL at all.
  */
 export function acquireRenderer(): boolean {
   if (unavailable) {
@@ -90,10 +76,7 @@ export function releaseRenderer(): void {
   renderer = null;
 }
 
-/**
- * Whether a context is in hand — for callers deciding whether building a scene
- * is worth the work.
- */
+/** Whether a context is in hand. */
 export function hasRenderer(): boolean {
   return renderer !== null;
 }
@@ -108,10 +91,7 @@ export function onContextRestored(listener: () => void): () => void {
 
 /**
  * Draw a scene through the shared context and copy the result into `target`.
- *
- * `width` and `height` are CSS pixels; the backing store is sized from them so
- * the drawing stays sharp on a dense panel without paying for more than it
- * shows.
+ * `width` and `height` are CSS pixels.
  */
 export function drawToCanvas(
   target: HTMLCanvasElement,

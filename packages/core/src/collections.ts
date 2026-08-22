@@ -1,12 +1,4 @@
-/**
- * The one grouping helper.
- *
- * Sorting a flat list into buckets — placements by tier, by consignment, piles
- * by type — is the most repeated shape in this codebase. It had been written
- * out by hand seven times, and three of those spread the bucket back into a new
- * array on every item, which turns grouping n placements into O(n²) for no
- * reason a reader would ever guess at.
- */
+/** Sort a flat list into buckets — the most repeated shape in this codebase. */
 export function groupBy<T, K>(
   items: Iterable<T>,
   key: (item: T) => K,

@@ -1,4 +1,3 @@
-import {useState} from 'react';
 import {
   NZ_VDAM_2016,
   VEHICLE_CSV_EXAMPLE,
@@ -9,6 +8,7 @@ import {
   payloadCapacity,
   toMetres,
 } from '@pile-on/core';
+import {useEditor} from '../lib/useEditor';
 import {useAppState} from '../state/AppStateProvider';
 import {CsvImportPanel} from './CsvImportPanel';
 import {VehicleForm} from './VehicleForm';
@@ -16,18 +16,15 @@ import {Button, EmptyState, Panel} from './ui';
 
 export function VehicleSection() {
   const {state, dispatch} = useAppState();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-
   const vehicles = state.catalogue.vehicles;
-  const editing = vehicles.find(vehicle => vehicle.id === editingId);
+  const editor = useEditor(vehicles);
 
   return (
     <Panel
       title={`Vehicles (${vehicles.length})`}
       actions={
-        !adding && !editing ? (
-          <Button variant="primary" onClick={() => setAdding(true)}>
+        !editor.adding && !editor.editing ? (
+          <Button variant="primary" onClick={editor.startAdd}>
             Add vehicle
           </Button>
         ) : null
@@ -57,12 +54,8 @@ export function VehicleSection() {
             </thead>
             <tbody>
               {vehicles.map(vehicle => {
-                /*
-                 * Two things worth flagging on sight: a rated gross above
-                 * general access needs an HPMV permit, and a deck so tall that
-                 * even a bare deck breaks the 4.3 m height limit is a data
-                 * error.
-                 */
+                // Flag on sight: gross above general access needs an HPMV
+                // permit, and a bare deck over the height limit is a data error.
                 const needsPermit = isOverGrossMass(vehicle.maxGross);
                 const deckTooTall = isOverHeight(vehicle.deckHeight);
                 return (
@@ -108,10 +101,7 @@ export function VehicleSection() {
                     <td className="py-2 text-right whitespace-nowrap">
                       <Button
                         variant="quiet"
-                        onClick={() => {
-                          setEditingId(vehicle.id);
-                          setAdding(false);
-                        }}
+                        onClick={() => editor.startEdit(vehicle.id)}
                       >
                         Edit
                       </Button>
@@ -132,18 +122,14 @@ export function VehicleSection() {
         </div>
       )}
 
-      {adding || editing ? (
+      {editor.adding || editor.editing ? (
         <VehicleForm
-          editing={editing}
+          editing={editor.editing}
           onSave={vehicle => {
             dispatch({type: 'upsertVehicle', vehicle});
-            setAdding(false);
-            setEditingId(null);
+            editor.close();
           }}
-          onCancel={() => {
-            setAdding(false);
-            setEditingId(null);
-          }}
+          onCancel={editor.close}
         />
       ) : null}
 

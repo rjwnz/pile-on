@@ -19,23 +19,12 @@ import {
 } from '../render/sharedRenderer';
 
 /**
- * The loaded truck, rendered with a depth buffer.
- *
- * The scene itself is built by a pure function so the geometry can be unit
- * tested — jsdom has no WebGL context, so nothing here can be, and pretending
- * otherwise would give coverage without confidence.
- *
- * What this component owns is timing, and it is deliberately split three ways.
- * The context is shared with every other view and lasts as long as the mount;
- * the scene is rebuilt only when the load changes; the draw happens whenever
- * either of those, or the size of the box, says it should. Keeping them apart
- * is the whole trick: uploading a fresh scene to the card costs on the order of
- * 150 ms, while drawing one already up there costs two. Every dependency added
- * to the wrong effect turns the cheap case into the expensive one.
- *
- * A machine with no WebGL gets a plain message rather than a blank box. The
- * exploded tier plans above are the drawings a load is checked against, so
- * losing this one is a nuisance, not a failure.
+ * The loaded truck, rendered with a depth buffer. The scene is built by a pure
+ * function so the geometry can be unit tested; this component owns timing,
+ * split three ways on purpose — context (lives as long as the mount), scene
+ * (rebuilt only when the load changes, ~150 ms), draw (resize or restore,
+ * ~2 ms). A dependency on the wrong effect turns the cheap case into the
+ * expensive one. No WebGL gets a plain message, not a blank box.
  */
 export function IsometricPlanCanvas({
   vehicle,
@@ -77,12 +66,7 @@ export function IsometricPlanCanvas({
     );
   }, []);
 
-  /*
-   * The context outlives every change to the load, so it gets an effect of its
-   * own with nothing in its dependencies. Tying it to the data would hand the
-   * context back and take a fresh one on every edit — which is precisely the
-   * cost that sharing it was meant to remove.
-   */
+  // The context outlives every change to the load: no dependencies, on purpose.
   useEffect(() => {
     if (!acquireRenderer()) {
       setUnsupported(true);
@@ -92,8 +76,8 @@ export function IsometricPlanCanvas({
     return releaseRenderer;
   }, []);
 
-  // The scene. Rebuilt when the load changes, and not otherwise — which relies
-  // on the caller handing over arrays that keep their identity between renders.
+  // The scene: rebuilt when the load changes, and not otherwise — which relies
+  // on the caller passing arrays that keep their identity between renders.
   useEffect(() => {
     if (!hasRenderer()) {
       return;
@@ -107,8 +91,7 @@ export function IsometricPlanCanvas({
     };
   }, [vehicle, catalogue, placements, options, draw]);
 
-  // Redraw when the box changes size, and again if the driver takes the context
-  // away and returns it. The scene is still in hand for both, so both are cheap.
+  // Redraw on resize, and when a lost context is restored. Both are cheap.
   useEffect(() => {
     const host = hostRef.current;
     const stopListening = onContextRestored(draw);

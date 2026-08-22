@@ -1,26 +1,13 @@
 import type {Kilograms, Millimetres} from '../units';
 
-/**
- * A single helical plate welded to the shaft.
- *
- * `offsetFromButt` is measured in pile-local coordinates from the butt (the
- * blunt, driven end) toward the tip, so it is independent of how the pile ends
- * up oriented on the deck.
- */
+/** A single helical plate welded to the shaft. */
 export interface Helix {
-  /** Distance from the butt to the centre plane of the plate. */
+  /** Butt (blunt end) to the centre plane of the plate, in pile-local mm. */
   readonly offsetFromButt: Millimetres;
   /** Outer radius of the plate, measured from the shaft axis. */
   readonly radius: Millimetres;
-  /**
-   * Axial length of the helix along the shaft: the plate thickness plus the
-   * rise of its flight. A helix is a short fat cylinder, not a flat disc, and
-   * this is how long that cylinder is.
-   *
-   * It decides whether two helices share a station on the deck, and therefore
-   * whether staggering buys anything — so it is worth getting right rather
-   * than defaulting to the plate gauge.
-   */
+  /** Axial length along the shaft: plate thickness plus the rise of its
+   * flight — a helix is a short fat cylinder, not a flat disc. */
   readonly length: Millimetres;
 }
 
@@ -36,25 +23,15 @@ export interface PileType {
   readonly helices: readonly Helix[];
 }
 
-/**
- * Whether this type may have its helices overlap a neighbour's helices.
- *
- * Single-helix piles nest: the plates sit beside each other horizontally at the
- * same level, so their swept circles may overlap in plan. Double-helix piles
- * cannot — with two plates on one shaft there is no rotation that lets a
- * neighbour's plate through.
- *
- * This is a property of the *pair*, not the pile: see `helicesMayInterleave`.
- */
+/** Single-helix piles nest their plates beside each other; see `helicesMayInterleave`. */
 export function isSingleHelix(type: PileType): boolean {
   return type.helices.length === 1;
 }
 
 /**
- * Whether two adjacent piles may have their helices overlap in plan view.
- *
- * Only true when *both* are single-helix. A double-helix pile forces full
- * helix-to-helix separation against any neighbour, single or double.
+ * Whether two adjacent piles may have their helices overlap in plan view —
+ * only when *both* are single-helix. A double-helix pile forces full
+ * plate-to-plate separation against any neighbour.
  */
 export function helicesMayInterleave(a: PileType, b: PileType): boolean {
   return isSingleHelix(a) && isSingleHelix(b);

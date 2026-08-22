@@ -5,12 +5,8 @@ import type {CsvRow} from '@pile-on/core';
 const SURPLUS_CELLS = '__parsed_extra';
 
 /**
- * Text to rows. Parsing CSV by hand is a classic way to lose an afternoon to
- * quoted commas and BOMs, so this is Papa's problem, not ours — including the
- * per-cell trimming.
- *
- * Delimiter detection is left on because the realistic input is a block pasted
- * out of Excel, which arrives tab-separated.
+ * Text to rows — Papa's problem, not ours, trimming included. Delimiter
+ * detection stays on because a block pasted from Excel arrives tab-separated.
  */
 export function parseCsvText(text: string): CsvRow[] {
   const {data} = Papa.parse<CsvRow>(text.trim(), {

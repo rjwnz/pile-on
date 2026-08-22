@@ -19,12 +19,9 @@ export interface Consignment {
 }
 
 /**
- * A plan is a flat list of placements, not a nested tree.
- *
- * Lanes and tiers-as-groups are outputs of the packer, not facts about the
- * load: the moment someone drags a pile 200 mm in the editor a stored lane is a
- * lie. Everything derivable — lane assignment, tier height, axle loads,
- * utilisation — is computed on demand and stored nowhere.
+ * A plan is a flat list of placements, not a nested tree. Lanes and tier
+ * groupings are packer outputs, not facts about the load — everything
+ * derivable is computed on demand and stored nowhere.
  */
 export interface LoadPlan {
   readonly consignments: readonly Consignment[];

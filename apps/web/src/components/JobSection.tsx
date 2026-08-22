@@ -165,7 +165,7 @@ export function JobSection() {
               ? ` — ${Math.round(massShare * 100)}% of your largest payload, so this job is almost
                  certainly limited by deck space rather than mass.`
               : ` — ${Math.round(massShare * 100)}% of your largest payload.`}{' '}
-          Truck count needs the packer, which is not built yet.
+          Pack it on the Loading plan tab for a truck count.
         </p>
       ) : null}
 

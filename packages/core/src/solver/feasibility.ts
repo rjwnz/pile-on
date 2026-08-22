@@ -5,14 +5,9 @@ import type {VdamRuleset} from '../rules/nzVdam';
 import type {Millimetres} from '../units';
 
 /**
- * Why a pile type can never go on this vehicle, or null if it can.
- *
- * Shared by both arrangers so the two never explain the same impossibility in
- * different words. They pass their own usable span, because they do not agree
- * on one: the baseline stops at the tailgate, and the packer will use a rear
- * overhang the yard has said it will accept.
- *
- * Checked once per type rather than discovered by a loop that never terminates.
+ * Why a pile type can never go on this vehicle, or null if it can. Shared by
+ * both arrangers; each passes its own usable span (the baseline stops at the
+ * tailgate, the packer may use overhang).
  */
 export function unplaceableReason(
   type: PileType,

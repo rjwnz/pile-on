@@ -18,24 +18,11 @@ export function helixIntervals(placed: readonly PlacedPile[]): Interval[] {
 }
 
 /**
- * Every longitudinal offset worth trying for a lane, given what is already
- * beside it.
- *
- * This is the idea the whole packer rests on. Sliding a lane along the deck
- * changes the separation its neighbour needs, but not continuously: the
- * requirement only changes where one pile's plate starts or stops sharing a
- * station with another's. Between those points nothing changes at all.
- *
- * So the offsets worth evaluating are exactly the boundaries of those windows.
- * For a plate `[s, e]` on this lane and `[s', e']` on a neighbour, they overlap
- * for offsets strictly inside `(s' − e, e' − s)`, so the two ends of that range
- * are where the answer flips — and every distinct answer is reachable from one
- * of them. The search is finite and *exact*: there is no sampling step, and no
- * better offset hiding between two that were tried.
- *
- * Add zero and the full slack so a lane with no useful stagger still has
- * somewhere to sit, and so the two extremes of the travel are always on the
- * list.
+ * Every longitudinal offset worth trying for a lane — the idea the packer
+ * rests on. The separation a neighbour needs only changes where one plate
+ * starts or stops sharing a station with another, so those boundaries are the
+ * complete, exact candidate set: nothing better hides between two of them.
+ * Zero and the full slack are always included.
  */
 export function staggerOffsets(
   own: readonly Interval[],

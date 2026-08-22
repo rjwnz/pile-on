@@ -5,6 +5,7 @@ import {
   upsertById,
   EMPTY_PLAN,
   type AppState,
+  type Catalogue,
   type JobLine,
   type PackingOptions,
   type LoadPlan,
@@ -65,69 +66,42 @@ function mergeAll<T extends {readonly id: string}>(
   );
 }
 
+function withCatalogue(state: AppState, patch: Partial<Catalogue>): AppState {
+  return {...state, catalogue: {...state.catalogue, ...patch}};
+}
+
 export function appReducer(state: AppState, action: AppAction): AppState {
+  const {pileTypes, vehicles} = state.catalogue;
   switch (action.type) {
     case 'upsertPileType':
-      return {
-        ...state,
-        catalogue: {
-          ...state.catalogue,
-          pileTypes: upsertById(state.catalogue.pileTypes, action.pileType),
-        },
-      };
+      return withCatalogue(state, {
+        pileTypes: upsertById(pileTypes, action.pileType),
+      });
 
     case 'removePileType':
-      return {
-        ...state,
-        catalogue: {
-          ...state.catalogue,
-          pileTypes: removeById(state.catalogue.pileTypes, action.id),
-        },
-      };
+      return withCatalogue(state, {
+        pileTypes: removeById(pileTypes, action.id),
+      });
 
     case 'importPileTypes':
-      return {
-        ...state,
-        catalogue: {
-          ...state.catalogue,
-          pileTypes: mergeAll(
-            state.catalogue.pileTypes,
-            action.pileTypes,
-            action.replace,
-          ),
-        },
-      };
+      return withCatalogue(state, {
+        pileTypes: mergeAll(pileTypes, action.pileTypes, action.replace),
+      });
 
     case 'upsertVehicle':
-      return {
-        ...state,
-        catalogue: {
-          ...state.catalogue,
-          vehicles: upsertById(state.catalogue.vehicles, action.vehicle),
-        },
-      };
+      return withCatalogue(state, {
+        vehicles: upsertById(vehicles, action.vehicle),
+      });
 
     case 'removeVehicle':
-      return {
-        ...state,
-        catalogue: {
-          ...state.catalogue,
-          vehicles: removeById(state.catalogue.vehicles, action.id),
-        },
-      };
+      return withCatalogue(state, {
+        vehicles: removeById(vehicles, action.id),
+      });
 
     case 'importVehicles':
-      return {
-        ...state,
-        catalogue: {
-          ...state.catalogue,
-          vehicles: mergeAll(
-            state.catalogue.vehicles,
-            action.vehicles,
-            action.replace,
-          ),
-        },
-      };
+      return withCatalogue(state, {
+        vehicles: mergeAll(vehicles, action.vehicles, action.replace),
+      });
 
     case 'setJobName':
       return {...state, job: {...state.job, name: action.name}};

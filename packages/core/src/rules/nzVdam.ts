@@ -4,18 +4,11 @@ import type {Kilograms, Millimetres} from '../units';
  * New Zealand general-access limits from Land Transport Rule: Vehicle
  * Dimensions and Mass 2016.
  *
- * These are DATA, not logic, and they move: NZTA removed 50MAX permits on
- * 6 August 2026, with further VDAM phases consulted on from October 2026.
- * Every quote must record which ruleset version produced it, so that an old
- * quote can still be explained after the rules change. Add a new version
- * alongside the old one rather than editing in place.
- *
- * Axle and axle-set limits, and the combined axle-set ("bridge formula") table,
- * are deliberately absent. A vehicle's total payload limit is always reached
- * first in this operation, so carrying those limits meant modelling axle
- * positions and tyre classes for a constraint that never binds. If that
- * assumption ever stops holding — much heavier piles, or shorter-wheelbase
- * units — they come back here, as a new ruleset version.
+ * These are DATA, not logic, and they move (NZTA removed 50MAX permits on
+ * 6 August 2026). Every quote records the ruleset version that produced it;
+ * add a new version alongside the old rather than editing in place. Axle and
+ * bridge-formula limits are deliberately absent — payload is always reached
+ * first in this operation.
  *
  * Sources:
  *   NZTA factsheet 13  — Vehicle dimensions and mass (May 2021)
@@ -80,12 +73,8 @@ export function isOverGrossMass(
 }
 
 /**
- * A load of more than one pile is divisible.
- *
- * This matters more than it looks. Overdimension permits are only available for
- * *indivisible* loads, so a multi-pile load cannot be permitted overwidth or
- * overheight at all — it has to fit general access, or go on an HPMV permit
- * (which allows overlength and overweight, but never overwidth or overheight).
+ * A load of more than one pile is divisible — so it can never be permitted
+ * overwidth or overheight; it must fit general access or go HPMV.
  */
 export function isDivisibleLoad(pileCount: number): boolean {
   return pileCount > 1;

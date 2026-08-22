@@ -13,12 +13,8 @@ export interface LaneSlot {
 }
 
 /**
- * A way of filling one lane end to end.
- *
- * Lanes are the unit the sweep works in, and a lane is a 1-D packing problem:
- * which piles, in what order, laid nose to tail down the deck. Mixed lengths
- * are allowed — a 4.5 m pile behind a 6 m one uses deck a lane of 6 m piles
- * would waste — which is why a pattern is a sequence rather than a count.
+ * A way of filling one lane end to end. Mixed lengths are allowed, which is
+ * why a pattern is a sequence rather than a count.
  */
 export interface LanePattern {
   readonly slots: readonly LaneSlot[];
@@ -43,16 +39,10 @@ export function patternDemand(
 }
 
 /**
- * A few orders worth laying the same piles in.
- *
- * Which order the piles of a lane go in does not change how many fit, but it
- * moves the lane's centre of mass a long way. Three equal-mass piles of 6 m,
- * 3 m and 3 m sit a metre off centre with the long one at either end, and dead
- * on it with the long one in the middle — and no amount of sliding the lane
- * afterwards recovers that, because a full lane has no slack to slide in.
- *
- * Enumerating every order is factorial and pointless. Longest-first,
- * shortest-first, and longest-in-the-middle span the useful range.
+ * A few orders worth laying the same piles in. Order does not change how many
+ * fit, but it moves the lane's centre of mass a long way, and a full lane has
+ * no slack to slide it back. Longest-first, shortest-first and
+ * longest-in-the-middle span the useful range; every order is factorial.
  */
 function arrangements(types: readonly PileType[]): PileType[][] {
   const descending = [...types];
@@ -99,16 +89,9 @@ function layOut(
 }
 
 /**
- * Ways of filling one lane, fullest first.
- *
- * The enumeration walks a sorted type list without going backwards, so each
- * multiset is generated once rather than once per ordering — the order piles
- * are laid in changes where their plates land, but flipping and sliding cover
- * that ground far more cheaply than a factorial would.
- *
- * Short patterns are kept as well as full ones. A lane with a pile missing has
- * more slack, and slack is what buys a stagger; occasionally the emptier lane
- * is what lets the next two close up.
+ * Ways of filling one lane, fullest first. Walks a sorted type list without
+ * going backwards, so each multiset is generated once. Short patterns are kept
+ * too: a lane with a pile missing has slack, and slack buys a stagger.
  */
 export function lanePatterns(
   available: ReadonlyMap<string, number>,
@@ -173,13 +156,8 @@ export function lanePatterns(
 }
 
 /**
- * The flip assignments worth trying for a pattern.
- *
- * Every combination, while there are few enough to enumerate. Past that the
- * blanket assignments do most of the work — what matters is that neighbouring
- * lanes present their plates at different stations, and all-on, all-off and
- * alternating already give the sweep three quite different plate layouts to
- * choose between.
+ * The flip assignments worth trying: every combination while there are few
+ * enough, then all-on, all-off and the two alternations.
  */
 export function flipVariants(
   pattern: LanePattern,

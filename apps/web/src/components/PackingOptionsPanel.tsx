@@ -6,14 +6,6 @@ import {
 } from '@pile-on/core';
 import {Button, Field} from './ui';
 
-/**
- * The numbers a load is judged against, in one place and saved with the job.
- *
- * These are not preferences. A clearance or a balance tolerance decides whether
- * a plan is legal, so a quote priced under one set cannot be re-explained under
- * another — which is why they travel in the session file rather than living in
- * a constant somewhere.
- */
 function NumberField({
   label,
   suffix,
@@ -46,6 +38,10 @@ function NumberField({
   );
 }
 
+/**
+ * The numbers a load is judged against — not preferences. They decide whether
+ * a plan is legal, so they travel in the session file with the job.
+ */
 export function PackingOptionsPanel({
   options,
   vehicle,
@@ -59,6 +55,13 @@ export function PackingOptionsPanel({
   const [open, setOpen] = useState(false);
   const changed =
     JSON.stringify(options) !== JSON.stringify(DEFAULT_PACKING_OPTIONS);
+
+  const patch = (part: Partial<PackingOptions>) =>
+    onChange({...options, ...part});
+  const patchClearances = (part: Partial<PackingOptions['clearances']>) =>
+    patch({clearances: {...options.clearances, ...part}});
+  const patchBalance = (part: Partial<PackingOptions['balance']>) =>
+    patch({balance: {...options.balance, ...part}});
 
   return (
     <div className="rounded border border-slate-300">
@@ -98,34 +101,19 @@ export function PackingOptionsPanel({
                 label="Shaft to shaft"
                 suffix="mm"
                 value={options.clearances.shaftToShaft}
-                onChange={shaftToShaft =>
-                  onChange({
-                    ...options,
-                    clearances: {...options.clearances, shaftToShaft},
-                  })
-                }
+                onChange={shaftToShaft => patchClearances({shaftToShaft})}
               />
               <NumberField
                 label="Helix to shaft"
                 suffix="mm"
                 value={options.clearances.helixToShaft}
-                onChange={helixToShaft =>
-                  onChange({
-                    ...options,
-                    clearances: {...options.clearances, helixToShaft},
-                  })
-                }
+                onChange={helixToShaft => patchClearances({helixToShaft})}
               />
               <NumberField
                 label="Helix to helix"
                 suffix="mm"
                 value={options.clearances.helixToHelix}
-                onChange={helixToHelix =>
-                  onChange({
-                    ...options,
-                    clearances: {...options.clearances, helixToHelix},
-                  })
-                }
+                onChange={helixToHelix => patchClearances({helixToHelix})}
               />
             </div>
           </section>
@@ -143,23 +131,13 @@ export function PackingOptionsPanel({
                 label="Along the deck"
                 suffix="mm"
                 value={options.balance.longitudinal}
-                onChange={longitudinal =>
-                  onChange({
-                    ...options,
-                    balance: {...options.balance, longitudinal},
-                  })
-                }
+                onChange={longitudinal => patchBalance({longitudinal})}
               />
               <NumberField
                 label="Across the deck"
                 suffix="mm"
                 value={options.balance.lateral}
-                onChange={lateral =>
-                  onChange({
-                    ...options,
-                    balance: {...options.balance, lateral},
-                  })
-                }
+                onChange={lateral => patchBalance({lateral})}
               />
             </div>
           </section>
@@ -201,9 +179,7 @@ export function PackingOptionsPanel({
               <input
                 type="checkbox"
                 checked={options.allowFlips}
-                onChange={event =>
-                  onChange({...options, allowFlips: event.target.checked})
-                }
+                onChange={event => patch({allowFlips: event.target.checked})}
                 className="mt-1"
               />
               <span>
@@ -229,42 +205,38 @@ export function PackingOptionsPanel({
                 label="Dunnage thickness"
                 suffix="mm"
                 value={options.dunnageThickness}
-                onChange={dunnageThickness =>
-                  onChange({...options, dunnageThickness})
-                }
+                onChange={dunnageThickness => patch({dunnageThickness})}
               />
               <NumberField
                 label="End gap"
                 suffix="mm"
                 value={options.endGap}
-                onChange={endGap => onChange({...options, endGap})}
+                onChange={endGap => patch({endGap})}
               />
               <NumberField
                 label="Side margin"
                 suffix="mm"
                 value={options.sideMargin}
-                onChange={sideMargin => onChange({...options, sideMargin})}
+                onChange={sideMargin => patch({sideMargin})}
               />
               <NumberField
                 label="Headboard gap"
                 suffix="mm"
                 value={options.headboardGap}
-                onChange={headboardGap => onChange({...options, headboardGap})}
+                onChange={headboardGap => patch({headboardGap})}
               />
               <NumberField
                 label="Max tiers"
                 suffix="count"
                 value={options.maxTiers}
-                onChange={maxTiers => onChange({...options, maxTiers})}
+                onChange={maxTiers => patch({maxTiers})}
               />
               <NumberField
                 label="Bearers and lashings"
                 suffix="kg per tier"
                 value={options.ancillaryMassPerTier}
                 hint="Counted against the payload, because it is."
-                onChange={ancillaryMassPerTier =>
-                  onChange({...options, ancillaryMassPerTier})
-                }
+                onChange={ancillaryMassPerTier => patch({ancillaryMassPerTier})}
               />
             </div>
           </section>

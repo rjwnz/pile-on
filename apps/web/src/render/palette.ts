@@ -1,13 +1,7 @@
 /**
- * Colour per pile type, stable across renders and across sessions.
- *
- * Derived from the type id rather than its position in the catalogue, so
- * adding a pile type does not recolour the whole drawing — a loader who has
- * learned "the blue ones are the SP168s" should stay right.
- *
- * Each entry pairs a light shaft with a darker plate of the same hue, so the
- * helices read as part of the same pile rather than as separate objects, and
- * the pile type is still distinguishable in greyscale on a printed plan.
+ * Colour per pile type, derived from the id so adding a type never recolours
+ * the drawing. Light shaft, darker plate of the same hue — distinguishable in
+ * greyscale on a printed plan.
  */
 export interface PileColour {
   /** The shaft, in both the tier plans and the 3D view. */

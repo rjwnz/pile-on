@@ -3,16 +3,9 @@ import type {Catalogue} from './catalogue';
 import {findPileType} from './catalogue';
 
 /**
- * What the job needs, as a quantity per pile type.
- *
- * Not one row per physical pile. Quantities are how a piling schedule actually
- * arrives, and per-pile records would have to answer an unanswerable question
- * the first time someone edits a quantity downward: which of the 400 records
- * goes, given some are already placed. Individual pile identity comes from
- * placements instead — a placement *is* a pile on a deck.
- *
- * Phases will slot in as another field on the line when they arrive. The single
- * -phase assumption is what makes quantities sufficient today.
+ * What the job needs, as a quantity per pile type — not one row per physical
+ * pile. Individual pile identity comes from placements instead: a placement
+ * *is* a pile on a deck.
  */
 export interface JobLine {
   readonly pileTypeId: string;
@@ -32,12 +25,7 @@ export function jobQuantity(job: Job, pileTypeId: string): number {
   return job.lines.find(line => line.pileTypeId === pileTypeId)?.quantity ?? 0;
 }
 
-/**
- * Set a quantity, dropping the line entirely at zero.
- *
- * Zero-quantity lines are noise: they bloat the export and make "which types
- * does this job use" a filter rather than a read.
- */
+/** Set a quantity, dropping the line entirely at zero. */
 export function setJobQuantity(
   job: Job,
   pileTypeId: string,
@@ -63,13 +51,8 @@ export function totalPileCount(job: Job): number {
   return job.lines.reduce((total, line) => total + line.quantity, 0);
 }
 
-/**
- * Total mass of the job's piles.
- *
- * Lines naming a pile type that is not in the catalogue contribute nothing
- * rather than throwing — `findDanglingReferences` is what reports them, and a
- * broken reference should not blank out the whole total.
- */
+/** Total mass of the job's piles. Dangling type references contribute nothing
+ * rather than throwing — `findDanglingReferences` reports them. */
 export function totalPileMass(job: Job, catalogue: Catalogue): Kilograms {
   return job.lines.reduce((total, line) => {
     const type = findPileType(catalogue, line.pileTypeId);

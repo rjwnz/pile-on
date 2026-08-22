@@ -13,13 +13,8 @@ import type {PileType} from './pile';
  * lever for getting helices off each other's stations.
  */
 export interface Placement {
-  /**
-   * Identity of this placement within the plan.
-   *
-   * A placement *is* an individual pile on a deck — there is no separate pile
-   * registry. The job holds quantities per type; what makes one of those 400
-   * piles distinguishable is being placed somewhere.
-   */
+  /** A placement *is* an individual pile on a deck — there is no separate
+   * pile registry. */
   readonly id: string;
   /** Which truck this pile rides on. */
   readonly consignmentId: string;

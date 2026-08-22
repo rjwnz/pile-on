@@ -71,7 +71,7 @@ describe('what the packer is for', () => {
      * requirement drops to plate-against-shaft, 334 mm, and a sixth lane
      * appears on a deck that fitted five.
      */
-    const {plan} = pack(job(['SP168-D6', 12]), CATALOGUE, SEMI, OPTIONS);
+    const {plan} = pack(job(['SP168-D6', 12]), CATALOGUE, OPTIONS);
     const bottom = plan.placements.filter(placement => placement.tier === 0);
 
     expect(new Set(bottom.map(placement => placement.y)).size).toBe(6);
@@ -80,7 +80,7 @@ describe('what the packer is for', () => {
 
   it('uses fewer trucks than the baseline on a job that fills them', () => {
     const scheduled = job(['SP168-D6', 95]);
-    const packed = pack(scheduled, CATALOGUE, SEMI, OPTIONS);
+    const packed = pack(scheduled, CATALOGUE, OPTIONS);
     const naive = arrangeNaively(scheduled, CATALOGUE, SEMI, OPTIONS);
 
     expect(naive.plan.consignments).toHaveLength(3);
@@ -91,7 +91,6 @@ describe('what the packer is for', () => {
     const {plan} = pack(
       job(['SP168-D6', 50], ['SP139-S4', 50]),
       CATALOGUE,
-      SEMI,
       OPTIONS,
     );
 
@@ -118,7 +117,6 @@ describe('what the packer is for', () => {
     const {plan} = pack(
       job(['SP168-D6', 6], ['SP139-S4', 6]),
       CATALOGUE,
-      SEMI,
       OPTIONS,
     );
 
@@ -143,7 +141,7 @@ describe('the packer never emits what the validator rejects', () => {
     ['a single pile', job(['SP168-D6', 1])],
     ['short piles only', job(['SP139-S4', 60])],
   ])('%s', (_label, scheduled) => {
-    const {plan} = pack(scheduled, CATALOGUE, SEMI, OPTIONS);
+    const {plan} = pack(scheduled, CATALOGUE, OPTIONS);
 
     expect(errors(plan)).toEqual([]);
   });
@@ -152,7 +150,6 @@ describe('the packer never emits what the validator rejects', () => {
     const {plan} = pack(
       job(['SP168-D6', 50], ['SP139-S4', 50]),
       CATALOGUE,
-      SEMI,
       OPTIONS,
     );
 
@@ -177,7 +174,6 @@ describe('accounting', () => {
     const {plan, unplaced} = pack(
       job(['SP168-D6', 37], ['SP139-S4', 21]),
       CATALOGUE,
-      SEMI,
       OPTIONS,
     );
 
@@ -191,21 +187,21 @@ describe('accounting', () => {
   });
 
   it('gives every placement its own id', () => {
-    const {plan} = pack(job(['SP168-D6', 60]), CATALOGUE, SEMI, OPTIONS);
+    const {plan} = pack(job(['SP168-D6', 60]), CATALOGUE, OPTIONS);
     const ids = plan.placements.map(placement => placement.id);
 
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('is deterministic', () => {
-    const once = pack(job(['SP168-D6', 44]), CATALOGUE, SEMI, OPTIONS);
-    const twice = pack(job(['SP168-D6', 44]), CATALOGUE, SEMI, OPTIONS);
+    const once = pack(job(['SP168-D6', 44]), CATALOGUE, OPTIONS);
+    const twice = pack(job(['SP168-D6', 44]), CATALOGUE, OPTIONS);
 
     expect(twice.plan).toEqual(once.plan);
   });
 
   it('produces nothing at all for an empty job', () => {
-    const {plan, unplaced} = pack(job(), CATALOGUE, SEMI, OPTIONS);
+    const {plan, unplaced} = pack(job(), CATALOGUE, OPTIONS);
 
     expect(plan.consignments).toEqual([]);
     expect(plan.placements).toEqual([]);
@@ -214,13 +210,13 @@ describe('accounting', () => {
 
   it('ignores a zero quantity rather than opening a truck for it', () => {
     expect(
-      pack(job(['SP168-D6', 0]), CATALOGUE, SEMI, OPTIONS).plan.consignments,
+      pack(job(['SP168-D6', 0]), CATALOGUE, OPTIONS).plan.consignments,
     ).toEqual([]);
   });
 
   it('says nothing about a job line whose type is not in the catalogue', () => {
     // findDanglingReferences is what reports that; the packer just cannot act.
-    const {plan, unplaced} = pack(job(['GHOST', 5]), CATALOGUE, SEMI, OPTIONS);
+    const {plan, unplaced} = pack(job(['GHOST', 5]), CATALOGUE, OPTIONS);
 
     expect(plan.placements).toEqual([]);
     expect(unplaced).toEqual([]);
@@ -233,7 +229,6 @@ describe('what will not fit', () => {
     const {plan, unplaced} = pack(
       job(['LONG', 5]),
       {...CATALOGUE, pileTypes: [long]},
-      SEMI,
       OPTIONS,
     );
 
@@ -250,7 +245,6 @@ describe('what will not fit', () => {
     const {unplaced} = pack(
       job(['WIDE', 5]),
       {...CATALOGUE, pileTypes: [wide]},
-      SEMI,
       OPTIONS,
     );
 
@@ -261,11 +255,18 @@ describe('what will not fit', () => {
     // 6.4 m piles do not fit two to a 12.4 m lane, but they do once the yard
     // will accept 700 mm hanging out the back.
     const sixFour: PileType = {...SP168, id: 'SP168-D64', length: 6400};
-    const catalogue: Catalogue = {pileTypes: [sixFour], vehicles: [SEMI]};
     const tolerant: Vehicle = {...SEMI, maxRearOverhang: 700};
 
-    const tight = pack(job(['SP168-D64', 12]), catalogue, SEMI, OPTIONS);
-    const roomy = pack(job(['SP168-D64', 12]), catalogue, tolerant, OPTIONS);
+    const tight = pack(
+      job(['SP168-D64', 12]),
+      {pileTypes: [sixFour], vehicles: [SEMI]},
+      OPTIONS,
+    );
+    const roomy = pack(
+      job(['SP168-D64', 12]),
+      {pileTypes: [sixFour], vehicles: [tolerant]},
+      OPTIONS,
+    );
 
     expect(
       roomy.plan.placements.filter(p => p.tier === 0).length,
@@ -281,7 +282,6 @@ describe('what will not fit', () => {
     const {plan, unplaced} = pack(
       job(['SP168-D6', 4]),
       {...CATALOGUE, vehicles: [tiny]},
-      tiny,
       OPTIONS,
     );
 
@@ -297,7 +297,6 @@ describe('flipping', () => {
     const {plan} = pack(
       job(['SP168-D6', 40]),
       CATALOGUE,
-      SEMI,
       withoutFlips(OPTIONS),
     );
 
@@ -308,7 +307,6 @@ describe('flipping', () => {
     const {plan} = pack(
       job(['SP168-D6', 95]),
       CATALOGUE,
-      SEMI,
       withoutFlips(OPTIONS),
     );
 
@@ -329,8 +327,8 @@ describe('flipping', () => {
       job(['SP139-S4', 36], ['SP168-D6', 60]),
       job(['SP168-D6', 95]),
     ]) {
-      const withFlips = pack(scheduled, CATALOGUE, SEMI, OPTIONS);
-      const without = pack(scheduled, CATALOGUE, SEMI, withoutFlips(OPTIONS));
+      const withFlips = pack(scheduled, CATALOGUE, OPTIONS);
+      const without = pack(scheduled, CATALOGUE, withoutFlips(OPTIONS));
 
       expect(withFlips.plan.consignments.length).toBeLessThanOrEqual(
         without.plan.consignments.length,
@@ -419,7 +417,7 @@ describe('properties, over generated jobs', () => {
             quantity: quantities[index]!,
           })),
         };
-        const {plan} = pack(scheduled, catalogue, SEMI, OPTIONS);
+        const {plan} = pack(scheduled, catalogue, OPTIONS);
 
         expect(
           validatePlan(plan, catalogue, OPTIONS).filter(violation =>
@@ -442,7 +440,7 @@ describe('properties, over generated jobs', () => {
             quantity: quantities[index]!,
           })),
         };
-        const {plan, unplaced} = pack(scheduled, catalogue, SEMI, OPTIONS);
+        const {plan, unplaced} = pack(scheduled, catalogue, OPTIONS);
 
         for (const [index, type] of types.entries()) {
           const placed = plan.placements.filter(
@@ -472,12 +470,126 @@ describe('properties, over generated jobs', () => {
   it('places at least as many piles per truck as the baseline, on real geometry', () => {
     for (const quantity of [12, 25, 40, 60, 95]) {
       const scheduled = job(['SP168-D6', quantity]);
-      const packed = pack(scheduled, CATALOGUE, SEMI, OPTIONS);
+      const packed = pack(scheduled, CATALOGUE, OPTIONS);
       const naive = arrangeNaively(scheduled, CATALOGUE, SEMI, OPTIONS);
 
       expect(packed.plan.consignments.length).toBeLessThanOrEqual(
         naive.plan.consignments.length,
       );
     }
+  });
+});
+
+describe('the fleet', () => {
+  const RIGID: Vehicle = {
+    ...SEMI,
+    id: 'RIGID-8',
+    name: '8-wheeler rigid',
+    kind: 'rigid',
+    deckLength: 7200,
+    deckHeight: 1200,
+    tare: 10600,
+    maxGross: 30000,
+  };
+  const TRAILER: Vehicle = {
+    ...SEMI,
+    id: 'TRAILER-4A',
+    name: '4-axle full trailer',
+    kind: 'full_trailer',
+    deckLength: 8100,
+    deckHeight: 1150,
+    tare: 6800,
+    maxGross: 22000,
+    towableBy: ['RIGID-8'],
+  };
+
+  it('tows the trailer when it saves a movement', () => {
+    // 60 piles need two solo runs of the rigid; with the trailer along, one
+    // movement carries the lot.
+    const fleet: Catalogue = {pileTypes: [SP139], vehicles: [RIGID, TRAILER]};
+    const solo = pack(
+      job(['SP139-S4', 60]),
+      {
+        pileTypes: [SP139],
+        vehicles: [RIGID],
+      },
+      OPTIONS,
+    );
+    const towed = pack(job(['SP139-S4', 60]), fleet, OPTIONS);
+
+    expect(towed.plan.consignments.length).toBeLessThan(
+      solo.plan.consignments.length,
+    );
+    const withTrailer = towed.plan.consignments.filter(c => c.trailerId);
+    expect(withTrailer.length).toBeGreaterThan(0);
+    expect(
+      towed.plan.placements.some(placement => placement.deck === 'trailer'),
+    ).toBe(true);
+  });
+
+  it('leaves the trailer behind when the truck alone will do', () => {
+    const fleet: Catalogue = {pileTypes: [SP139], vehicles: [RIGID, TRAILER]};
+    const {plan} = pack(job(['SP139-S4', 4]), fleet, OPTIONS);
+
+    expect(plan.consignments).toHaveLength(1);
+    expect(plan.consignments[0]!.trailerId).toBeNull();
+  });
+
+  it('stamps every placement with the deck it was packed on', () => {
+    const fleet: Catalogue = {pileTypes: [SP139], vehicles: [RIGID, TRAILER]};
+    const {plan} = pack(job(['SP139-S4', 40]), fleet, OPTIONS);
+
+    const ids = plan.placements.map(placement => placement.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const placement of plan.placements) {
+      expect(placement.id).toContain(`-${placement.deck}-`);
+    }
+  });
+
+  it('keeps the combination under the route cap, and legal throughout', () => {
+    // Piles heavy enough that both decks filling to their own payloads would
+    // gross the combination past 44 t.
+    const heavy: PileType = {...SP139, id: 'HEAVY', mass: 950};
+    const fleet: Catalogue = {
+      pileTypes: [heavy],
+      vehicles: [
+        {...RIGID, maxGross: 40000},
+        {...TRAILER, maxGross: 30000},
+      ],
+    };
+    const {plan} = pack(job(['HEAVY', 60]), fleet, OPTIONS);
+
+    expect(
+      validatePlan(plan, fleet, OPTIONS).filter(v => v.severity === 'error'),
+    ).toEqual([]);
+  });
+
+  it('picks whichever truck fits the job, not just the first row', () => {
+    // 9 m piles fit the semi and not the rigid, whatever order they are in.
+    const long: PileType = {...SP168, id: 'LONG-9', length: 9000};
+    const fleet: Catalogue = {pileTypes: [long], vehicles: [RIGID, SEMI]};
+    const {plan, unplaced} = pack(job(['LONG-9', 6]), fleet, OPTIONS);
+
+    expect(unplaced).toEqual([]);
+    expect(plan.consignments.every(c => c.vehicleId === 'SEMI-45')).toBe(true);
+  });
+
+  it('reports demand no combination can take, naming the nearest miss', () => {
+    const long: PileType = {...SP168, id: 'LONG-14', length: 14000};
+    const fleet: Catalogue = {pileTypes: [long], vehicles: [RIGID, SEMI]};
+    const {unplaced} = pack(job(['LONG-14', 3]), fleet, OPTIONS);
+
+    expect(unplaced[0]!.reason).toContain('fits no vehicle in the fleet');
+    expect(unplaced[0]!.reason).toContain('Tractor + 4-axle semi');
+  });
+
+  it('places nothing when the catalogue has only trailers', () => {
+    const fleet: Catalogue = {pileTypes: [SP139], vehicles: [TRAILER]};
+    const {plan, unplaced} = pack(job(['SP139-S4', 5]), fleet, OPTIONS);
+
+    expect(plan.consignments).toEqual([]);
+    expect(unplaced[0]!.reason).toBe(
+      'no self-propelled truck in the catalogue',
+    );
   });
 });

@@ -65,7 +65,6 @@ interface Row {
 function utilisation(
   plan: LoadPlan,
   state: AppState,
-  vehicle: Vehicle,
   options: PackingOptions,
 ): {deck: number; mass: number; balance: number} {
   if (plan.consignments.length === 0) {
@@ -74,31 +73,51 @@ function utilisation(
   let deck = 0;
   let mass = 0;
   let balance = 0;
+  let decksCounted = 0;
   for (const consignment of plan.consignments) {
-    const on = plan.placements.filter(p => p.consignmentId === consignment.id);
-    const footprint = on.reduce((total, placement) => {
-      const type = state.catalogue.pileTypes.find(
-        entry => entry.id === placement.pileTypeId,
-      );
-      return type ? total + type.length * type.shaftRadius * 2 : total;
-    }, 0);
-    // Against every tier's worth of deck, not one — four tiers of half-covered
-    // deck is half used, not twice.
-    const tiers = new Set(on.map(placement => placement.tier)).size || 1;
-    deck += footprint / (deckArea(vehicle) * tiers);
-    mass +=
-      consignmentPayload(on, state.catalogue, options) /
-      payloadCapacity(vehicle);
-    const offset = balanceOffset(on, state.catalogue, vehicle);
-    balance = Math.max(
-      balance,
-      offset
-        ? Math.max(Math.abs(offset.longitudinal), Math.abs(offset.lateral))
-        : 0,
+    const decks: {vehicle: Vehicle; role: 'truck' | 'trailer'}[] = [];
+    const truck = state.catalogue.vehicles.find(
+      v => v.id === consignment.vehicleId,
     );
+    if (truck) {
+      decks.push({vehicle: truck, role: 'truck'});
+    }
+    const trailer = consignment.trailerId
+      ? state.catalogue.vehicles.find(v => v.id === consignment.trailerId)
+      : undefined;
+    if (trailer) {
+      decks.push({vehicle: trailer, role: 'trailer'});
+    }
+
+    for (const {vehicle, role} of decks) {
+      const on = plan.placements.filter(
+        p => p.consignmentId === consignment.id && p.deck === role,
+      );
+      const footprint = on.reduce((total, placement) => {
+        const type = state.catalogue.pileTypes.find(
+          entry => entry.id === placement.pileTypeId,
+        );
+        return type ? total + type.length * type.shaftRadius * 2 : total;
+      }, 0);
+      // Against every tier's worth of deck, not one — four tiers of
+      // half-covered deck is half used, not twice.
+      const tiers = new Set(on.map(placement => placement.tier)).size || 1;
+      deck += footprint / (deckArea(vehicle) * tiers);
+      mass +=
+        consignmentPayload(on, state.catalogue, options) /
+        payloadCapacity(vehicle);
+      const offset = balanceOffset(on, state.catalogue, vehicle);
+      balance = Math.max(
+        balance,
+        offset
+          ? Math.max(Math.abs(offset.longitudinal), Math.abs(offset.lateral))
+          : 0,
+      );
+      decksCounted += 1;
+    }
   }
-  const trucks = plan.consignments.length;
-  return {deck: deck / trucks, mass: mass / trucks, balance};
+  const divisor = decksCounted || 1;
+  return {deck: deck / divisor, mass: mass / divisor, balance};
 }
 
 function run(state: AppState, fixture: string): Row {
@@ -112,17 +131,12 @@ function run(state: AppState, fixture: string): Row {
   };
 
   const started = process.hrtime.bigint();
-  const packed = pack(state.job, state.catalogue, vehicle, options);
+  const packed = pack(state.job, state.catalogue, options);
   const millis = Number(process.hrtime.bigint() - started) / 1e6;
 
-  const noFlip = pack(
-    state.job,
-    state.catalogue,
-    vehicle,
-    withoutFlips(options),
-  );
+  const noFlip = pack(state.job, state.catalogue, withoutFlips(options));
   const naive = arrangeNaively(state.job, state.catalogue, vehicle, options);
-  const used = utilisation(packed.plan, state, vehicle, options);
+  const used = utilisation(packed.plan, state, options);
 
   return {
     fixture,

@@ -1,14 +1,19 @@
 import {
+  combinationDeckArea,
+  combinationsOf,
   findPileType,
+  findVehicle,
   type Catalogue,
   type Consignment,
   type LoadPlan,
+  type VehicleCombination,
 } from '../domain/catalogue';
 import type {Job} from '../domain/job';
 import {maxRadius} from '../domain/pile';
-import type {Placement} from '../domain/placement';
+import type {DeckRole, Placement} from '../domain/placement';
 import {
   balanceTargetOf,
+  deckArea,
   payloadCapacity,
   type Vehicle,
 } from '../domain/vehicle';
@@ -20,7 +25,7 @@ import {coveredSpans} from '../validation/plan';
 import type {Kilograms, Millimetres} from '../units';
 import {groupBy} from '../collections';
 import {shiftToBalance} from './balance';
-import {unplaceableReason} from './feasibility';
+import {unplaceableOnFleet} from './feasibility';
 import {withoutFlips, type PackingOptions} from './options';
 import {packTier, type TierPlacement} from './tier';
 
@@ -73,7 +78,10 @@ interface TierChoice {
 }
 
 /**
- * Pack a job onto trucks of one type.
+ * Pack a job onto the fleet: every truck in the catalogue, each optionally
+ * towing one of the trailers that lists it. The objective is fewest movements
+ * — a truck and its trailer travel as one — with ties broken by least deck
+ * area committed.
  *
  * With flipping allowed the job is packed twice, once each way, and the better
  * answer kept: the greedy sweep is not monotone in its candidate set, so on
@@ -82,33 +90,48 @@ interface TierChoice {
 export function pack(
   job: Job,
   catalogue: Catalogue,
-  vehicle: Vehicle,
   options: PackingOptions,
   ruleset: VdamRuleset = NZ_VDAM_2016,
 ): PackResult {
-  const flipped = packOnce(job, catalogue, vehicle, options, ruleset);
+  const flipped = packFleetOnce(job, catalogue, options, ruleset);
   if (!options.allowFlips) {
     return flipped;
   }
-  const plain = packOnce(
-    job,
-    catalogue,
-    vehicle,
-    withoutFlips(options),
-    ruleset,
-  );
-  return better(flipped, plain);
+  const plain = packFleetOnce(job, catalogue, withoutFlips(options), ruleset);
+  return better(flipped, plain, catalogue);
 }
 
-/** Fewer trucks wins; then more piles placed; then the flipped one, for stability. */
-function better(flipped: PackResult, plain: PackResult): PackResult {
-  const trucks = (result: PackResult) => result.plan.consignments.length;
-  if (trucks(plain) !== trucks(flipped)) {
-    return trucks(plain) < trucks(flipped) ? plain : flipped;
+/**
+ * Fewer movements wins; then more piles placed; then less deck area
+ * committed; then the flipped one, for stability.
+ */
+function better(
+  flipped: PackResult,
+  plain: PackResult,
+  catalogue: Catalogue,
+): PackResult {
+  const movements = (result: PackResult) => result.plan.consignments.length;
+  if (movements(plain) !== movements(flipped)) {
+    return movements(plain) < movements(flipped) ? plain : flipped;
   }
-  return plain.plan.placements.length > flipped.plan.placements.length
-    ? plain
-    : flipped;
+  if (plain.plan.placements.length !== flipped.plan.placements.length) {
+    return plain.plan.placements.length > flipped.plan.placements.length
+      ? plain
+      : flipped;
+  }
+  const area = (result: PackResult) =>
+    result.plan.consignments.reduce((total, consignment) => {
+      const truck = findVehicle(catalogue, consignment.vehicleId);
+      const trailer = consignment.trailerId
+        ? findVehicle(catalogue, consignment.trailerId)
+        : undefined;
+      return (
+        total +
+        (truck ? deckArea(truck) : 0) +
+        (trailer ? deckArea(trailer) : 0)
+      );
+    }, 0);
+  return area(plain) < area(flipped) ? plain : flipped;
 }
 
 /** What one deck came out carrying, before it knows which movement it is in. */
@@ -264,18 +287,92 @@ function packOneDeck(
   };
 }
 
-function packOnce(
+/** One candidate movement, packed but not committed. */
+interface MovementLoad {
+  readonly combo: VehicleCombination;
+  readonly truck: DeckLoad;
+  readonly trailer: DeckLoad | null;
+  readonly placed: number;
+  readonly area: number;
+}
+
+/**
+ * Pack one candidate movement against the remaining demand.
+ *
+ * Both deck budgets are carved out of the route cap's headroom in sequence,
+ * which is what keeps the combined gross legal by construction: whatever the
+ * truck deck takes, the trailer deck can only have what the cap still allows.
+ * The longer deck packs first so the long piles land where they fit, but the
+ * loads keep their roles — a pile packed on the trailer's row is a trailer
+ * placement whichever deck went first.
+ */
+function packMovement(
+  combo: VehicleCombination,
+  remaining: ReadonlyMap<string, number>,
+  catalogue: Catalogue,
+  options: PackingOptions,
+  ruleset: VdamRuleset,
+): MovementLoad {
+  const combinedTare = combo.truck.tare + (combo.trailer?.tare ?? 0);
+  const headroom = ruleset.maxGrossMass - combinedTare;
+
+  const reach = (vehicle: Vehicle) =>
+    vehicle.deckLength + vehicle.maxRearOverhang;
+  const decks: {role: DeckRole; vehicle: Vehicle}[] = combo.trailer
+    ? [
+        {role: 'truck' as const, vehicle: combo.truck},
+        {role: 'trailer' as const, vehicle: combo.trailer},
+      ].sort((a, b) => reach(b.vehicle) - reach(a.vehicle))
+    : [{role: 'truck', vehicle: combo.truck}];
+
+  const available = new Map(remaining);
+  const loads: Partial<Record<DeckRole, DeckLoad>> = {};
+  let massUsed = 0;
+  for (const {role, vehicle} of decks) {
+    const load = packOneDeck(
+      available,
+      catalogue,
+      vehicle,
+      options,
+      ruleset,
+      headroom - massUsed,
+    );
+    loads[role] = load;
+    massUsed += load.mass;
+    for (const [id, count] of load.consumed) {
+      available.set(id, (available.get(id) ?? 0) - count);
+    }
+  }
+
+  const truck = loads.truck ?? EMPTY_DECK;
+  const trailer = combo.trailer ? (loads.trailer ?? EMPTY_DECK) : null;
+  return {
+    combo,
+    truck,
+    trailer,
+    placed: truck.placements.length + (trailer?.placements.length ?? 0),
+    area: combinationDeckArea(combo),
+  };
+}
+
+/**
+ * The greedy fewest-movements loop: every iteration packs every combination
+ * the catalogue can field against what is still to move, and commits the one
+ * that places the most piles — the classic set-cover greedy. Ties fall to the
+ * least deck area, so a truck alone beats towing a trailer that buys nothing,
+ * and then to catalogue order, for determinism.
+ */
+function packFleetOnce(
   job: Job,
   catalogue: Catalogue,
-  vehicle: Vehicle,
   options: PackingOptions,
   ruleset: VdamRuleset,
 ): PackResult {
-  const usable = {
+  const combos = combinationsOf(catalogue);
+  const usableOf = (vehicle: Vehicle) => ({
     length: vehicle.deckLength + vehicle.maxRearOverhang - options.headboardGap,
     width: vehicle.deckWidth - options.sideMargin * 2,
-  };
-  const payload = payloadCapacity(vehicle);
+  });
 
   const remaining = new Map<string, number>();
   const unplaced: PackedType[] = [];
@@ -289,7 +386,7 @@ function packOnce(
       // findDanglingReferences is what reports this; the packer just cannot act.
       continue;
     }
-    const reason = unplaceableReason(type, vehicle, options, ruleset, usable);
+    const reason = unplaceableOnFleet(type, combos, options, ruleset, usableOf);
     if (reason) {
       unplaced.push({pileTypeId: type.id, quantity: line.quantity, reason});
       continue;
@@ -304,47 +401,63 @@ function packOnce(
     [...remaining.values()].reduce((total, count) => total + count, 0);
 
   while (outstanding() > 0) {
-    const truckId = `C${consignments.length + 1}`;
-    const load = packOneDeck(
-      remaining,
-      catalogue,
-      vehicle,
-      options,
-      ruleset,
-      payload,
-    );
+    let best: MovementLoad | null = null;
+    for (const combo of combos) {
+      const candidate = packMovement(
+        combo,
+        remaining,
+        catalogue,
+        options,
+        ruleset,
+      );
+      if (
+        !best ||
+        candidate.placed > best.placed ||
+        (candidate.placed === best.placed && candidate.area < best.area)
+      ) {
+        best = candidate;
+      }
+    }
 
-    if (load.placements.length === 0) {
-      // Nothing fits an empty truck, so nothing will fit the next one either.
-      // Report what is left rather than opening trucks forever.
+    if (!best || best.placed === 0) {
+      // Nothing fits an empty movement, so nothing will fit the next one
+      // either. Report what is left rather than opening trucks forever.
       for (const [id, count] of remaining) {
         if (count > 0) {
           unplaced.push({
             pileTypeId: id,
             quantity: count,
             reason:
-              'no room left on a truck of this type once the rest is loaded',
+              'no room on any combination in the fleet once the rest is loaded',
           });
         }
       }
       break;
     }
 
+    const truckId = `C${consignments.length + 1}`;
     consignments.push({
       id: truckId,
-      vehicleId: vehicle.id,
-      trailerId: null,
+      vehicleId: best.combo.truck.id,
+      trailerId: best.combo.trailer?.id ?? null,
       phase: null,
     });
-    placements.push(
-      ...load.placements.map(placement => ({
-        ...placement,
-        id: `${truckId}-${placement.id}`,
-        consignmentId: truckId,
-      })),
-    );
-    for (const [id, count] of load.consumed) {
-      remaining.set(id, (remaining.get(id) ?? 0) - count);
+    const commit = (load: DeckLoad, deck: DeckRole) => {
+      placements.push(
+        ...load.placements.map(placement => ({
+          ...placement,
+          id: `${truckId}-${deck}-${placement.id}`,
+          consignmentId: truckId,
+          deck,
+        })),
+      );
+      for (const [id, count] of load.consumed) {
+        remaining.set(id, (remaining.get(id) ?? 0) - count);
+      }
+    };
+    commit(best.truck, 'truck');
+    if (best.trailer) {
+      commit(best.trailer, 'trailer');
     }
   }
 

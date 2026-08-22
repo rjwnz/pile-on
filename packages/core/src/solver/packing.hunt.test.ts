@@ -32,7 +32,40 @@ const HARD = [
   'over-rear-overhang',
   'ahead-of-headboard',
   'outside-side-margin',
+  'over-combined-gross',
+  'phantom-deck',
+  'not-towable',
+  'vehicle-is-trailer',
+  'unknown-trailer',
 ];
+
+/** Sometimes the fleet is just the semi; sometimes it can also tow. */
+const trailer = fc.record({
+  deckLength: fc.integer({min: 5000, max: 9000}),
+  deckHeight: fc.integer({min: 900, max: 1400}),
+  tare: fc.integer({min: 4000, max: 9000}),
+  payload: fc.integer({min: 8000, max: 18000}),
+});
+const fleet: fc.Arbitrary<Vehicle[]> = fc
+  .option(trailer, {nil: undefined})
+  .map(towed =>
+    towed
+      ? [
+          SEMI,
+          {
+            ...SEMI,
+            id: 'TRAILER-4A',
+            name: 't',
+            kind: 'full_trailer' as const,
+            deckLength: towed.deckLength,
+            deckHeight: towed.deckHeight,
+            tare: towed.tare,
+            maxGross: towed.tare + towed.payload,
+            towableBy: [SEMI.id],
+          },
+        ]
+      : [SEMI],
+  );
 
 const helix = (length: number): fc.Arbitrary<Helix> =>
   fc
@@ -61,13 +94,14 @@ const scenario = fc
         PileType[]
       >,
       fc.constant(q),
+      fleet,
     ),
   );
 
 it('hunts hard-rule violations over many seeds', () => {
   fc.assert(
-    fc.property(scenario, ([types, quantities]) => {
-      const catalogue: Catalogue = {pileTypes: types, vehicles: [SEMI]};
+    fc.property(scenario, ([types, quantities, vehicles]) => {
+      const catalogue: Catalogue = {pileTypes: types, vehicles};
       const job: Job = {
         name: 'g',
         lines: types.map((t, i) => ({
@@ -75,7 +109,7 @@ it('hunts hard-rule violations over many seeds', () => {
           quantity: quantities[i]!,
         })),
       };
-      const {plan, unplaced} = pack(job, catalogue, SEMI, OPTIONS);
+      const {plan, unplaced} = pack(job, catalogue, OPTIONS);
       expect(
         validatePlan(plan, catalogue, OPTIONS).filter(v =>
           HARD.includes(v.rule),

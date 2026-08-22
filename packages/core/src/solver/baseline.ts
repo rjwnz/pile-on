@@ -1,17 +1,24 @@
-import {findPileType, type Catalogue, type LoadPlan} from '../domain/catalogue';
+import {
+  combinationDeckArea,
+  combinationsOf,
+  findPileType,
+  type Catalogue,
+  type LoadPlan,
+  type VehicleCombination,
+} from '../domain/catalogue';
 import {tierHeightFor, type LoadingOptions} from '../domain/loading';
 import type {Job, JobLine} from '../domain/job';
 import {maxRadius, type PileType} from '../domain/pile';
-import type {Placement} from '../domain/placement';
+import type {DeckRole, Placement} from '../domain/placement';
 import {
   balanceTargetOf,
   payloadCapacity,
   type Vehicle,
 } from '../domain/vehicle';
 import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
-import type {Millimetres} from '../units';
+import type {Kilograms, Millimetres} from '../units';
 import {shiftToBalance} from './balance';
-import {unplaceableReason} from './feasibility';
+import {unplaceableOnFleet} from './feasibility';
 
 /**
  * The naive bounding-box arranger — the *control* the packer has to beat.
@@ -123,18 +130,43 @@ export function cellsFor(
   return chosen;
 }
 
-interface OpenTruck {
-  readonly id: string;
+interface OpenDeck {
+  readonly role: DeckRole;
   readonly vehicle: Vehicle;
   tier: number;
   heightUsed: Millimetres;
-  massUsed: number;
+  massUsed: Kilograms;
+  /** True once a part-filled tier means nothing may stack on this deck. */
+  closed: boolean;
+}
+
+interface OpenMovement {
+  readonly id: string;
+  readonly decks: readonly OpenDeck[];
+}
+
+/**
+ * The one combination the baseline ever sends: the biggest thing the yard
+ * owns, by total deck area — used for every movement, whatever the job looks
+ * like. That is the honest naive answer to owning a fleet.
+ */
+function naiveCombination(catalogue: Catalogue): VehicleCombination | null {
+  const combos = combinationsOf(catalogue);
+  if (combos.length === 0) {
+    return null;
+  }
+  return combos.reduce((biggest, combo) => {
+    const byArea = combinationDeckArea(combo) - combinationDeckArea(biggest);
+    if (byArea !== 0) {
+      return byArea > 0 ? combo : biggest;
+    }
+    return combo.truck.id < biggest.truck.id ? combo : biggest;
+  });
 }
 
 export function arrangeNaively(
   job: Job,
   catalogue: Catalogue,
-  vehicle: Vehicle,
   options: LoadingOptions,
   ruleset: VdamRuleset = NZ_VDAM_2016,
 ): ArrangeResult {
@@ -142,26 +174,58 @@ export function arrangeNaively(
   const consignments: {
     id: string;
     vehicleId: string;
-    trailerId: null;
+    trailerId: string | null;
     phase: null;
   }[] = [];
   const unplaced: {pileTypeId: string; quantity: number; reason: string}[] = [];
 
-  const maxLoadHeight = ruleset.maxHeight - vehicle.deckHeight;
-  const payload = payloadCapacity(vehicle);
+  const combo = naiveCombination(catalogue);
+  if (!combo) {
+    for (const line of job.lines) {
+      if (line.quantity > 0 && findPileType(catalogue, line.pileTypeId)) {
+        unplaced.push({
+          pileTypeId: line.pileTypeId,
+          quantity: line.quantity,
+          reason: 'no self-propelled truck in the catalogue',
+        });
+      }
+    }
+    return {plan: {consignments: [], placements: []}, unplaced};
+  }
 
-  let truck: OpenTruck | null = null;
-  // Returns rather than assigning the outer binding: a closure that writes to
-  // `truck` would defeat the narrowing at the call site.
-  function openTruck(): OpenTruck {
+  const combinedTare = combo.truck.tare + (combo.trailer?.tare ?? 0);
+  const grossHeadroom = ruleset.maxGrossMass - combinedTare;
+
+  let movement: OpenMovement | null = null;
+  function openMovement(): OpenMovement {
     const id = `C${consignments.length + 1}`;
     consignments.push({
       id,
-      vehicleId: vehicle.id,
-      trailerId: null,
+      vehicleId: combo!.truck.id,
+      trailerId: combo!.trailer?.id ?? null,
       phase: null,
     });
-    return {id, vehicle, tier: 0, heightUsed: 0, massUsed: 0};
+    const decks: OpenDeck[] = [
+      {
+        role: 'truck',
+        vehicle: combo!.truck,
+        tier: 0,
+        heightUsed: 0,
+        massUsed: 0,
+        closed: false,
+      },
+    ];
+    if (combo!.trailer) {
+      decks.push({
+        role: 'trailer',
+        vehicle: combo!.trailer,
+        tier: 0,
+        heightUsed: 0,
+        massUsed: 0,
+        closed: false,
+      });
+    }
+    return {id, decks};
   }
 
   /** Demand, widest first — a big-piles-first order keeps tiers from thrashing. */
@@ -174,16 +238,50 @@ export function arrangeNaively(
     )
     .sort((a, b) => b.type.length - a.type.length || b.type.mass - a.type.mass);
 
-  for (const {line, type} of demand) {
-    const cells = cellsFor(vehicle, type, options);
-    const tierHeight = tierHeightFor(type, options);
+  // The baseline stops at the tailgate — it does not use overhang — so the
+  // usable span it reports is the deck alone.
+  const deckOnly = (vehicle: Vehicle) => ({
+    length: vehicle.deckLength - options.headboardGap,
+    width: vehicle.deckWidth - options.sideMargin * 2,
+  });
 
-    // The baseline stops at the tailgate — it does not use overhang — so the
-    // usable length it reports is the deck alone.
-    const reason = unplaceableReason(type, vehicle, options, ruleset, {
-      length: vehicle.deckLength - options.headboardGap,
-      width: vehicle.deckWidth - options.sideMargin * 2,
-    });
+  /** Whether this deck can take one more tier of this type, and how many piles. */
+  function tierCapacity(
+    deck: OpenDeck,
+    type: PileType,
+    spareGross: Kilograms,
+  ): number {
+    if (deck.closed || deck.tier >= options.maxTiers) {
+      return 0;
+    }
+    const tierHeight = tierHeightFor(type, options);
+    const maxLoadHeight = ruleset.maxHeight - deck.vehicle.deckHeight;
+    if (deck.heightUsed + tierHeight > maxLoadHeight) {
+      return 0;
+    }
+    const sparePayload =
+      payloadCapacity(deck.vehicle) -
+      deck.massUsed -
+      options.ancillaryMassPerTier;
+    const spare = Math.min(
+      sparePayload,
+      spareGross - options.ancillaryMassPerTier,
+    );
+    const byMass = Math.floor(spare / type.mass);
+    return Math.max(
+      0,
+      Math.min(cellsFor(deck.vehicle, type, options).length, byMass),
+    );
+  }
+
+  for (const {line, type} of demand) {
+    const reason = unplaceableOnFleet(
+      type,
+      [combo],
+      options,
+      ruleset,
+      deckOnly,
+    );
     if (reason) {
       unplaced.push({pileTypeId: type.id, quantity: line.quantity, reason});
       continue;
@@ -191,28 +289,46 @@ export function arrangeNaively(
 
     let remaining = line.quantity;
     while (remaining > 0) {
-      if (
-        truck === null ||
-        truck.tier >= options.maxTiers ||
-        truck.heightUsed + tierHeight > maxLoadHeight ||
-        truck.massUsed + type.mass + options.ancillaryMassPerTier > payload
-      ) {
-        truck = openTruck();
+      if (movement === null) {
+        movement = openMovement();
       }
 
-      // The bearers for this tier land on the payload before any pile does.
-      const spare = payload - truck.massUsed - options.ancillaryMassPerTier;
-      const byMass = Math.floor(spare / type.mass);
-      const take = Math.min(remaining, cells.length, byMass);
+      const used = movement.decks.reduce((sum, deck) => sum + deck.massUsed, 0);
+      const spareGross = grossHeadroom - used;
+      const deck = movement.decks.find(
+        entry => tierCapacity(entry, type, spareGross) > 0,
+      );
+
+      if (!deck) {
+        // Neither deck takes even one pile. A fresh movement whose decks both
+        // refuse can never accept this type, so report rather than loop.
+        const fresh = movement.decks.every(
+          entry => entry.tier === 0 && !entry.closed,
+        );
+        if (fresh) {
+          unplaced.push({
+            pileTypeId: type.id,
+            quantity: remaining,
+            reason:
+              'no room on the naive combination once tares and bearers are counted',
+          });
+          break;
+        }
+        movement = null;
+        continue;
+      }
+
+      const cells = cellsFor(deck.vehicle, type, options);
+      const take = Math.min(remaining, tierCapacity(deck, type, spareGross));
 
       for (let index = 0; index < take; index++) {
         const cell = cells[index]!;
         placements.push({
-          id: `${truck.id}-T${truck.tier}-${index}`,
-          consignmentId: truck.id,
-          deck: 'truck',
+          id: `${movement.id}-${deck.role}-T${deck.tier}-${index}`,
+          consignmentId: movement.id,
+          deck: deck.role,
           pileTypeId: type.id,
-          tier: truck.tier,
+          tier: deck.tier,
           x: cell.x,
           y: cell.y,
           flipped: false,
@@ -220,27 +336,40 @@ export function arrangeNaively(
       }
 
       remaining -= take;
-      truck.massUsed += take * type.mass + options.ancillaryMassPerTier;
-      truck.heightUsed += tierHeight;
-      truck.tier += 1;
+      deck.massUsed += take * type.mass + options.ancillaryMassPerTier;
+      deck.heightUsed += tierHeightFor(type, options);
+      deck.tier += 1;
 
-      // A partly filled tier closes the truck: nothing may stack on a layer
-      // that does not cover the deck, and `validatePlan` enforces it.
+      // A partly filled tier closes the deck: nothing may stack on a layer
+      // that does not cover it, and `validatePlan` enforces that.
       if (take < cells.length) {
-        truck = null;
+        deck.closed = true;
+        if (movement.decks.every(entry => entry.closed)) {
+          movement = null;
+        }
       }
     }
   }
 
-  // Slide each finished load onto its balance point, whole — so the shift
+  // Slide each finished deck onto its own balance point, whole — so the shift
   // cannot affect separation or support.
-  const balanced = consignments.flatMap(consignment =>
-    shiftToBalance(
-      placements.filter(p => p.consignmentId === consignment.id),
-      catalogue,
-      vehicle,
-    ),
-  );
+  const balanced = consignments.flatMap(consignment => {
+    const decks: {role: DeckRole; vehicle: Vehicle}[] = [
+      {role: 'truck', vehicle: combo.truck},
+    ];
+    if (combo.trailer) {
+      decks.push({role: 'trailer', vehicle: combo.trailer});
+    }
+    return decks.flatMap(({role, vehicle}) =>
+      shiftToBalance(
+        placements.filter(
+          p => p.consignmentId === consignment.id && p.deck === role,
+        ),
+        catalogue,
+        vehicle,
+      ),
+    );
+  });
 
   return {plan: {consignments, placements: balanced}, unplaced};
 }

@@ -90,7 +90,7 @@ describe('the arranger and the validator agree', () => {
       name: 'j',
       lines: [{pileTypeId: 'SP168-D6', quantity: 95}],
     };
-    const {plan} = arrangeNaively(job, CATALOGUE, SEMI, STRICT);
+    const {plan} = arrangeNaively(job, CATALOGUE, STRICT);
 
     expect(plan.consignments.length).toBeGreaterThan(1);
     expect(validatePlan(plan, CATALOGUE, STRICT)).toEqual([]);
@@ -103,7 +103,7 @@ describe('the arranger and the validator agree', () => {
       name: 'j',
       lines: [{pileTypeId: 'SP168-D6', quantity: 95}],
     };
-    const {plan} = arrangeNaively(job, CATALOGUE, SEMI, STRICT);
+    const {plan} = arrangeNaively(job, CATALOGUE, STRICT);
     const last = plan.consignments[plan.consignments.length - 1]!;
     const onLast = plan.placements.filter(p => p.consignmentId === last.id);
 
@@ -586,7 +586,7 @@ describe('the arranger never builds an unsupported load', () => {
         },
       ],
     };
-    const {plan} = arrangeNaively(job, withSecondType, SEMI, OPTIONS);
+    const {plan} = arrangeNaively(job, withSecondType, OPTIONS);
 
     expect(validatePlan(plan, withSecondType, OPTIONS)).toEqual([]);
   });

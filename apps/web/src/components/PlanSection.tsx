@@ -51,15 +51,14 @@ export function PlanSection() {
       return;
     }
     const result = useBaseline
-      ? arrangeNaively(job, catalogue, vehicle, options)
+      ? arrangeNaively(job, catalogue, options)
       : pack(job, catalogue, options);
     dispatch({type: 'setPlan', plan: result.plan});
     setUnplaced(result.unplaced);
     setBaselineTrucks(
       useBaseline
         ? null
-        : arrangeNaively(job, catalogue, vehicle, options).plan.consignments
-            .length,
+        : arrangeNaively(job, catalogue, options).plan.consignments.length,
     );
   }
 

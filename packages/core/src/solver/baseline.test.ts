@@ -1,5 +1,6 @@
 import {describe, expect, it} from '@jest/globals';
 import {arrangeNaively, cellsFor, lanesFor, pilesPerLane} from './baseline';
+import {validatePlan} from '../validation/plan';
 import {balanceOffset} from '../domain/balance';
 import {DEFAULT_LOADING_OPTIONS} from '../domain/loading';
 import type {Catalogue} from '../domain/catalogue';
@@ -107,7 +108,7 @@ describe('pilesPerLane', () => {
 
 describe('arrangeNaively', () => {
   it('produces nothing for an empty job', () => {
-    const {plan, unplaced} = arrangeNaively(job(), CATALOGUE, SEMI, OPTIONS);
+    const {plan, unplaced} = arrangeNaively(job(), CATALOGUE, OPTIONS);
 
     expect(plan.consignments).toEqual([]);
     expect(plan.placements).toEqual([]);
@@ -116,12 +117,7 @@ describe('arrangeNaively', () => {
 
   it('fills one tier before opening the next', () => {
     // 5 lanes × 2 piles = 10 per tier.
-    const {plan} = arrangeNaively(
-      job(['SP168-D6', 10]),
-      CATALOGUE,
-      SEMI,
-      OPTIONS,
-    );
+    const {plan} = arrangeNaively(job(['SP168-D6', 10]), CATALOGUE, OPTIONS);
 
     expect(plan.placements).toHaveLength(10);
     expect(new Set(plan.placements.map(p => p.tier))).toEqual(new Set([0]));
@@ -129,12 +125,7 @@ describe('arrangeNaively', () => {
   });
 
   it('opens a second tier once the first is full', () => {
-    const {plan} = arrangeNaively(
-      job(['SP168-D6', 11]),
-      CATALOGUE,
-      SEMI,
-      OPTIONS,
-    );
+    const {plan} = arrangeNaively(job(['SP168-D6', 11]), CATALOGUE, OPTIONS);
 
     expect(plan.placements.filter(p => p.tier === 0)).toHaveLength(10);
     expect(plan.placements.filter(p => p.tier === 1)).toHaveLength(1);
@@ -144,7 +135,6 @@ describe('arrangeNaively', () => {
     const {plan, unplaced} = arrangeNaively(
       job(['SP168-D6', 37], ['SP139-S4', 21]),
       CATALOGUE,
-      SEMI,
       OPTIONS,
     );
 
@@ -156,7 +146,6 @@ describe('arrangeNaively', () => {
     const {plan} = arrangeNaively(
       job(['SP168-D6', 10], ['SP139-S4', 10]),
       CATALOGUE,
-      SEMI,
       OPTIONS,
     );
 
@@ -176,12 +165,7 @@ describe('arrangeNaively', () => {
 
   it('opens a second truck when the tier limit is reached', () => {
     // 4 tiers × 10 = 40 per truck.
-    const {plan} = arrangeNaively(
-      job(['SP168-D6', 41]),
-      CATALOGUE,
-      SEMI,
-      OPTIONS,
-    );
+    const {plan} = arrangeNaively(job(['SP168-D6', 41]), CATALOGUE, OPTIONS);
 
     expect(plan.consignments).toHaveLength(2);
     expect(plan.placements.filter(p => p.consignmentId === 'C1')).toHaveLength(
@@ -198,7 +182,6 @@ describe('arrangeNaively', () => {
     const {plan} = arrangeNaively(
       job(['SP168-D6', 20]),
       {...CATALOGUE, vehicles: [light]},
-      light,
       OPTIONS,
     );
 
@@ -213,7 +196,6 @@ describe('arrangeNaively', () => {
     const {plan} = arrangeNaively(
       job(['SP168-D6', 40]),
       {...CATALOGUE, vehicles: [tall]},
-      tall,
       OPTIONS,
     );
 
@@ -229,7 +211,6 @@ describe('arrangeNaively', () => {
     const {plan, unplaced} = arrangeNaively(
       job(['LONG', 5]),
       {...CATALOGUE, pileTypes: [long]},
-      SEMI,
       OPTIONS,
     );
 
@@ -238,7 +219,8 @@ describe('arrangeNaively', () => {
       {
         pileTypeId: 'LONG',
         quantity: 5,
-        reason: 'too long for the deck — 14000 mm on a 12500 mm deck',
+        reason:
+          'fits no vehicle in the fleet — best case (Semi): too long for the deck — 14000 mm on a 12500 mm deck',
       },
     ]);
   });
@@ -252,7 +234,6 @@ describe('arrangeNaively', () => {
     const {unplaced} = arrangeNaively(
       job(['WIDE', 3]),
       {...CATALOGUE, pileTypes: [wide]},
-      SEMI,
       OPTIONS,
     );
 
@@ -264,7 +245,6 @@ describe('arrangeNaively', () => {
     const {unplaced} = arrangeNaively(
       job(['HEAVY', 1]),
       {...CATALOGUE, pileTypes: [heavy]},
-      SEMI,
       OPTIONS,
     );
 
@@ -275,7 +255,6 @@ describe('arrangeNaively', () => {
     const {plan, unplaced} = arrangeNaively(
       job(['GHOST', 5]),
       CATALOGUE,
-      SEMI,
       OPTIONS,
     );
 
@@ -285,18 +264,8 @@ describe('arrangeNaively', () => {
   });
 
   it('gives every placement a unique, deterministic id', () => {
-    const first = arrangeNaively(
-      job(['SP168-D6', 25]),
-      CATALOGUE,
-      SEMI,
-      OPTIONS,
-    );
-    const second = arrangeNaively(
-      job(['SP168-D6', 25]),
-      CATALOGUE,
-      SEMI,
-      OPTIONS,
-    );
+    const first = arrangeNaively(job(['SP168-D6', 25]), CATALOGUE, OPTIONS);
+    const second = arrangeNaively(job(['SP168-D6', 25]), CATALOGUE, OPTIONS);
 
     const ids = first.plan.placements.map(p => p.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -311,12 +280,7 @@ describe('arrangeNaively', () => {
    * on a vehicle whose yard has not allowed a front overhang.
    */
   it('never projects a pile past the headboard', () => {
-    const {plan} = arrangeNaively(
-      job(['SP168-D6', 25]),
-      CATALOGUE,
-      SEMI,
-      OPTIONS,
-    );
+    const {plan} = arrangeNaively(job(['SP168-D6', 25]), CATALOGUE, OPTIONS);
 
     for (const placement of plan.placements) {
       expect(placement.x).toBeGreaterThanOrEqual(-SEMI.maxFrontOverhang);
@@ -324,12 +288,7 @@ describe('arrangeNaively', () => {
   });
 
   it('stays within the rear overhang the vehicle allows', () => {
-    const {plan} = arrangeNaively(
-      job(['SP168-D6', 25]),
-      CATALOGUE,
-      SEMI,
-      OPTIONS,
-    );
+    const {plan} = arrangeNaively(job(['SP168-D6', 25]), CATALOGUE, OPTIONS);
 
     for (const placement of plan.placements) {
       expect(placement.x + SP168.length).toBeLessThanOrEqual(
@@ -341,12 +300,7 @@ describe('arrangeNaively', () => {
   it('leaves every truck it builds balanced', () => {
     // A part-loaded last truck is the case that goes wrong: full tiers balance
     // themselves, a truncated one does not.
-    const {plan} = arrangeNaively(
-      job(['SP168-D6', 95]),
-      CATALOGUE,
-      SEMI,
-      OPTIONS,
-    );
+    const {plan} = arrangeNaively(job(['SP168-D6', 95]), CATALOGUE, OPTIONS);
 
     for (const consignment of plan.consignments) {
       const offset = balanceOffset(
@@ -373,5 +327,86 @@ describe('arrangeNaively', () => {
       lanes.length * pilesPerLane(SEMI, SP168, OPTIONS),
     );
     expect(new Set(cells.map(c => `${c.x}:${c.y}`)).size).toBe(cells.length);
+  });
+});
+
+describe('arrangeNaively with a trailer in the fleet', () => {
+  const RIGID: Vehicle = {
+    ...SEMI,
+    id: 'RIGID-8',
+    name: 'Rigid',
+    kind: 'rigid',
+    deckLength: 7200,
+    deckHeight: 1200,
+    tare: 10600,
+    maxGross: 30000,
+  };
+  const TRAILER: Vehicle = {
+    ...SEMI,
+    id: 'TRAILER-4A',
+    name: 'Trailer',
+    kind: 'full_trailer',
+    deckLength: 8100,
+    deckHeight: 1150,
+    tare: 6800,
+    maxGross: 22000,
+    towableBy: ['RIGID-8'],
+  };
+  const FLEET: Catalogue = {
+    pileTypes: [SP168, SP139],
+    vehicles: [RIGID, TRAILER],
+  };
+
+  it('always sends the biggest combination it owns', () => {
+    const {plan} = arrangeNaively(job(['SP139-S4', 10]), FLEET, OPTIONS);
+
+    // Deterministically rigid + trailer, even for a load the truck alone
+    // would take: the control is naive on purpose.
+    expect(plan.consignments[0]!.vehicleId).toBe('RIGID-8');
+    expect(plan.consignments[0]!.trailerId).toBe('TRAILER-4A');
+  });
+
+  it('fills the trailer deck once the truck deck is full', () => {
+    const {plan, unplaced} = arrangeNaively(
+      job(['SP139-S4', 60]),
+      FLEET,
+      OPTIONS,
+    );
+
+    expect(unplaced).toEqual([]);
+    expect(plan.placements.some(p => p.deck === 'trailer')).toBe(true);
+    expect(plan.placements.length).toBe(60);
+  });
+
+  it('emits a plan the validator accepts, both decks included', () => {
+    const {plan} = arrangeNaively(
+      job(['SP168-D6', 30], ['SP139-S4', 30]),
+      FLEET,
+      OPTIONS,
+    );
+
+    expect(
+      validatePlan(plan, FLEET, OPTIONS).filter(v => v.severity === 'error'),
+    ).toEqual([]);
+  });
+
+  it('is deterministic across runs', () => {
+    const first = arrangeNaively(job(['SP139-S4', 45]), FLEET, OPTIONS);
+    const second = arrangeNaively(job(['SP139-S4', 45]), FLEET, OPTIONS);
+
+    expect(second.plan).toEqual(first.plan);
+  });
+
+  it('reports everything unplaced when the catalogue is only trailers', () => {
+    const {plan, unplaced} = arrangeNaively(
+      job(['SP139-S4', 5]),
+      {pileTypes: [SP139], vehicles: [TRAILER]},
+      OPTIONS,
+    );
+
+    expect(plan.consignments).toEqual([]);
+    expect(unplaced[0]!.reason).toBe(
+      'no self-propelled truck in the catalogue',
+    );
   });
 });

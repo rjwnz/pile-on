@@ -81,7 +81,7 @@ describe('what the packer is for', () => {
   it('uses fewer trucks than the baseline on a job that fills them', () => {
     const scheduled = job(['SP168-D6', 95]);
     const packed = pack(scheduled, CATALOGUE, OPTIONS);
-    const naive = arrangeNaively(scheduled, CATALOGUE, SEMI, OPTIONS);
+    const naive = arrangeNaively(scheduled, CATALOGUE, OPTIONS);
 
     expect(naive.plan.consignments).toHaveLength(3);
     expect(packed.plan.consignments).toHaveLength(2);
@@ -471,7 +471,7 @@ describe('properties, over generated jobs', () => {
     for (const quantity of [12, 25, 40, 60, 95]) {
       const scheduled = job(['SP168-D6', quantity]);
       const packed = pack(scheduled, CATALOGUE, OPTIONS);
-      const naive = arrangeNaively(scheduled, CATALOGUE, SEMI, OPTIONS);
+      const naive = arrangeNaively(scheduled, CATALOGUE, OPTIONS);
 
       expect(packed.plan.consignments.length).toBeLessThanOrEqual(
         naive.plan.consignments.length,

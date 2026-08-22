@@ -135,7 +135,7 @@ function run(state: AppState, fixture: string): Row {
   const millis = Number(process.hrtime.bigint() - started) / 1e6;
 
   const noFlip = pack(state.job, state.catalogue, withoutFlips(options));
-  const naive = arrangeNaively(state.job, state.catalogue, vehicle, options);
+  const naive = arrangeNaively(state.job, state.catalogue, options);
   const used = utilisation(packed.plan, state, options);
 
   return {

@@ -10,10 +10,10 @@ const GOOD: CsvRow = {
   mass: '178',
   helix1_offset: '400',
   helix1_radius: '225',
-  helix1_thickness: '110',
+  helix1_length: '110',
   helix2_offset: '1100',
   helix2_radius: '175',
-  helix2_thickness: '110',
+  helix2_length: '110',
 };
 
 function paths(result: ReturnType<typeof parsePileTypeRows>): string[] {
@@ -36,8 +36,8 @@ describe('parsePileTypeRows', () => {
       shaftRadius: 84,
       mass: 178,
       helices: [
-        {offsetFromButt: 400, radius: 225, thickness: 110},
-        {offsetFromButt: 1100, radius: 175, thickness: 110},
+        {offsetFromButt: 400, radius: 225, length: 110},
+        {offsetFromButt: 1100, radius: 175, length: 110},
       ],
     });
   });
@@ -55,7 +55,7 @@ describe('parsePileTypeRows', () => {
         id: 'SP139-S4',
         helix2_offset: '',
         helix2_radius: '',
-        helix2_thickness: '',
+        helix2_length: '',
       },
     ]);
 
@@ -68,7 +68,7 @@ describe('parsePileTypeRows', () => {
         ...GOOD,
         helix3_offset: '2000',
         helix3_radius: '150',
-        helix3_thickness: '110',
+        helix3_length: '110',
       },
     ]);
 
@@ -162,5 +162,28 @@ describe('parsePileTypeEntry', () => {
     const result = parsePileTypeEntry({...GOOD, length: 'oops'});
 
     expect(!result.ok && result.issues.map(i => i.path)).toEqual(['length']);
+  });
+});
+
+describe('the old helix thickness column', () => {
+  it('still imports, so existing catalogue sheets keep working', () => {
+    const legacy = {
+      ...GOOD,
+      helix1_length: undefined as unknown as string,
+      helix1_thickness: '110',
+    };
+    delete (legacy as Record<string, unknown>)['helix1_length'];
+    const result = parsePileTypeRows([legacy]);
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value[0]!.helices[0]!.length).toBe(110);
+  });
+
+  it('is overridden by the new column when a sheet carries both', () => {
+    const result = parsePileTypeRows([
+      {...GOOD, helix1_length: '150', helix1_thickness: '110'},
+    ]);
+
+    expect(result.ok && result.value[0]!.helices[0]!.length).toBe(150);
   });
 });

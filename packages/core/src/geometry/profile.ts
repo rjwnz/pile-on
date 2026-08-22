@@ -49,7 +49,7 @@ export function radiusProfile(placed: PlacedPile): RadiusSegment[] {
 
   for (const helix of type.helices) {
     const centre = helixCentre(type, placement, helix.offsetFromButt);
-    const half = helix.thickness / 2;
+    const half = helix.length / 2;
     const helixStart = Math.max(start, centre - half);
     const helixEnd = Math.min(end, centre + half);
     if (helixEnd > helixStart) {

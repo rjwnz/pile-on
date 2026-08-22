@@ -37,9 +37,14 @@ maintained in a spreadsheet. Any number of helices works; the parser scans
 `helix1_*`, `helix2_*`, … until they run out.
 
 ```
-id,name,length,shaft_radius,mass,helix1_offset,helix1_radius,helix1_thickness
+id,name,length,shaft_radius,mass,helix1_offset,helix1_radius,helix1_length
 SP139-S4,SP139 4.5 m single helix,4500,70,96,350,175,90
 ```
+
+`helixN_length` is the axial length of the helix — plate thickness plus the rise
+of its flight — not the plate gauge. It decides whether two plates share a
+station on the deck, so it is what makes staggering possible or not. The column
+was once `helixN_thickness`; sheets using the old header still import.
 
 **Vehicles.** A deck and a mass limit — no axle data.
 

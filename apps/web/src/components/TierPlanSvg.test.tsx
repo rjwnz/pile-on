@@ -23,7 +23,7 @@ const CATALOGUE: Catalogue = {
       length: 6000,
       shaftRadius: 84,
       mass: 178,
-      helices: [{offsetFromButt: 400, radius: 225, thickness: 110}],
+      helices: [{offsetFromButt: 400, radius: 225, length: 110}],
     },
   ],
   vehicles: [SEMI],

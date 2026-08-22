@@ -40,10 +40,10 @@ function Tube({
 }) {
   return (
     <g data-testid={testId ?? undefined}>
-      <polygon points={cylinder.shaded} fill={shaded} />
-      <polygon points={cylinder.lit} fill={lit} />
-      <polygon
-        points={cylinder.silhouette}
+      <path d={cylinder.shaded} fill={shaded} />
+      <path d={cylinder.lit} fill={lit} />
+      <path
+        d={cylinder.silhouette}
         fill="none"
         stroke={outline}
         strokeWidth={6}

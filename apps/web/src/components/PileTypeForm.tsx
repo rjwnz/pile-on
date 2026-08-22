@@ -11,7 +11,7 @@ import {Button, Field, IssueList} from './ui';
 interface HelixDraft {
   readonly offset: string;
   readonly radius: string;
-  readonly thickness: string;
+  readonly length: string;
 }
 
 interface Draft {
@@ -29,7 +29,7 @@ const BLANK: Draft = {
   length: '',
   shaftRadius: '',
   mass: '',
-  helices: [{offset: '', radius: '', thickness: ''}],
+  helices: [{offset: '', radius: '', length: ''}],
 };
 
 function toDraft(type: PileType): Draft {
@@ -42,7 +42,7 @@ function toDraft(type: PileType): Draft {
     helices: type.helices.map(helix => ({
       offset: String(helix.offsetFromButt),
       radius: String(helix.radius),
-      thickness: String(helix.thickness),
+      length: String(helix.length),
     })),
   };
 }
@@ -63,7 +63,7 @@ export function draftToRow(draft: Draft): CsvRow {
   draft.helices.forEach((helix, index) => {
     row[`helix${index + 1}_offset`] = helix.offset;
     row[`helix${index + 1}_radius`] = helix.radius;
-    row[`helix${index + 1}_thickness`] = helix.thickness;
+    row[`helix${index + 1}_length`] = helix.length;
   });
   return row;
 }
@@ -164,18 +164,18 @@ export function PileTypeForm({
               onChange={v => setHelix(index, {offset: v})}
             />
             <Field
-              label="Radius"
+              label={`Plate ${index + 1} radius`}
               suffix="mm"
               type="number"
               value={helix.radius}
               onChange={v => setHelix(index, {radius: v})}
             />
             <Field
-              label="Thickness"
+              label={`Plate ${index + 1} length`}
               suffix="mm"
               type="number"
-              value={helix.thickness}
-              onChange={v => setHelix(index, {thickness: v})}
+              value={helix.length}
+              onChange={v => setHelix(index, {length: v})}
             />
             <div className="flex items-end pb-1">
               <Button
@@ -197,7 +197,7 @@ export function PileTypeForm({
           onClick={() =>
             set('helices', [
               ...draft.helices,
-              {offset: '', radius: '', thickness: ''},
+              {offset: '', radius: '', length: ''},
             ])
           }
         >

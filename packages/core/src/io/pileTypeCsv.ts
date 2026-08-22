@@ -1,4 +1,5 @@
 import type {Helix, PileType} from '../domain/pile';
+import type {Millimetres} from '../units';
 import {IssueLog, type Result} from '../validation/result';
 import {
   readNumber,
@@ -15,6 +16,9 @@ import {
  * this catalogue maintain it in Excel. The parser scans upward from 1 until it
  * finds no columns for the next index, so any number of helices works without
  * the format committing to a maximum.
+ *
+ * `helixN_length` was once called `helixN_thickness`. Both are accepted, so a
+ * sheet written against the old header still imports.
  */
 export const PILE_TYPE_CSV_HEADERS = [
   'id',
@@ -24,25 +28,42 @@ export const PILE_TYPE_CSV_HEADERS = [
   'mass',
   'helix1_offset',
   'helix1_radius',
-  'helix1_thickness',
+  'helix1_length',
   'helix2_offset',
   'helix2_radius',
-  'helix2_thickness',
+  'helix2_length',
 ] as const;
 
-export const PILE_TYPE_CSV_EXAMPLE = `id,name,length,shaft_radius,mass,helix1_offset,helix1_radius,helix1_thickness,helix2_offset,helix2_radius,helix2_thickness
+/** Superseded by `helixN_length`; still read so old sheets keep importing. */
+const LEGACY_LENGTH_SUFFIX = 'thickness';
+
+export const PILE_TYPE_CSV_EXAMPLE = `id,name,length,shaft_radius,mass,helix1_offset,helix1_radius,helix1_length,helix2_offset,helix2_radius,helix2_length
 SP168-D6,SP168 6.0 m twin helix,6000,84,178,400,225,110,1100,175,110
 SP139-S4,SP139 4.5 m single helix,4500,70,96,350,175,90,,,
 `;
 
 function helixColumnsPresent(row: CsvRow, index: number): boolean {
-  return ['offset', 'radius', 'thickness'].some(part => {
+  return ['offset', 'radius', 'length', LEGACY_LENGTH_SUFFIX].some(part => {
     const value = row[`helix${index}_${part}`];
     return value !== undefined && value.trim() !== '';
   });
 }
 
-function readHelices(row: CsvRow, length: number, log: IssueLog): Helix[] {
+/** Read `helixN_length`, falling back to the old `helixN_thickness` column. */
+function readHelixLength(
+  row: CsvRow,
+  index: number,
+  log: IssueLog,
+): Millimetres {
+  const legacy = row[`helix${index}_${LEGACY_LENGTH_SUFFIX}`];
+  const field =
+    row[`helix${index}_length`] === undefined && legacy !== undefined
+      ? `helix${index}_${LEGACY_LENGTH_SUFFIX}`
+      : `helix${index}_length`;
+  return readNumber(row, field, log, {min: 0});
+}
+
+function readHelices(row: CsvRow, pileLength: number, log: IssueLog): Helix[] {
   const helices: Helix[] = [];
 
   // Stop at the first index with no data, but keep going past a gap in the
@@ -57,15 +78,15 @@ function readHelices(row: CsvRow, length: number, log: IssueLog): Helix[] {
       continue;
     }
     const prefix = `helix${index}`;
-    // Only bound the offset by the length if the length itself parsed — one bad
-    // length column should not cascade into a bogus complaint per helix.
+    // Only bound the offset by the pile length if that parsed — one bad length
+    // column should not cascade into a bogus complaint per helix.
     const offsetFromButt = readNumber(row, `${prefix}_offset`, log, {
       min: 0,
-      ...(length > 0 ? {max: length} : {}),
+      ...(pileLength > 0 ? {max: pileLength} : {}),
     });
     const radius = readNumber(row, `${prefix}_radius`, log, {min: 0.0001});
-    const thickness = readNumber(row, `${prefix}_thickness`, log, {min: 0});
-    helices.push({offsetFromButt, radius, thickness});
+    const length = readHelixLength(row, index, log);
+    helices.push({offsetFromButt, radius, length});
   }
 
   return helices.sort((a, b) => a.offsetFromButt - b.offsetFromButt);

@@ -74,7 +74,7 @@ describe('radiusProfile', () => {
   });
 
   it('drops a helix with no longitudinal extent', () => {
-    const zeroThickness = pileType('flat', [helixAt(500, {thickness: 0})]);
+    const zeroThickness = pileType('flat', [helixAt(500, {length: 0})]);
 
     expect(radiusProfile(place(zeroThickness))).toHaveLength(1);
   });
@@ -98,8 +98,8 @@ describe('helixRadiusAt', () => {
 
   it('takes the widest plate when helices overlap at a station', () => {
     const stacked = pileType('stacked', [
-      helixAt(500, {thickness: 400}),
-      helixAt(500, {radius: 350, thickness: 400}),
+      helixAt(500, {length: 400}),
+      helixAt(500, {radius: 350, length: 400}),
     ]);
 
     expect(helixRadiusAt(radiusProfile(place(stacked)), 500)).toBe(350);

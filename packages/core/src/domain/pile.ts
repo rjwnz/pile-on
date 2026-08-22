@@ -13,11 +13,15 @@ export interface Helix {
   /** Outer radius of the plate, measured from the shaft axis. */
   readonly radius: Millimetres;
   /**
-   * Longitudinal extent of the plate along the shaft — the plate thickness plus
-   * the rise of one revolution. This is what decides whether two helices share a
-   * station on the deck, and therefore whether staggering buys anything.
+   * Axial length of the helix along the shaft: the plate thickness plus the
+   * rise of its flight. A helix is a short fat cylinder, not a flat disc, and
+   * this is how long that cylinder is.
+   *
+   * It decides whether two helices share a station on the deck, and therefore
+   * whether staggering buys anything — so it is worth getting right rather
+   * than defaulting to the plate gauge.
    */
-  readonly thickness: Millimetres;
+  readonly length: Millimetres;
 }
 
 /** A catalogue entry. Many piles on a job share one type. */

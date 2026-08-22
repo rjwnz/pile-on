@@ -13,7 +13,7 @@ import type {Millimetres} from '../units';
  */
 export const SHAFT_RADIUS: Millimetres = 60;
 export const HELIX_RADIUS: Millimetres = 200;
-export const HELIX_THICKNESS: Millimetres = 100;
+export const HELIX_LENGTH: Millimetres = 100;
 export const PILE_LENGTH: Millimetres = 6000;
 
 export function helixAt(
@@ -23,7 +23,7 @@ export function helixAt(
   return {
     offsetFromButt,
     radius: HELIX_RADIUS,
-    thickness: HELIX_THICKNESS,
+    length: HELIX_LENGTH,
     ...overrides,
   };
 }

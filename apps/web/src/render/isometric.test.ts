@@ -9,6 +9,30 @@ import {
 
 const COS30 = Math.cos(Math.PI / 6);
 
+/** Every explicit coordinate pair in a path, in order. */
+function pointsIn(path: string): {x: number; y: number}[] {
+  return [...path.matchAll(/[MLA][^MLAZ]*/g)].flatMap(match => {
+    const numbers = match[0]
+      .slice(1)
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
+    // An arc carries five parameters before its endpoint.
+    const pair = match[0][0] === 'A' ? numbers.slice(5) : numbers;
+    return pair.length === 2 ? [{x: pair[0]!, y: pair[1]!}] : [];
+  });
+}
+
+/** The rx, ry and x-axis-rotation of the first arc in a path. */
+function arcIn(path: string): [number, number, number] {
+  const numbers = /A\s+([^Z]+)/
+    .exec(path)![1]!
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  return [numbers[0]!, numbers[1]!, numbers[2]!];
+}
+
 describe('project', () => {
   it('leaves the origin at the origin', () => {
     expect(project(0, 0, 0)).toEqual({x: 0, y: 0});
@@ -162,35 +186,65 @@ describe('cylinderAlongDeck', () => {
     expect(cylinder.capRotation).toBe(-60);
   });
 
-  it('splits the body into a lit and a shaded half, four corners each', () => {
-    expect(cylinder.lit.split(' ')).toHaveLength(4);
-    expect(cylinder.shaded.split(' ')).toHaveLength(4);
-  });
-
-  it('shares the axis line between the two halves, so they meet exactly', () => {
-    const litStart = cylinder.lit.split(' ').slice(0, 2);
-    const shadedStart = cylinder.shaded.split(' ').slice(0, 2);
-
-    expect(litStart).toEqual(shadedStart);
+  it('splits the body into a lit and a shaded half', () => {
+    // Both start on the pile axis and close back to it, so together they cover
+    // the tube exactly once with no overlap and no gap.
+    expect(cylinder.lit).toMatch(/^M /);
+    expect(cylinder.shaded).toMatch(/^M /);
+    expect(pointsIn(cylinder.lit)[0]).toEqual(pointsIn(cylinder.shaded)[0]);
   });
 
   it('puts the lit half above the shaded half on screen', () => {
-    const yOf = (poly: string) =>
-      poly.split(' ').map(pair => Number(pair.split(',')[1]));
+    const topOf = (path: string) =>
+      Math.min(...pointsIn(path).map(point => point.y));
 
-    expect(Math.min(...yOf(cylinder.lit))).toBeLessThan(
-      Math.min(...yOf(cylinder.shaded)),
-    );
+    expect(topOf(cylinder.lit)).toBeLessThan(topOf(cylinder.shaded));
   });
 
   it('makes the body half-width match the cap, so the two meet cleanly', () => {
     // Silhouette half-width and cap major semi-axis are the same number; if
     // they ever diverge the cap either floats free of the body or bulges out.
-    const [axisX, axisY] = cylinder.lit.split(' ')[1]!.split(',').map(Number);
-    const [edgeX, edgeY] = cylinder.lit.split(' ')[2]!.split(',').map(Number);
-    const halfWidth = Math.hypot(edgeX! - axisX!, edgeY! - axisY!);
+    const axis = pointsIn(cylinder.lit)[1]!;
+    const edge = pointsIn(cylinder.lit)[2]!;
 
-    expect(halfWidth).toBeCloseTo(cylinder.capRx);
+    expect(Math.hypot(edge.x - axis.x, edge.y - axis.y)).toBeCloseTo(
+      cylinder.capRx,
+    );
+  });
+
+  describe('the far end', () => {
+    it('is an arc, not a straight edge — a cylinder is not a sawn plank', () => {
+      expect(cylinder.silhouette).toContain('A ');
+      expect(cylinder.lit).toContain('A ');
+      expect(cylinder.shaded).toContain('A ');
+    });
+
+    it('curves on the same ellipse as the cap', () => {
+      const [rx, ry, rotation] = arcIn(cylinder.silhouette);
+
+      expect(rx).toBeCloseTo(cylinder.capRx);
+      expect(ry).toBeCloseTo(cylinder.capRy);
+      expect(rotation).toBeCloseTo(cylinder.capRotation);
+    });
+
+    it('bulges away from the viewer, past the end of the body', () => {
+      // The lit and shaded halves both end at the far rim's outermost point,
+      // one minor semi-axis beyond the pile axis, directly away from the eye.
+      const axisStart = pointsIn(cylinder.lit)[0]!;
+      const bulge = pointsIn(cylinder.lit).at(-1)!;
+      const alongDeck = {x: Math.cos(Math.PI / 6), y: 0.5};
+
+      const outward =
+        (axisStart.x - bulge.x) * alongDeck.x +
+        (axisStart.y - bulge.y) * alongDeck.y;
+      expect(outward).toBeCloseTo(cylinder.capRy);
+    });
+
+    it('closes the silhouette back on itself', () => {
+      const corners = pointsIn(cylinder.silhouette);
+
+      expect(corners.at(-1)).toEqual(corners[0]);
+    });
   });
 
   it('scales with radius, so a helix plate uses the same shape as a shaft', () => {
@@ -198,21 +252,5 @@ describe('cylinderAlongDeck', () => {
 
     expect(plate.capRx / cylinder.capRx).toBeCloseTo(225 / 100);
     expect(plate.capRotation).toBeCloseTo(cylinder.capRotation);
-  });
-});
-
-describe('cylinder outline', () => {
-  const cylinder = cylinderAlongDeck(0, 6000, 0, 500, 100);
-
-  it('traces the whole body, not one half', () => {
-    expect(cylinder.silhouette.split(' ')).toHaveLength(4);
-  });
-
-  it('avoids the axis, so no seam is drawn down the middle of a pile', () => {
-    const axisPoints = new Set(cylinder.lit.split(' ').slice(0, 2));
-
-    for (const corner of cylinder.silhouette.split(' ')) {
-      expect(axisPoints.has(corner)).toBe(false);
-    }
   });
 });

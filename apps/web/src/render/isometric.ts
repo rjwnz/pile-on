@@ -41,6 +41,9 @@ export function project(
  */
 const UP: Point2 = {x: SIN30, y: -COS30};
 
+/** Unit vector along a pile on screen — toward the viewer, down and right. */
+const ALONG: Point2 = {x: COS30, y: SIN30};
+
 /**
  * A circle in the deck's cross-section plane projects to an ellipse.
  *
@@ -59,7 +62,7 @@ const CAP_ROTATION_DEG = Number(
 );
 
 export interface Cylinder {
-  /** Upper, lit half of the body. */
+  /** Upper, lit half of the body, as SVG path data. */
   readonly lit: string;
   /** Lower, shaded half — the two together read as round. */
   readonly shaded: string;
@@ -89,6 +92,7 @@ export function cylinderAlongDeck(
   const start = project(x0, y, z);
   const end = project(x1, y, z);
   const halfWidth = radius * CAP_MAJOR;
+  const capRy = radius * CAP_MINOR;
   const offset = {x: UP.x * halfWidth, y: UP.y * halfWidth};
 
   const corner = (base: Point2, sign: number): Point2 => ({
@@ -96,19 +100,62 @@ export function cylinderAlongDeck(
     y: base.y + offset.y * sign,
   });
 
+  /*
+   * Farthest point of the far rim. The far end shows the outside of the tube
+   * curving away, not a cut face, so its edge is an arc bulging past the body
+   * by the cap's minor semi-axis — a square edge there makes a cylinder look
+   * like a sawn plank.
+   */
+  const farExtreme: Point2 = {
+    x: start.x - ALONG.x * capRy,
+    y: start.y - ALONG.y * capRy,
+  };
+
+  /*
+   * The far rim is the same ellipse as the cap, so the arcs reuse its radii and
+   * rotation. Endpoints sit on the major axis, which makes the silhouette a
+   * clean half ellipse and each shaded half a quarter.
+   *
+   * Sweep flags, reading positions off a clock face (SVG's y runs down, so
+   * sweep 1 is clockwise on screen):
+   *   silhouette  8 → 10 → 2 o'clock   clockwise        → 1
+   *   lit         2 → 12 → 10 o'clock  anticlockwise    → 0
+   *   shaded      8 → 9  → 10 o'clock  clockwise        → 1
+   */
+  const arcTo = (to: Point2, sweep: 0 | 1) =>
+    `A ${halfWidth} ${capRy} ${CAP_ROTATION_DEG} 0 ${sweep} ${to.x} ${to.y}`;
+  const move = (at: Point2) => `M ${at.x} ${at.y}`;
+  const line = (to: Point2) => `L ${to.x} ${to.y}`;
+
   return {
-    lit: points(start, end, corner(end, 1), corner(start, 1)),
-    shaded: points(start, end, corner(end, -1), corner(start, -1)),
-    silhouette: points(
-      corner(start, 1),
-      corner(end, 1),
-      corner(end, -1),
-      corner(start, -1),
-    ),
+    lit: [
+      move(start),
+      line(end),
+      line(corner(end, 1)),
+      line(corner(start, 1)),
+      arcTo(farExtreme, 0),
+      'Z',
+    ].join(' '),
+    shaded: [
+      move(start),
+      line(end),
+      line(corner(end, -1)),
+      line(corner(start, -1)),
+      arcTo(farExtreme, 1),
+      'Z',
+    ].join(' '),
+    silhouette: [
+      move(corner(start, 1)),
+      line(corner(end, 1)),
+      line(corner(end, -1)),
+      line(corner(start, -1)),
+      arcTo(corner(start, 1), 1),
+      'Z',
+    ].join(' '),
     capCx: end.x,
     capCy: end.y,
     capRx: halfWidth,
-    capRy: radius * CAP_MINOR,
+    capRy,
     capRotation: CAP_ROTATION_DEG,
   };
 }

@@ -15,8 +15,8 @@ const SP168: PileType = {
   shaftRadius: 84,
   mass: 178,
   helices: [
-    {offsetFromButt: 400, radius: 225, thickness: 110},
-    {offsetFromButt: 1100, radius: 175, thickness: 110},
+    {offsetFromButt: 400, radius: 225, length: 110},
+    {offsetFromButt: 1100, radius: 175, length: 110},
   ],
 };
 
@@ -330,7 +330,7 @@ describe('the arranger never builds an unsupported load', () => {
           length: 4500,
           shaftRadius: 70,
           mass: 96,
-          helices: [{offsetFromButt: 350, radius: 175, thickness: 90}],
+          helices: [{offsetFromButt: 350, radius: 175, length: 90}],
         },
       ],
     };

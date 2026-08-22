@@ -19,7 +19,7 @@ const PILE_TYPE: PileType = {
   length: 6000,
   shaftRadius: 84,
   mass: 178,
-  helices: [{offsetFromButt: 400, radius: 225, thickness: 110}],
+  helices: [{offsetFromButt: 400, radius: 225, length: 110}],
 };
 
 const VEHICLE: Vehicle = {
@@ -276,14 +276,14 @@ describe('parseAppState — malformed entries', () => {
           length: 6000,
           shaftRadius: 84,
           mass: 178,
-          helices: [{offsetFromButt: 400, radius: 'wide', thickness: 110}],
+          helices: [{offsetFromButt: 400, radius: 'wide', length: 110}],
         },
       ],
       vehicles: [],
     });
 
     expect(messages(parseAppState(source))).toEqual([
-      'catalogue / pileTypes[0] / helices: each helix needs numeric offsetFromButt, radius and thickness',
+      'catalogue / pileTypes[0] / helices: each helix needs numeric offsetFromButt, radius and length',
     ]);
   });
 
@@ -487,5 +487,31 @@ describe('parseAppState — job and plan entries', () => {
     const result = parseAppState(source);
 
     expect(result.ok && result.value.plan.placements[0]!.flipped).toBe(false);
+  });
+});
+
+describe('reading a version 4 file', () => {
+  it('accepts the old helix thickness field as its length', () => {
+    const v4 = JSON.stringify({
+      formatVersion: 4,
+      catalogue: {
+        pileTypes: [
+          {
+            id: 'X',
+            length: 6000,
+            shaftRadius: 84,
+            mass: 178,
+            helices: [{offsetFromButt: 400, radius: 225, thickness: 110}],
+          },
+        ],
+        vehicles: [],
+      },
+    });
+    const result = parseAppState(v4);
+
+    expect(result.ok).toBe(true);
+    expect(
+      result.ok && result.value.catalogue.pileTypes[0]!.helices[0],
+    ).toEqual({offsetFromButt: 400, radius: 225, length: 110});
   });
 });

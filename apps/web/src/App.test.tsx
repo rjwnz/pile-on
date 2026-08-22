@@ -49,8 +49,8 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/^Shaft radius/), '84');
     await user.type(screen.getByLabelText(/^Mass/), '178');
     await user.type(screen.getByLabelText(/Plate 1 offset/), '400');
-    await user.type(screen.getByLabelText(/^Radius/), '225');
-    await user.type(screen.getByLabelText(/^Thickness/), '110');
+    await user.type(screen.getByLabelText(/Plate 1 radius/), '225');
+    await user.type(screen.getByLabelText(/Plate 1 length/), '110');
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
 
     const row = screen.getByRole('row', {name: /SP168-D6/});

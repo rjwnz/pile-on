@@ -25,8 +25,10 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  * 4 — placements gained `consignmentId`; without it a plan cannot say which
  *     truck a pile rides on. No version 3 file has placements either, since
  *     the arranger did not exist yet.
+ * 5 — `helix.thickness` became `helix.length`, which is what it always meant.
+ *     Version 4 files read cleanly: the old field is still accepted.
  */
-export const STATE_FORMAT_VERSION = 4;
+export const STATE_FORMAT_VERSION = 5;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -106,15 +108,22 @@ function parsePileType(value: unknown, log: IssueLog): PileType | null {
   }
   const helixList = Array.isArray(helices) ? helices : [];
   const parsedHelices = helixList.flatMap(helix => {
+    // `length` was `thickness` before version 5; old files still read.
+    const axial =
+      isRecord(helix) && typeof helix['length'] === 'number'
+        ? helix['length']
+        : isRecord(helix) && typeof helix['thickness'] === 'number'
+          ? helix['thickness']
+          : undefined;
     if (
       !isRecord(helix) ||
       typeof helix['offsetFromButt'] !== 'number' ||
       typeof helix['radius'] !== 'number' ||
-      typeof helix['thickness'] !== 'number'
+      axial === undefined
     ) {
       log.add(
         'helices',
-        'each helix needs numeric offsetFromButt, radius and thickness',
+        'each helix needs numeric offsetFromButt, radius and length',
       );
       return [];
     }
@@ -122,7 +131,7 @@ function parsePileType(value: unknown, log: IssueLog): PileType | null {
       {
         offsetFromButt: helix['offsetFromButt'],
         radius: helix['radius'],
-        thickness: helix['thickness'],
+        length: axial,
       },
     ];
   });

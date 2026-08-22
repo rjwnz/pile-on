@@ -1,10 +1,15 @@
 import type {Millimetres} from '../units';
 import type {PileType} from './pile';
 
+/** Which deck of a movement a pile rides on. */
+export const DECK_ROLES = ['truck', 'trailer'] as const;
+export type DeckRole = (typeof DECK_ROLES)[number];
+
 /**
  * Deck coordinate system, used everywhere:
  *
- *   x — along the deck, 0 at the headboard, increasing toward the rear.
+ *   x — along the deck, 0 at *that deck's* headboard, increasing toward the
+ *       rear. A movement's truck and trailer decks each have their own origin.
  *   y — across the deck, 0 on the centreline, positive to the driver's right.
  *   tier — 0 is the bottom layer on the deck; each tier sits on dunnage.
  *
@@ -16,8 +21,10 @@ export interface Placement {
   /** A placement *is* an individual pile on a deck — there is no separate
    * pile registry. */
   readonly id: string;
-  /** Which truck this pile rides on. */
+  /** Which movement this pile rides on. */
   readonly consignmentId: string;
+  /** Which of that movement's decks it sits on. */
+  readonly deck: DeckRole;
   readonly pileTypeId: string;
   readonly tier: number;
   /** Position of the pile's leading (headboard-most) end. */

@@ -42,6 +42,7 @@ const SEMI: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 
 function renderPlan({

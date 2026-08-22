@@ -4,9 +4,11 @@ import {
   VEHICLE_KIND_LABELS,
   isOverGrossMass,
   isOverHeight,
+  isTrailer,
   parseVehicleRows,
   payloadCapacity,
   toMetres,
+  trailersFor,
 } from '@pile-on/core';
 import {useEditor} from '../lib/useEditor';
 import {useAppState} from '../state/AppStateProvider';
@@ -41,6 +43,7 @@ export function VehicleSection() {
               <tr className="border-b border-slate-200 text-left text-slate-600">
                 <th className="py-2 pr-3 font-medium">Id</th>
                 <th className="py-2 pr-3 font-medium">Kind</th>
+                <th className="py-2 pr-3 font-medium">Tows</th>
                 <th className="py-2 pr-3 text-right font-medium">Deck</th>
                 <th className="py-2 pr-3 text-right font-medium">
                   Deck height
@@ -68,6 +71,46 @@ export function VehicleSection() {
                     </td>
                     <td className="py-2 pr-3">
                       {VEHICLE_KIND_LABELS[vehicle.kind]}
+                    </td>
+                    <td className="py-2 pr-3 text-xs">
+                      {isTrailer(vehicle) ? (
+                        <>
+                          towed by{' '}
+                          {vehicle.towableBy.map((truckId, index) => (
+                            <span key={truckId}>
+                              {index > 0 ? ', ' : ''}
+                              <span
+                                className={
+                                  vehicles.some(v => v.id === truckId)
+                                    ? 'font-mono'
+                                    : 'font-mono text-red-700'
+                                }
+                                title={
+                                  vehicles.some(v => v.id === truckId)
+                                    ? undefined
+                                    : 'No truck with this id in the catalogue'
+                                }
+                              >
+                                {truckId}
+                              </span>
+                            </span>
+                          ))}
+                        </>
+                      ) : (
+                        (() => {
+                          const tows = trailersFor(state.catalogue, vehicle.id);
+                          return tows.length === 0 ? (
+                            <span className="text-slate-500">solo</span>
+                          ) : (
+                            <>
+                              tows{' '}
+                              <span className="font-mono">
+                                {tows.map(t => t.id).join(', ')}
+                              </span>
+                            </>
+                          );
+                        })()
+                      )}
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums">
                       {toMetres(vehicle.deckLength).toFixed(2)} ×{' '}

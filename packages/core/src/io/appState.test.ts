@@ -34,6 +34,7 @@ const VEHICLE: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 
 const POPULATED: AppState = {
@@ -44,11 +45,14 @@ const POPULATED: AppState = {
     lines: [{pileTypeId: 'SP168-D6', quantity: 12}],
   },
   plan: {
-    consignments: [{id: 'C1', vehicleId: 'SEMI-45', phase: null}],
+    consignments: [
+      {id: 'C1', vehicleId: 'SEMI-45', trailerId: null, phase: null},
+    ],
     placements: [
       {
         id: 'PL-1',
         consignmentId: 'C1',
+        deck: 'truck',
         pileTypeId: 'SP168-D6',
         tier: 0,
         x: 100,
@@ -230,6 +234,7 @@ describe('findDanglingReferences', () => {
           {
             id: 'PL-9',
             consignmentId: 'C1',
+            deck: 'truck',
             pileTypeId: 'GHOST',
             tier: 0,
             x: 0,
@@ -369,6 +374,7 @@ describe('reading a version 1 file', () => {
       maxFrontOverhang: 0,
       maxRearOverhang: 0,
       balanceTarget: null,
+      towableBy: [],
     });
   });
 
@@ -468,6 +474,7 @@ describe('parseAppState — job and plan entries', () => {
           {
             id: 'PL-1',
             consignmentId: 'C1',
+            deck: 'truck',
             pileTypeId: 'A',
             tier: 0,
             x: 'left',
@@ -488,6 +495,7 @@ describe('parseAppState — job and plan entries', () => {
           {
             id: 'PL-1',
             consignmentId: 'C1',
+            deck: 'truck',
             pileTypeId: 'A',
             tier: 0,
             x: 0,
@@ -670,5 +678,124 @@ describe('reading a version 5 vehicle', () => {
 
     const bad = parseAppState(withTarget('halfway'));
     expect(bad.ok && bad.value.catalogue.vehicles[0]!.balanceTarget).toBeNull();
+  });
+});
+
+describe('reading a version 6 file', () => {
+  const v6 = JSON.stringify({
+    formatVersion: 6,
+    catalogue: {
+      pileTypes: [],
+      vehicles: [
+        {
+          id: 'SEMI-45',
+          kind: 'semi_trailer',
+          deckLength: 12500,
+          deckWidth: 2450,
+          deckHeight: 1350,
+          tare: 15800,
+          maxGross: 44000,
+        },
+      ],
+    },
+    plan: {
+      consignments: [{id: 'C1', vehicleId: 'SEMI-45', phase: null}],
+      placements: [
+        {
+          id: 'PL-1',
+          consignmentId: 'C1',
+          pileTypeId: 'SP168-D6',
+          tier: 0,
+          x: 100,
+          y: 0,
+          flipped: false,
+        },
+      ],
+    },
+  });
+
+  it('reads as a fleet of solo trucks with every pile on the truck deck', () => {
+    const result = parseAppState(v6);
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.catalogue.vehicles[0]!.towableBy).toEqual(
+      [],
+    );
+    expect(
+      result.ok && result.value.plan.consignments[0]!.trailerId,
+    ).toBeNull();
+    expect(result.ok && result.value.plan.placements[0]!.deck).toBe('truck');
+  });
+});
+
+describe('trailer fields', () => {
+  it('round-trips towableBy, trailerId and deck', () => {
+    const state: AppState = {
+      ...POPULATED,
+      catalogue: {
+        pileTypes: POPULATED.catalogue.pileTypes,
+        vehicles: [
+          POPULATED.catalogue.vehicles[0]!,
+          {
+            ...POPULATED.catalogue.vehicles[0]!,
+            id: 'TRAILER-4A',
+            towableBy: ['SEMI-45'],
+          },
+        ],
+      },
+      plan: {
+        consignments: [
+          {
+            id: 'C1',
+            vehicleId: 'SEMI-45',
+            trailerId: 'TRAILER-4A',
+            phase: null,
+          },
+        ],
+        placements: [{...POPULATED.plan.placements[0]!, deck: 'trailer'}],
+      },
+    };
+    const result = parseAppState(serialiseAppState(state));
+
+    expect(result.ok && result.value.catalogue.vehicles[1]!.towableBy).toEqual([
+      'SEMI-45',
+    ]);
+    expect(result.ok && result.value.plan.consignments[0]!.trailerId).toBe(
+      'TRAILER-4A',
+    );
+    expect(result.ok && result.value.plan.placements[0]!.deck).toBe('trailer');
+  });
+
+  it('reports a consignment towing a trailer that is not in the catalogue', () => {
+    const state: AppState = {
+      ...POPULATED,
+      plan: {
+        consignments: [
+          {id: 'C1', vehicleId: 'SEMI-45', trailerId: 'GONE', phase: null},
+        ],
+        placements: [],
+      },
+    };
+
+    expect(findDanglingReferences(state).map(i => i.message)).toEqual([
+      'tows missing trailer "GONE"',
+    ]);
+  });
+
+  it('reports a trailer towable by a truck that is not in the catalogue', () => {
+    const state: AppState = {
+      ...POPULATED,
+      catalogue: {
+        pileTypes: POPULATED.catalogue.pileTypes,
+        vehicles: [
+          {...POPULATED.catalogue.vehicles[0]!, towableBy: ['NOBODY']},
+        ],
+      },
+      plan: {consignments: [], placements: []},
+    };
+
+    expect(findDanglingReferences(state).map(i => i.message)).toEqual([
+      'is towable by missing vehicle "NOBODY"',
+    ]);
   });
 });

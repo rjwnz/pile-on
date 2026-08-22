@@ -34,6 +34,7 @@ describe('parseVehicleRows', () => {
       maxFrontOverhang: 0,
       maxRearOverhang: 0,
       balanceTarget: null,
+      towableBy: [],
     });
   });
 
@@ -162,5 +163,38 @@ describe('the loading columns', () => {
     expect(
       messages(parseVehicleRows([{...GOOD, max_rear_overhang: '-100'}])),
     ).toEqual(['row 1 / max_rear_overhang: must be at least 0, got -100']);
+  });
+});
+
+describe('the towable_by column', () => {
+  it('reads a semicolon-separated list of towing trucks', () => {
+    const result = parseVehicleRows([
+      {...GOOD, id: 'TRAILER-4A', towable_by: 'RIGID-8; RIGID-6'},
+    ]);
+
+    expect(result.ok && result.value[0]!.towableBy).toEqual([
+      'RIGID-8',
+      'RIGID-6',
+    ]);
+  });
+
+  it('reads a single id without a separator', () => {
+    const result = parseVehicleRows([{...GOOD, towable_by: 'RIGID-8'}]);
+
+    expect(result.ok && result.value[0]!.towableBy).toEqual(['RIGID-8']);
+  });
+
+  it('reads blank or absent as self-propelled', () => {
+    const blank = parseVehicleRows([{...GOOD, towable_by: '  '}]);
+    const absent = parseVehicleRows([GOOD]);
+
+    expect(blank.ok && blank.value[0]!.towableBy).toEqual([]);
+    expect(absent.ok && absent.value[0]!.towableBy).toEqual([]);
+  });
+
+  it('drops empty entries left by stray semicolons', () => {
+    const result = parseVehicleRows([{...GOOD, towable_by: ';RIGID-8;;'}]);
+
+    expect(result.ok && result.value[0]!.towableBy).toEqual(['RIGID-8']);
   });
 });

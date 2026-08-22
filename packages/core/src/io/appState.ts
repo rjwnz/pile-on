@@ -33,8 +33,14 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  *     vehicles gained overhang allowances and a balance target. Version 5 files
  *     read cleanly: every one of those defaults to the conservative reading, so
  *     an old file means exactly what it meant.
+ * 7 — vehicles gained `towableBy`, consignments `trailerId`, placements
+ *     `deck`. Bumped although every field defaults, because a version-6 reader
+ *     would fold a trailer's load onto the truck deck and re-judge the plan
+ *     wrongly — the one thing tolerance must not do. Version 6 files read
+ *     cleanly: no vehicle tows, no consignment has a trailer, every placement
+ *     is on the truck deck, and the file means exactly what it meant.
  */
-export const STATE_FORMAT_VERSION = 6;
+export const STATE_FORMAT_VERSION = 7;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -209,6 +215,12 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
       Number.isFinite(value['balanceTarget'])
         ? value['balanceTarget']
         : null,
+    // Absent before version 7: nothing towed, so nothing tows.
+    towableBy: Array.isArray(value['towableBy'])
+      ? value['towableBy'].filter(
+          (entry): entry is string => typeof entry === 'string' && entry !== '',
+        )
+      : [],
   };
 }
 
@@ -305,7 +317,7 @@ function parseConsignment(value: unknown, log: IssueLog): Consignment | null {
     log.add('', 'must be an object');
     return null;
   }
-  const {id, vehicleId, phase} = value;
+  const {id, vehicleId, trailerId, phase} = value;
   if (
     typeof id !== 'string' ||
     !id ||
@@ -315,7 +327,13 @@ function parseConsignment(value: unknown, log: IssueLog): Consignment | null {
     log.add('', 'needs a non-empty id and vehicleId');
     return null;
   }
-  return {id, vehicleId, phase: typeof phase === 'string' ? phase : null};
+  return {
+    id,
+    vehicleId,
+    // Absent before version 7: every movement was a truck running solo.
+    trailerId: typeof trailerId === 'string' && trailerId ? trailerId : null,
+    phase: typeof phase === 'string' ? phase : null,
+  };
 }
 
 /**
@@ -329,7 +347,7 @@ function parsePlacement(value: unknown, log: IssueLog): Placement | null {
     log.add('', 'must be an object');
     return null;
   }
-  const {id, consignmentId, pileTypeId, tier, x, y, flipped} = value;
+  const {id, consignmentId, deck, pileTypeId, tier, x, y, flipped} = value;
   if (
     typeof id !== 'string' ||
     !id ||
@@ -349,7 +367,17 @@ function parsePlacement(value: unknown, log: IssueLog): Placement | null {
     log.add('', 'tier, x and y must be numbers');
     return null;
   }
-  return {id, consignmentId, pileTypeId, tier, x, y, flipped: flipped === true};
+  return {
+    id,
+    consignmentId,
+    // Absent before version 7, when the truck deck was the only deck.
+    deck: deck === 'trailer' ? 'trailer' : 'truck',
+    pileTypeId,
+    tier,
+    x,
+    y,
+    flipped: flipped === true,
+  };
 }
 
 /**
@@ -483,11 +511,27 @@ export function findDanglingReferences(state: AppState): Issue[] {
       );
     }
   }
+  for (const vehicle of state.catalogue.vehicles) {
+    for (const truckId of vehicle.towableBy) {
+      if (!vehicleIds.has(truckId)) {
+        log.add(
+          `catalogue / vehicle ${vehicle.id}`,
+          `is towable by missing vehicle "${truckId}"`,
+        );
+      }
+    }
+  }
   for (const consignment of state.plan.consignments) {
     if (!vehicleIds.has(consignment.vehicleId)) {
       log.add(
         `plan / consignment ${consignment.id}`,
         `uses missing vehicle "${consignment.vehicleId}"`,
+      );
+    }
+    if (consignment.trailerId && !vehicleIds.has(consignment.trailerId)) {
+      log.add(
+        `plan / consignment ${consignment.id}`,
+        `tows missing trailer "${consignment.trailerId}"`,
       );
     }
   }

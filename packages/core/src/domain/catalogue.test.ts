@@ -1,10 +1,15 @@
 import {describe, expect, it} from '@jest/globals';
+import {NZ_VDAM_2016} from '../rules/nzVdam';
 import {
   EMPTY_CATALOGUE,
   EMPTY_PLAN,
+  combinationDeckArea,
+  combinationsOf,
   findPileType,
   findVehicle,
+  movementPayloadCapacity,
   removeById,
+  trailersFor,
   upsertById,
   type Catalogue,
 } from './catalogue';
@@ -32,6 +37,7 @@ const VEHICLE: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [TYPE], vehicles: [VEHICLE]};
@@ -94,5 +100,79 @@ describe('empty values', () => {
   it('provides an empty catalogue and plan to start from', () => {
     expect(EMPTY_CATALOGUE).toEqual({pileTypes: [], vehicles: []});
     expect(EMPTY_PLAN).toEqual({consignments: [], placements: []});
+  });
+});
+
+describe('composing the fleet into combinations', () => {
+  const TRUCK: Vehicle = {...VEHICLE, id: 'RIGID-8'};
+  const OTHER: Vehicle = {...VEHICLE, id: 'RIGID-6', deckLength: 6100};
+  const TRAILER: Vehicle = {
+    ...VEHICLE,
+    id: 'TRAILER-4A',
+    kind: 'full_trailer',
+    deckLength: 8100,
+    tare: 6800,
+    maxGross: 22000,
+    towableBy: ['RIGID-8'],
+  };
+  const FLEET: Catalogue = {
+    pileTypes: [],
+    vehicles: [TRUCK, OTHER, TRAILER],
+  };
+
+  it('lists the trailers a truck may tow', () => {
+    expect(trailersFor(FLEET, 'RIGID-8').map(v => v.id)).toEqual([
+      'TRAILER-4A',
+    ]);
+    expect(trailersFor(FLEET, 'RIGID-6')).toEqual([]);
+  });
+
+  it('fields each truck alone, then with each trailer that names it', () => {
+    expect(
+      combinationsOf(FLEET).map(
+        combo => `${combo.truck.id}+${combo.trailer?.id ?? 'solo'}`,
+      ),
+    ).toEqual(['RIGID-8+solo', 'RIGID-8+TRAILER-4A', 'RIGID-6+solo']);
+  });
+
+  it('never fields a trailer on its own, so an all-trailer catalogue is empty', () => {
+    expect(combinationsOf({pileTypes: [], vehicles: [TRAILER]})).toEqual([]);
+  });
+
+  it('sums the deck area a combination commits', () => {
+    expect(combinationDeckArea({truck: TRUCK, trailer: null})).toBe(
+      7200 * 2450,
+    );
+    expect(combinationDeckArea({truck: TRUCK, trailer: TRAILER})).toBe(
+      7200 * 2450 + 8100 * 2450,
+    );
+  });
+
+  describe('movementPayloadCapacity', () => {
+    it('sums the deck payloads when the route cap is not binding', () => {
+      // Payloads total 17,000 kg; the cap leaves 36,000, so the decks bind.
+      const lightTruck = {...TRUCK, tare: 5000, maxGross: 15000};
+      const lightTrailer = {...TRAILER, tare: 3000, maxGross: 10000};
+      expect(
+        movementPayloadCapacity(
+          {truck: lightTruck, trailer: lightTrailer},
+          NZ_VDAM_2016,
+        ),
+      ).toBe(10000 + 7000);
+    });
+
+    it('caps a heavy combination at what the route allows it to gross', () => {
+      // Deck payloads total 34,600 kg, but 44,000 minus both tares (17,400)
+      // leaves only 26,600 kg of legal load.
+      expect(
+        movementPayloadCapacity({truck: TRUCK, trailer: TRAILER}, NZ_VDAM_2016),
+      ).toBe(26600);
+    });
+
+    it('is the plain payload for a truck running solo under the cap', () => {
+      expect(
+        movementPayloadCapacity({truck: TRUCK, trailer: null}, NZ_VDAM_2016),
+      ).toBe(19400);
+    });
   });
 });

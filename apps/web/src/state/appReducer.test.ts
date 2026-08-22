@@ -26,6 +26,7 @@ function vehicle(id: string): Vehicle {
     maxFrontOverhang: 0,
     maxRearOverhang: 0,
     balanceTarget: null,
+    towableBy: [],
   };
 }
 
@@ -284,7 +285,9 @@ describe('loading options', () => {
     const withPlan = appReducer(BASE, {
       type: 'setPlan',
       plan: {
-        consignments: [{id: 'C1', vehicleId: 'RIGID-8', phase: null}],
+        consignments: [
+          {id: 'C1', vehicleId: 'RIGID-8', trailerId: null, phase: null},
+        ],
         placements: [],
       },
     });

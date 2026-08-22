@@ -21,6 +21,7 @@ interface Draft {
   readonly maxFrontOverhang: string;
   readonly maxRearOverhang: string;
   readonly balanceTarget: string;
+  readonly towableBy: string;
 }
 
 const BLANK: Draft = {
@@ -35,6 +36,7 @@ const BLANK: Draft = {
   maxFrontOverhang: '0',
   maxRearOverhang: '0',
   balanceTarget: '',
+  towableBy: '',
 };
 
 function toDraft(vehicle: Vehicle): Draft {
@@ -53,6 +55,7 @@ function toDraft(vehicle: Vehicle): Draft {
     // absence of an opinion, and the form has to be able to express that.
     balanceTarget:
       vehicle.balanceTarget === null ? '' : String(vehicle.balanceTarget),
+    towableBy: vehicle.towableBy.join('; '),
   };
 }
 
@@ -70,6 +73,7 @@ export function draftToRow(draft: Draft): CsvRow {
     max_front_overhang: draft.maxFrontOverhang,
     max_rear_overhang: draft.maxRearOverhang,
     balance_target: draft.balanceTarget,
+    towable_by: draft.towableBy,
   };
 }
 
@@ -170,6 +174,12 @@ export function VehicleForm({
           value={draft.balanceTarget}
           placeholder="mid-deck"
           onChange={v => set('balanceTarget', v)}
+        />
+        <Field
+          label="Towable by — truck ids, semicolon-separated"
+          value={draft.towableBy}
+          placeholder="self-propelled"
+          onChange={v => set('towableBy', v)}
         />
       </div>
 

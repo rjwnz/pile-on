@@ -40,6 +40,7 @@ const SEMI: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [SP168, SP139], vehicles: [SEMI]};

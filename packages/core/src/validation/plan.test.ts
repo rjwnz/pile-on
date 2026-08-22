@@ -38,6 +38,7 @@ const SEMI: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [SP168], vehicles: [SEMI]};
@@ -60,6 +61,7 @@ function place(overrides: Partial<Placement> = {}): Placement {
   return {
     id: 'PL-1',
     consignmentId: 'C1',
+    deck: 'truck',
     pileTypeId: 'SP168-D6',
     tier: 0,
     x: 100,
@@ -71,7 +73,9 @@ function place(overrides: Partial<Placement> = {}): Placement {
 
 function planWith(placements: Placement[]): LoadPlan {
   return {
-    consignments: [{id: 'C1', vehicleId: 'SEMI-45', phase: null}],
+    consignments: [
+      {id: 'C1', vehicleId: 'SEMI-45', trailerId: null, phase: null},
+    ],
     placements,
   };
 }
@@ -230,7 +234,9 @@ describe('the envelope', () => {
 
   function onTolerant(placements: Placement[]): LoadPlan {
     return {
-      consignments: [{id: 'C1', vehicleId: 'SEMI-OH', phase: null}],
+      consignments: [
+        {id: 'C1', vehicleId: 'SEMI-OH', trailerId: null, phase: null},
+      ],
       placements,
     };
   }
@@ -365,7 +371,9 @@ describe('balance', () => {
   function balanceRules(placements: Placement[], vehicle = SEMI): string[] {
     return validatePlan(
       {
-        consignments: [{id: 'C1', vehicleId: vehicle.id, phase: null}],
+        consignments: [
+          {id: 'C1', vehicleId: vehicle.id, trailerId: null, phase: null},
+        ],
         placements,
       },
       {pileTypes: [SP168], vehicles: [vehicle]},
@@ -464,7 +472,9 @@ describe('broken references', () => {
 
   it('flags placements pointing at a consignment that is not in the plan', () => {
     const plan: LoadPlan = {
-      consignments: [{id: 'C1', vehicleId: 'SEMI-45', phase: null}],
+      consignments: [
+        {id: 'C1', vehicleId: 'SEMI-45', trailerId: null, phase: null},
+      ],
       placements: [place({consignmentId: 'C9'})],
     };
 
@@ -476,8 +486,8 @@ describe('multiple consignments', () => {
   it('checks each truck on its own placements', () => {
     const plan: LoadPlan = {
       consignments: [
-        {id: 'C1', vehicleId: 'SEMI-45', phase: null},
-        {id: 'C2', vehicleId: 'SEMI-45', phase: null},
+        {id: 'C1', vehicleId: 'SEMI-45', trailerId: null, phase: null},
+        {id: 'C2', vehicleId: 'SEMI-45', trailerId: null, phase: null},
       ],
       placements: [
         place({id: 'a', consignmentId: 'C1', y: 0}),

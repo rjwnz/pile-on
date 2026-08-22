@@ -139,7 +139,12 @@ export function arrangeNaively(
   ruleset: VdamRuleset = NZ_VDAM_2016,
 ): ArrangeResult {
   const placements: Placement[] = [];
-  const consignments: {id: string; vehicleId: string; phase: null}[] = [];
+  const consignments: {
+    id: string;
+    vehicleId: string;
+    trailerId: null;
+    phase: null;
+  }[] = [];
   const unplaced: {pileTypeId: string; quantity: number; reason: string}[] = [];
 
   const maxLoadHeight = ruleset.maxHeight - vehicle.deckHeight;
@@ -150,7 +155,12 @@ export function arrangeNaively(
   // `truck` would defeat the narrowing at the call site.
   function openTruck(): OpenTruck {
     const id = `C${consignments.length + 1}`;
-    consignments.push({id, vehicleId: vehicle.id, phase: null});
+    consignments.push({
+      id,
+      vehicleId: vehicle.id,
+      trailerId: null,
+      phase: null,
+    });
     return {id, vehicle, tier: 0, heightUsed: 0, massUsed: 0};
   }
 
@@ -200,6 +210,7 @@ export function arrangeNaively(
         placements.push({
           id: `${truck.id}-T${truck.tier}-${index}`,
           consignmentId: truck.id,
+          deck: 'truck',
           pileTypeId: type.id,
           tier: truck.tier,
           x: cell.x,

@@ -115,6 +115,6 @@ describe('CsvImportPanel', () => {
     await user.click(screen.getByRole('button', {name: 'Fill with example'}));
     await user.click(screen.getByRole('button', {name: 'Import pasted rows'}));
 
-    expect((onImport.mock.calls[0] as [unknown[], boolean])[0]).toHaveLength(2);
+    expect((onImport.mock.calls[0] as [unknown[], boolean])[0]).toHaveLength(3);
   });
 });

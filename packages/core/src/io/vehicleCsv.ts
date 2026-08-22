@@ -20,10 +20,15 @@ import {
  * a sheet written before they existed still imports and still means what it
  * meant. They cannot be derived: overhang limits are stated against axle
  * spacing, and where a deck wants its load depends on where its axles are.
+ *
+ * `towable_by` marks a trailer: the ids of the trucks allowed to tow it,
+ * semicolon-separated (commas belong to the CSV). Blank means the row is a
+ * self-propelled truck.
  */
-export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target
-SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,1200,
-RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000,0,0,
+export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target,towable_by
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,1200,,
+RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000,0,0,,
+TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,1150,6800,22000,0,0,,RIGID-8
 `;
 
 function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
@@ -47,6 +52,10 @@ function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
   const balanceTarget = balanceTargetRaw
     ? readNumber(row, 'balance_target', log, {min: 0, max: deckLength})
     : null;
+  const towableBy = readString(row, 'towable_by', log, {required: false})
+    .split(';')
+    .map(entry => entry.trim())
+    .filter(Boolean);
 
   if (maxGross > 0 && tare > 0 && maxGross <= tare) {
     log.add('max_gross', `must exceed tare (${tare}), leaving no payload`);
@@ -64,6 +73,7 @@ function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
     maxFrontOverhang,
     maxRearOverhang,
     balanceTarget,
+    towableBy,
   };
 }
 

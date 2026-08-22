@@ -225,6 +225,7 @@ function packOnce(
         onTruck.push({
           id: `${truckId}-T${tier}-${index}`,
           consignmentId: truckId,
+          deck: 'truck',
           pileTypeId: placed.pileTypeId,
           tier,
           x: placed.x,
@@ -256,7 +257,12 @@ function packOnce(
       break;
     }
 
-    consignments.push({id: truckId, vehicleId: vehicle.id, phase: null});
+    consignments.push({
+      id: truckId,
+      vehicleId: vehicle.id,
+      trailerId: null,
+      phase: null,
+    });
     // Settling is an optimisation and is checked like one: verified, and
     // thrown away for the sweep's own (already supported) layout if it broke
     // support.

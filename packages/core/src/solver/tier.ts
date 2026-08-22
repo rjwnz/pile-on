@@ -69,6 +69,7 @@ function placeLane(
     const placement: Placement = {
       id: `lane-${index}`,
       consignmentId: '',
+      deck: 'truck',
       pileTypeId: slot.pileTypeId,
       tier: 0,
       x: slot.x + offset,

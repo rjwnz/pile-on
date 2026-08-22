@@ -29,6 +29,7 @@ const SEMI: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [LIGHT, HEAVY], vehicles: [SEMI]};
@@ -37,6 +38,7 @@ function place(overrides: Partial<Placement> = {}): Placement {
   return {
     id: 'p',
     consignmentId: 'C1',
+    deck: 'truck',
     pileTypeId: 'LIGHT',
     tier: 0,
     x: 0,

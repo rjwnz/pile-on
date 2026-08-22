@@ -20,6 +20,7 @@ const SEMI: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 const OPTIONS = DEFAULT_PACKING_OPTIONS;
 const HARD = [

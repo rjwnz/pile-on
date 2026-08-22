@@ -42,6 +42,18 @@ export interface Vehicle {
    * unstated (mid-length assumed) — kept separate so the assumption stays
    * visible. */
   readonly balanceTarget: Millimetres | null;
+  /**
+   * Ids of the trucks allowed to tow this row. Non-empty marks the row as a
+   * trailer, which never moves on its own; empty is a self-propelled truck.
+   * `kind` is labels elsewhere — this is the one field that decides what may
+   * move with what.
+   */
+  readonly towableBy: readonly string[];
+}
+
+/** Whether this row is a towed unit rather than a self-propelled truck. */
+export function isTrailer(vehicle: Vehicle): boolean {
+  return vehicle.towableBy.length > 0;
 }
 
 /** Mass available for piles, dunnage and restraint. */

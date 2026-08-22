@@ -2,6 +2,7 @@ import {describe, expect, it} from '@jest/globals';
 import {
   VEHICLE_KINDS,
   deckArea,
+  isTrailer,
   payloadCapacity,
   type Vehicle,
 } from './vehicle';
@@ -18,6 +19,7 @@ const SEMI: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 
 describe('payloadCapacity', () => {
@@ -34,6 +36,15 @@ describe('payloadCapacity', () => {
 describe('deckArea', () => {
   it('multiplies deck length by width', () => {
     expect(deckArea(SEMI)).toBe(12500 * 2450);
+  });
+});
+
+describe('isTrailer', () => {
+  it('is decided by towableBy, not by kind', () => {
+    // A row someone can tow is a trailer whatever its kind label says; a row
+    // nobody can tow is a truck even if it is labelled full_trailer.
+    expect(isTrailer({...SEMI, towableBy: ['RIGID-8']})).toBe(true);
+    expect(isTrailer({...SEMI, kind: 'full_trailer'})).toBe(false);
   });
 });
 

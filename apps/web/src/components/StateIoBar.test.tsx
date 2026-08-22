@@ -33,6 +33,7 @@ const VEHICLE: Vehicle = {
   maxFrontOverhang: 0,
   maxRearOverhang: 0,
   balanceTarget: null,
+  towableBy: [],
 };
 
 /** Current session: catalogue A + V, and a plan that depends on both. */
@@ -41,7 +42,7 @@ const CURRENT: AppState = {
   catalogue: {pileTypes: [TYPE_A], vehicles: [VEHICLE]},
   job: {name: 'Current job', lines: [{pileTypeId: 'A', quantity: 12}]},
   plan: {
-    consignments: [{id: 'C1', vehicleId: 'V', phase: null}],
+    consignments: [{id: 'C1', vehicleId: 'V', trailerId: null, phase: null}],
     placements: [],
   },
 };

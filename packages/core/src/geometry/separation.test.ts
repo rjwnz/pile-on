@@ -276,6 +276,50 @@ describe('requiredLateralSeparation', () => {
       expect(requiredLateralSeparation(a, b, NO_CLEARANCE, 500)).toBe(0);
     });
   });
+
+  /*
+   * The packer staggers plates so they just miss, and the tightest correct
+   * answer is plates that exactly abut. Asking for that in floating point —
+   * after a lane has been centred on the deck by some non-terminating fraction
+   * — lands a picometre either side of the mark. Landing on the wrong side used
+   * to read as "both piles present a plate here" and demand the full
+   * plate-to-plate pitch, so the packer condemned loads it had just built.
+   */
+  describe('plates that abut, to within floating point', () => {
+    // DOUBLE carries plates at 500 and 1200 from the butt, each 100 long, so
+    // pile A presents plate over [450, 550] and B, 100 mm along, over [550, 650].
+    const ABUTTING = 100;
+
+    it('reads exactly abutting plates as missing each other', () => {
+      const a = place(DOUBLE, {x: 0});
+      const b = place(DOUBLE, {x: ABUTTING});
+
+      expect(requiredAxisDistance(a, b, NO_CLEARANCE)).toBe(HELIX_TO_SHAFT);
+    });
+
+    it('is unmoved by a picometre of overlap that only arithmetic can see', () => {
+      const a = place(DOUBLE, {x: 0});
+      const b = place(DOUBLE, {x: ABUTTING - 1e-12});
+
+      expect(requiredAxisDistance(a, b, NO_CLEARANCE)).toBe(HELIX_TO_SHAFT);
+    });
+
+    it('still charges plate-to-plate for an overlap anyone could measure', () => {
+      // A millimetre of plate genuinely over plate is a clash, and the
+      // tolerance above must not be a way to smuggle one past.
+      const a = place(DOUBLE, {x: 0});
+      const b = place(DOUBLE, {x: ABUTTING - 1});
+
+      expect(requiredAxisDistance(a, b, NO_CLEARANCE)).toBe(HELIX_TO_HELIX);
+    });
+
+    it('treats piles that overlap by only a picometre as sharing no station', () => {
+      const a = place(PLAIN, {x: 0});
+      const b = place(PLAIN, {x: PILE_LENGTH - 1e-12});
+
+      expect(requiredAxisDistance(a, b, NO_CLEARANCE)).toBe(0);
+    });
+  });
 });
 
 describe('lateralSeparationOk', () => {

@@ -56,7 +56,7 @@ export function requiredAxisDistance(
 
   const overlapStart = Math.max(startA, startB);
   const overlapEnd = Math.min(endA, endB);
-  if (overlapEnd <= overlapStart) {
+  if (overlapEnd - overlapStart <= GEOMETRIC_EPSILON) {
     return 0;
   }
 
@@ -75,7 +75,24 @@ export function requiredAxisDistance(
     point => point >= overlapStart && point < overlapEnd,
   );
 
-  for (const point of points) {
+  for (const [index, point] of points.entries()) {
+    /*
+     * Skip stations too narrow to be real.
+     *
+     * The packer staggers plates so they just miss, and the exact answer is
+     * plates that abut — zero overlap. Ask for that in floating point, after a
+     * lane has been centred on the deck by some non-terminating fraction, and
+     * what comes back is an overlap of a picometre or so. Sampled naively, that
+     * sliver reads as "both piles present a plate here" and demands the full
+     * plate-to-plate pitch, condemning a load the packer had every right to
+     * build. Nothing narrower than the tolerance every other comparison in this
+     * file already works to is a station worth separating for.
+     */
+    const until = points[index + 1] ?? overlapEnd;
+    if (until - point <= GEOMETRIC_EPSILON) {
+      continue;
+    }
+
     // Sample just inside the interval that starts here: between breakpoints
     // both profiles are constant, so one sample settles the whole interval.
     const helixA = helixRadiusAt(profileA, point);

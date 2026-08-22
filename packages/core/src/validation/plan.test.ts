@@ -591,3 +591,182 @@ describe('the arranger never builds an unsupported load', () => {
     expect(validatePlan(plan, withSecondType, OPTIONS)).toEqual([]);
   });
 });
+
+describe('movements with a trailer', () => {
+  const RIGID: Vehicle = {
+    ...SEMI,
+    id: 'RIGID-8',
+    kind: 'rigid',
+    deckLength: 7200,
+    deckHeight: 1200,
+    tare: 10600,
+    maxGross: 30000,
+  };
+  const TRAILER: Vehicle = {
+    ...SEMI,
+    id: 'TRAILER-4A',
+    kind: 'full_trailer',
+    deckLength: 8100,
+    deckHeight: 1150,
+    tare: 6800,
+    maxGross: 22000,
+    towableBy: ['RIGID-8'],
+  };
+  const FLEET: Catalogue = {
+    pileTypes: [SP168],
+    vehicles: [RIGID, TRAILER],
+  };
+
+  function movement(
+    trailerId: string | null,
+    placements: Placement[],
+    catalogue = FLEET,
+  ) {
+    return validatePlan(
+      {
+        consignments: [
+          {id: 'C1', vehicleId: 'RIGID-8', trailerId, phase: null},
+        ],
+        placements,
+      },
+      catalogue,
+      OPTIONS,
+    );
+  }
+
+  it('rejects a movement led by a trailer', () => {
+    const led = validatePlan(
+      {
+        consignments: [
+          {id: 'C1', vehicleId: 'TRAILER-4A', trailerId: null, phase: null},
+        ],
+        placements: [],
+      },
+      FLEET,
+      OPTIONS,
+    );
+
+    expect(led.map(v => v.rule)).toEqual(['vehicle-is-trailer']);
+  });
+
+  it('rejects a trailer that is not in the catalogue', () => {
+    expect(movement('GONE', []).map(v => v.rule)).toEqual(['unknown-trailer']);
+  });
+
+  it('rejects a pairing the trailer does not list', () => {
+    const wrongTruck = validatePlan(
+      {
+        consignments: [
+          {
+            id: 'C1',
+            vehicleId: 'SEMI-45',
+            trailerId: 'TRAILER-4A',
+            phase: null,
+          },
+        ],
+        placements: [],
+      },
+      {pileTypes: [SP168], vehicles: [SEMI, RIGID, TRAILER]},
+      OPTIONS,
+    );
+
+    expect(wrongTruck.map(v => v.rule)).toEqual(['not-towable']);
+  });
+
+  it('rejects placements on a trailer deck the movement does not have', () => {
+    const rules = movement(null, [
+      place({deck: 'trailer', consignmentId: 'C1'}),
+    ]).map(v => v.rule);
+
+    expect(rules).toContain('phantom-deck');
+    // The orphaned placement is not judged against the truck deck.
+    expect(rules).not.toContain('ahead-of-headboard');
+  });
+
+  it('judges each deck against its own row, not the movement pooled', () => {
+    // Two piles per deck, each pair legal on its own deck. Pooled, the piles
+    // at equal x would clash and the mass would be charged twice.
+    const rules = movement('TRAILER-4A', [
+      place({id: 'T1', consignmentId: 'C1', deck: 'truck', x: 100, y: -400}),
+      place({id: 'T2', consignmentId: 'C1', deck: 'trailer', x: 100, y: -400}),
+    ]).map(v => v.rule);
+
+    expect(rules).toEqual([]);
+  });
+
+  it('prefixes deck messages only when there is a trailer to confuse', () => {
+    const withTrailer = movement('TRAILER-4A', [
+      place({consignmentId: 'C1', deck: 'truck', x: -600}),
+    ]);
+    const solo = movement(null, [place({consignmentId: 'C1', x: -600})]);
+
+    expect(withTrailer.map(v => v.message)).toEqual([
+      expect.stringMatching(/^truck deck: /),
+    ]);
+    expect(solo[0]!.message).not.toMatch(/deck:/);
+  });
+
+  // One pile carrying a deck's worth of mass, so the mass rules can be
+  // exercised without inventing a geometrically legal 60-pile layout.
+  const SLAB: PileType = {
+    id: 'SLAB',
+    name: 'SLAB',
+    length: 6000,
+    shaftRadius: 84,
+    mass: 15000,
+    helices: [],
+  };
+  const HEAVY_FLEET: Catalogue = {
+    pileTypes: [SP168, SLAB],
+    vehicles: [RIGID, TRAILER],
+  };
+
+  it('caps what the combination may gross at the route limit', () => {
+    // 15 t per deck is inside each deck's own payload (19.4 t and 15.2 t),
+    // but with 17.4 t of tares the combination grosses past 44 t.
+    const rules = movement(
+      'TRAILER-4A',
+      [
+        place({
+          id: 'K1',
+          consignmentId: 'C1',
+          deck: 'truck',
+          pileTypeId: 'SLAB',
+        }),
+        place({
+          id: 'R1',
+          consignmentId: 'C1',
+          deck: 'trailer',
+          pileTypeId: 'SLAB',
+        }),
+      ],
+      HEAVY_FLEET,
+    ).map(v => v.rule);
+
+    expect(rules).toContain('over-combined-gross');
+    // Neither deck is over its own payload — the cap is the only mass problem.
+    expect(rules).not.toContain('over-payload');
+  });
+
+  it('warns when the trailer grosses more than 1.5 times the truck', () => {
+    // A bare truck (10.6 t) towing 6.8 t of trailer plus 15 t of pile: the
+    // trailer grosses about twice the truck.
+    const found = movement(
+      'TRAILER-4A',
+      [
+        place({
+          id: 'R1',
+          consignmentId: 'C1',
+          deck: 'trailer',
+          pileTypeId: 'SLAB',
+        }),
+      ],
+      HEAVY_FLEET,
+    );
+
+    expect(found.map(v => v.rule)).toContain('trailer-heavy');
+    expect(found.find(v => v.rule === 'trailer-heavy')!.severity).toBe(
+      'warning',
+    );
+  });
+});

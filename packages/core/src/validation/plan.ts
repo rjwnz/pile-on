@@ -13,9 +13,10 @@ import {
   type LoadingOptions,
 } from '../domain/loading';
 import {maxRadius} from '../domain/pile';
-import type {PlacedPile, Placement} from '../domain/placement';
+import type {DeckRole, PlacedPile, Placement} from '../domain/placement';
 import {
   balanceTargetOf,
+  isTrailer,
   payloadCapacity,
   type Vehicle,
 } from '../domain/vehicle';
@@ -156,7 +157,7 @@ export function validatePlan(
   }
 
   for (const consignment of plan.consignments) {
-    const placements = byConsignment.get(consignment.id) ?? [];
+    const all = byConsignment.get(consignment.id) ?? [];
     const vehicle = findVehicle(catalogue, consignment.vehicleId);
 
     if (!vehicle) {
@@ -169,66 +170,224 @@ export function validatePlan(
       );
       continue;
     }
-
-    const mass = consignmentPayload(placements, catalogue, options);
-    const payload = payloadCapacity(vehicle);
-    if (mass > payload) {
+    if (isTrailer(vehicle)) {
       violations.push(
         error(
           consignment.id,
-          'over-payload',
-          `load is ${mass.toLocaleString('en-NZ')} kg with bearers and lashings, over the ${payload.toLocaleString('en-NZ')} kg payload by ${(mass - payload).toLocaleString('en-NZ')} kg`,
+          'vehicle-is-trailer',
+          `vehicle "${vehicle.id}" is a trailer — a movement must be led by a self-propelled truck`,
         ),
       );
+      continue;
     }
 
-    const height =
-      vehicle.deckHeight + loadHeight(placements, catalogue, options);
-    if (height > ruleset.maxHeight) {
+    /*
+     * Resolve the trailer. A wrong pairing still gets its deck checked — the
+     * pairing error is already reported, and the geometry is still geometry.
+     */
+    let trailer: Vehicle | null = null;
+    if (consignment.trailerId) {
+      const towed = findVehicle(catalogue, consignment.trailerId);
+      if (!towed) {
+        violations.push(
+          error(
+            consignment.id,
+            'unknown-trailer',
+            `trailer "${consignment.trailerId}" is not in the catalogue`,
+          ),
+        );
+      } else {
+        if (!towed.towableBy.includes(vehicle.id)) {
+          violations.push(
+            error(
+              consignment.id,
+              'not-towable',
+              `trailer "${towed.id}" is not listed as towable by ${vehicle.id}`,
+            ),
+          );
+        }
+        trailer = towed;
+      }
+    }
+
+    const truckPlacements = all.filter(p => p.deck === 'truck');
+    const trailerPlacements = all.filter(p => p.deck === 'trailer');
+
+    if (trailerPlacements.length > 0 && !trailer) {
+      // Excluded from the per-deck checks below rather than silently judged
+      // against the truck: there is no deck to judge them against.
       violations.push(
         error(
           consignment.id,
-          'over-height',
-          `loaded height is ${toMetres(height).toFixed(2)} m, over the ${toMetres(ruleset.maxHeight).toFixed(1)} m limit`,
+          'phantom-deck',
+          `${trailerPlacements.length} placements sit on a trailer deck, but this consignment has no trailer`,
         ),
       );
     }
 
-    const width = loadWidth(placements, catalogue);
-    if (width > ruleset.maxWidth) {
-      violations.push(
-        error(
-          consignment.id,
-          'over-width',
-          `load is ${toMetres(width).toFixed(2)} m wide, over the ${toMetres(ruleset.maxWidth).toFixed(2)} m limit`,
-        ),
-      );
-    }
-    if (width > vehicle.deckWidth) {
-      violations.push(
-        warning(
-          consignment.id,
-          'overhangs-side',
-          `load is wider than the ${toMetres(vehicle.deckWidth).toFixed(2)} m deck`,
-        ),
-      );
-    }
+    // A solo movement reads exactly as it always did; only a movement with a
+    // trailer needs its messages to say which deck they mean.
+    const prefixed = (deck: DeckRole, found: Violation[]) =>
+      trailer
+        ? found.map(v => ({...v, message: `${deck} deck: ${v.message}`}))
+        : found;
 
     violations.push(
-      ...checkEnvelope(consignment.id, placements, catalogue, vehicle, options),
+      ...prefixed(
+        'truck',
+        deckViolations(
+          consignment.id,
+          truckPlacements,
+          vehicle,
+          catalogue,
+          options,
+          ruleset,
+        ),
+      ),
     );
-    violations.push(
-      ...checkBalance(consignment.id, placements, catalogue, vehicle, options),
-    );
-    violations.push(
-      ...checkSeparations(consignment.id, placements, catalogue, options),
-    );
-    violations.push(
-      ...checkSupport(consignment.id, placements, catalogue, options),
-    );
+    if (trailer) {
+      violations.push(
+        ...prefixed(
+          'trailer',
+          deckViolations(
+            consignment.id,
+            trailerPlacements,
+            trailer,
+            catalogue,
+            options,
+            ruleset,
+          ),
+        ),
+      );
+
+      const gross = combinationGross(
+        vehicle,
+        trailer,
+        truckPlacements,
+        trailerPlacements,
+        catalogue,
+        options,
+      );
+      if (gross > ruleset.maxGrossMass) {
+        violations.push(
+          error(
+            consignment.id,
+            'over-combined-gross',
+            `combination grosses ${gross.toLocaleString('en-NZ')} kg — both tares plus both loads — over the ${ruleset.maxGrossMass.toLocaleString('en-NZ')} kg route limit by ${(gross - ruleset.maxGrossMass).toLocaleString('en-NZ')} kg`,
+          ),
+        );
+      }
+
+      const truckGross =
+        vehicle.tare + consignmentPayload(truckPlacements, catalogue, options);
+      const trailerGross =
+        trailer.tare +
+        consignmentPayload(trailerPlacements, catalogue, options);
+      if (trailerGross > ruleset.maxTrailerToTruckMassRatio * truckGross) {
+        violations.push(
+          warning(
+            consignment.id,
+            'trailer-heavy',
+            `trailer grosses ${trailerGross.toLocaleString('en-NZ')} kg against the truck's ${truckGross.toLocaleString('en-NZ')} kg — over ${ruleset.maxTrailerToTruckMassRatio} times, which VDAM does not allow to be towed`,
+          ),
+        );
+      }
+    }
   }
 
   return violations;
+}
+
+/** Everything one deck is checked against, given the row it is loaded on. */
+function deckViolations(
+  consignmentId: string,
+  placements: readonly Placement[],
+  vehicle: Vehicle,
+  catalogue: Catalogue,
+  options: LoadingOptions,
+  ruleset: VdamRuleset,
+): Violation[] {
+  const violations: Violation[] = [];
+
+  const mass = consignmentPayload(placements, catalogue, options);
+  const payload = payloadCapacity(vehicle);
+  if (mass > payload) {
+    violations.push(
+      error(
+        consignmentId,
+        'over-payload',
+        `load is ${mass.toLocaleString('en-NZ')} kg with bearers and lashings, over the ${payload.toLocaleString('en-NZ')} kg payload by ${(mass - payload).toLocaleString('en-NZ')} kg`,
+      ),
+    );
+  }
+
+  const height =
+    vehicle.deckHeight + loadHeight(placements, catalogue, options);
+  if (height > ruleset.maxHeight) {
+    violations.push(
+      error(
+        consignmentId,
+        'over-height',
+        `loaded height is ${toMetres(height).toFixed(2)} m, over the ${toMetres(ruleset.maxHeight).toFixed(1)} m limit`,
+      ),
+    );
+  }
+
+  const width = loadWidth(placements, catalogue);
+  if (width > ruleset.maxWidth) {
+    violations.push(
+      error(
+        consignmentId,
+        'over-width',
+        `load is ${toMetres(width).toFixed(2)} m wide, over the ${toMetres(ruleset.maxWidth).toFixed(2)} m limit`,
+      ),
+    );
+  }
+  if (width > vehicle.deckWidth) {
+    violations.push(
+      warning(
+        consignmentId,
+        'overhangs-side',
+        `load is wider than the ${toMetres(vehicle.deckWidth).toFixed(2)} m deck`,
+      ),
+    );
+  }
+
+  violations.push(
+    ...checkEnvelope(consignmentId, placements, catalogue, vehicle, options),
+  );
+  violations.push(
+    ...checkBalance(consignmentId, placements, catalogue, vehicle, options),
+  );
+  violations.push(
+    ...checkSeparations(consignmentId, placements, catalogue, options),
+  );
+  violations.push(
+    ...checkSupport(consignmentId, placements, catalogue, options),
+  );
+
+  return violations;
+}
+
+/**
+ * What a truck-and-trailer movement grosses: both tares plus everything the
+ * payload has to carry on each deck. Shared by the route-cap rule and the UI,
+ * so the number on screen is the number the rule judged.
+ */
+export function combinationGross(
+  truck: Vehicle,
+  trailer: Vehicle,
+  truckPlacements: readonly Placement[],
+  trailerPlacements: readonly Placement[],
+  catalogue: Catalogue,
+  options: LoadingOptions,
+): number {
+  return (
+    truck.tare +
+    trailer.tare +
+    consignmentPayload(truckPlacements, catalogue, options) +
+    consignmentPayload(trailerPlacements, catalogue, options)
+  );
 }
 
 /**

@@ -17,7 +17,7 @@ import type {PlacedPile} from '../domain/placement';
 import {requiredLateralSeparation} from '../geometry/separation';
 import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
 import {coveredSpans} from '../validation/plan';
-import type {Millimetres} from '../units';
+import type {Kilograms, Millimetres} from '../units';
 import {groupBy} from '../collections';
 import {shiftToBalance} from './balance';
 import {unplaceableReason} from './feasibility';
@@ -111,6 +111,159 @@ function better(flipped: PackResult, plain: PackResult): PackResult {
     : flipped;
 }
 
+/** What one deck came out carrying, before it knows which movement it is in. */
+interface DeckLoad {
+  /**
+   * Deck-local placements: x from this deck's headboard, scratch ids of the
+   * form `T{tier}-{index}` for the caller to qualify, `consignmentId` and
+   * `deck` left for the caller to stamp.
+   */
+  readonly placements: readonly Placement[];
+  /** Piles plus per-tier ancillary mass — what the deck adds to the gross. */
+  readonly mass: Kilograms;
+  /** Demand this load would consume, by pile type. */
+  readonly consumed: ReadonlyMap<string, number>;
+}
+
+const EMPTY_DECK: DeckLoad = {placements: [], mass: 0, consumed: new Map()};
+
+/**
+ * Fill one deck from the demand: the tier loop, then the balance pipeline —
+ * mirror, settle (verified, with fallback), shift, nudge — all against this
+ * deck's own row. Does not mutate `remaining`; the caller commits `consumed`
+ * if it keeps the load.
+ */
+function packOneDeck(
+  remaining: ReadonlyMap<string, number>,
+  catalogue: Catalogue,
+  vehicle: Vehicle,
+  options: PackingOptions,
+  ruleset: VdamRuleset,
+  massAllowance: Kilograms,
+): DeckLoad {
+  const maxLoadHeight = ruleset.maxHeight - vehicle.deckHeight;
+  const payload = Math.min(payloadCapacity(vehicle), massAllowance);
+
+  const available = new Map(remaining);
+  const consumed = new Map<string, number>();
+  const onDeck: Placement[] = [];
+
+  let heightUsed = 0;
+  let massUsed = 0;
+  let ceiling = Infinity;
+  let support: readonly (readonly [Millimetres, Millimetres])[] | null = null;
+
+  for (let tier = 0; tier < options.maxTiers; tier++) {
+    const massBudget = payload - massUsed - options.ancillaryMassPerTier;
+    if (massBudget <= 0) {
+      break;
+    }
+
+    /*
+     * Try each remaining diameter as the tier's ceiling and keep the densest
+     * per millimetre of height. The ceiling never rises going up the stack,
+     * and the bottom tier gets no vote — the widest thing still wanted sets
+     * it, else no wide pile could ever board.
+     */
+    const classes = widthClasses(available, catalogue);
+    const allowed = tier === 0 ? classes.slice(0, 1) : classes;
+
+    let best: TierChoice | null = null;
+    for (const halfWidth of allowed) {
+      if (halfWidth > ceiling) {
+        continue;
+      }
+      if (heightUsed + tierHeightForClass(halfWidth, options) > maxLoadHeight) {
+        continue;
+      }
+      const result = packTier({
+        available,
+        catalogue,
+        vehicle,
+        options,
+        maxHalfWidth: halfWidth,
+        massBudget,
+        support,
+      });
+      if (result.placements.length === 0) {
+        continue;
+      }
+      // Charged on what the tier actually holds, not on what it was allowed
+      // to hold. A tier permitted 225 mm plates but filled with 175 mm ones
+      // is a 175 mm tier, and scoring it as tall would hide the better answer.
+      const height = tierHeightForClass(result.halfWidth, options);
+      if (heightUsed + height > maxLoadHeight) {
+        continue;
+      }
+      const density = result.placements.length / height;
+      const bestDensity = best
+        ? best.result.placements.length / best.height
+        : -Infinity;
+      if (
+        density > bestDensity ||
+        (density === bestDensity && height > (best?.height ?? 0))
+      ) {
+        best = {result, height};
+      }
+    }
+
+    if (!best) {
+      break;
+    }
+
+    for (const [index, placed] of best.result.placements.entries()) {
+      onDeck.push({
+        id: `T${tier}-${index}`,
+        consignmentId: '',
+        deck: 'truck',
+        pileTypeId: placed.pileTypeId,
+        tier,
+        x: placed.x,
+        y: placed.y,
+        flipped: placed.flipped,
+      });
+    }
+
+    consume(available, best.result.placements);
+    for (const placed of best.result.placements) {
+      consumed.set(
+        placed.pileTypeId,
+        (consumed.get(placed.pileTypeId) ?? 0) + 1,
+      );
+    }
+    massUsed += best.result.mass + options.ancillaryMassPerTier;
+    heightUsed += best.height;
+    ceiling = best.result.halfWidth;
+    support = spansOf(best.result.placements, catalogue, options);
+  }
+
+  if (onDeck.length === 0) {
+    return EMPTY_DECK;
+  }
+
+  // Settling is an optimisation and is checked like one: verified, and thrown
+  // away for the sweep's own (already supported) layout if it broke support.
+  const settled = settleTiers(
+    mirrorTiers(onDeck, catalogue),
+    catalogue,
+    vehicle,
+    options,
+  );
+  const kept = allTiersSupported(settled, catalogue, options)
+    ? settled
+    : onDeck;
+  return {
+    placements: nudgeLanes(
+      shiftToBalance(kept, catalogue, vehicle),
+      catalogue,
+      vehicle,
+      options,
+    ),
+    mass: massUsed,
+    consumed,
+  };
+}
+
 function packOnce(
   job: Job,
   catalogue: Catalogue,
@@ -122,7 +275,6 @@ function packOnce(
     length: vehicle.deckLength + vehicle.maxRearOverhang - options.headboardGap,
     width: vehicle.deckWidth - options.sideMargin * 2,
   };
-  const maxLoadHeight = ruleset.maxHeight - vehicle.deckHeight;
   const payload = payloadCapacity(vehicle);
 
   const remaining = new Map<string, number>();
@@ -153,95 +305,16 @@ function packOnce(
 
   while (outstanding() > 0) {
     const truckId = `C${consignments.length + 1}`;
-    const onTruck: Placement[] = [];
+    const load = packOneDeck(
+      remaining,
+      catalogue,
+      vehicle,
+      options,
+      ruleset,
+      payload,
+    );
 
-    let heightUsed = 0;
-    let massUsed = 0;
-    let ceiling = Infinity;
-    let support: readonly (readonly [Millimetres, Millimetres])[] | null = null;
-
-    for (let tier = 0; tier < options.maxTiers; tier++) {
-      const massBudget = payload - massUsed - options.ancillaryMassPerTier;
-      if (massBudget <= 0) {
-        break;
-      }
-
-      /*
-       * Try each remaining diameter as the tier's ceiling and keep the densest
-       * per millimetre of height. The ceiling never rises going up the stack,
-       * and the bottom tier gets no vote — the widest thing still wanted sets
-       * it, else no wide pile could ever board.
-       */
-      const classes = widthClasses(remaining, catalogue);
-      const allowed = tier === 0 ? classes.slice(0, 1) : classes;
-
-      let best: TierChoice | null = null;
-      for (const halfWidth of allowed) {
-        if (halfWidth > ceiling) {
-          continue;
-        }
-        if (
-          heightUsed + tierHeightForClass(halfWidth, options) >
-          maxLoadHeight
-        ) {
-          continue;
-        }
-        const result = packTier({
-          available: remaining,
-          catalogue,
-          vehicle,
-          options,
-          maxHalfWidth: halfWidth,
-          massBudget,
-          support,
-        });
-        if (result.placements.length === 0) {
-          continue;
-        }
-        // Charged on what the tier actually holds, not on what it was allowed
-        // to hold. A tier permitted 225 mm plates but filled with 175 mm ones
-        // is a 175 mm tier, and scoring it as tall would hide the better answer.
-        const height = tierHeightForClass(result.halfWidth, options);
-        if (heightUsed + height > maxLoadHeight) {
-          continue;
-        }
-        const density = result.placements.length / height;
-        const bestDensity = best
-          ? best.result.placements.length / best.height
-          : -Infinity;
-        if (
-          density > bestDensity ||
-          (density === bestDensity && height > (best?.height ?? 0))
-        ) {
-          best = {result, height};
-        }
-      }
-
-      if (!best) {
-        break;
-      }
-
-      for (const [index, placed] of best.result.placements.entries()) {
-        onTruck.push({
-          id: `${truckId}-T${tier}-${index}`,
-          consignmentId: truckId,
-          deck: 'truck',
-          pileTypeId: placed.pileTypeId,
-          tier,
-          x: placed.x,
-          y: placed.y,
-          flipped: placed.flipped,
-        });
-      }
-
-      consume(remaining, best.result.placements);
-      massUsed += best.result.mass + options.ancillaryMassPerTier;
-      heightUsed += best.height;
-      ceiling = best.result.halfWidth;
-      support = spansOf(best.result.placements, catalogue, options);
-    }
-
-    if (onTruck.length === 0) {
+    if (load.placements.length === 0) {
       // Nothing fits an empty truck, so nothing will fit the next one either.
       // Report what is left rather than opening trucks forever.
       for (const [id, count] of remaining) {
@@ -263,26 +336,16 @@ function packOnce(
       trailerId: null,
       phase: null,
     });
-    // Settling is an optimisation and is checked like one: verified, and
-    // thrown away for the sweep's own (already supported) layout if it broke
-    // support.
-    const settled = settleTiers(
-      mirrorTiers(onTruck, catalogue),
-      catalogue,
-      vehicle,
-      options,
-    );
-    const kept = allTiersSupported(settled, catalogue, options)
-      ? settled
-      : onTruck;
     placements.push(
-      ...nudgeLanes(
-        shiftToBalance(kept, catalogue, vehicle),
-        catalogue,
-        vehicle,
-        options,
-      ),
+      ...load.placements.map(placement => ({
+        ...placement,
+        id: `${truckId}-${placement.id}`,
+        consignmentId: truckId,
+      })),
     );
+    for (const [id, count] of load.consumed) {
+      remaining.set(id, (remaining.get(id) ?? 0) - count);
+    }
   }
 
   return {plan: {consignments, placements}, unplaced};

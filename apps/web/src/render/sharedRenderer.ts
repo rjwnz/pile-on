@@ -3,20 +3,17 @@ import * as THREE from 'three';
 /**
  * One WebGL context for every load view on the page.
  *
- * A renderer per truck is where a component-shaped design lands you, and it is
- * what this app used to do. It was also the most expensive thing the loading
- * plan did: constructing a `WebGLRenderer` costs the better part of a second,
- * and it costs that whether the truck carries fifty piles or five. Six trucks
- * meant six of them, back to back, on the main thread, before anything drew.
+ * Constructing a `WebGLRenderer` costs the better part of a second, and costs
+ * that whether the truck carries fifty piles or five. One per truck would put
+ * that on the main thread once per truck, before anything drew — so the context
+ * is shared, and the cost is paid once for the page.
  *
- * So the context is shared. Each view draws through it in turn and copies the
- * result into a 2D canvas of its own — the copy is a blit, and it does not
- * register against a render that takes milliseconds. What used to be a cost per
- * truck is now paid once for the page.
+ * Each view draws through it in turn and copies the result into a 2D canvas of
+ * its own. The copy is a blit, and does not register against a render measured
+ * in milliseconds.
  *
- * Sharing also means the page holds one context rather than one per truck,
- * which matters: browsers cap how many they will keep alive, and a long plan
- * used to walk straight towards that cap.
+ * Sharing also keeps the page to a single context. Browsers cap how many they
+ * will hold, and a plan is as long as the job needs.
  */
 
 /** Past 2x the extra pixels cost more than they show. */

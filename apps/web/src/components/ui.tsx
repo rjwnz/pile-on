@@ -3,6 +3,13 @@ import type {Issue} from '@pile-on/core';
 
 /* Minimal shared primitives. Deliberately plain — this is a working tool. */
 
+const BUTTON_STYLES: Record<string, string> = {
+  default: 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
+  primary: 'border-sky-700 bg-sky-700 text-white hover:bg-sky-800',
+  danger: 'border-red-300 bg-white text-red-700 hover:bg-red-50',
+  quiet: 'border-transparent bg-transparent text-slate-600 hover:bg-slate-100',
+};
+
 export function Button({
   children,
   onClick,
@@ -16,19 +23,12 @@ export function Button({
   readonly type?: 'button' | 'submit';
   readonly disabled?: boolean;
 }) {
-  const styles: Record<string, string> = {
-    default: 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
-    primary: 'border-sky-700 bg-sky-700 text-white hover:bg-sky-800',
-    danger: 'border-red-300 bg-white text-red-700 hover:bg-red-50',
-    quiet:
-      'border-transparent bg-transparent text-slate-600 hover:bg-slate-100',
-  };
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`rounded border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]}`}
+      className={`rounded border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON_STYLES[variant]}`}
     >
       {children}
     </button>

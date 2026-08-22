@@ -14,14 +14,12 @@ import {colourForPileType} from './palette';
 /**
  * The loaded truck as a three.js scene.
  *
- * This replaced an SVG drawing that sorted shapes back to front. Painter's
- * ordering was the wrong tool: a correct order does not always exist for
- * overlapping solids, and every key or pairwise rule traded one family of
- * artefacts for another. A depth buffer resolves visibility per pixel, so the
- * question stops being "what order?" and simply does not arise.
+ * Visibility is resolved by the depth buffer, per pixel. Overlapping solids
+ * have no guaranteed back-to-front order, so sorting shapes cannot be made
+ * correct in general — the question is best not asked.
  *
- * The cost is that this view is raster, so it no longer prints as crisply as
- * the exploded tier plans — those stay SVG, and they are the drawings a load
+ * The cost is that this view is raster, and so prints less crisply than the
+ * exploded tier plans. Those stay SVG, and they are the drawings a load
  * actually gets checked against.
  *
  * Coordinates stay in the domain's frame: x along the deck, y across it, z up.
@@ -114,9 +112,8 @@ export function buildLoadScene(input: LoadSceneInput): LoadScene {
     /*
      * The pile rests on its widest point — for a helical pile that is the
      * plates, not the shaft — so the axis sits one widest-radius above the
-     * bearers. That sum used to live here, which meant the drawing and the
-     * separation rule each had their own idea of where steel was. It is
-     * geometry, so it comes from `core` now.
+     * bearers. That is geometry, so it comes from `core`: the drawing and the
+     * separation rule must not hold separate ideas of where steel is.
      */
     const axisZ = axisHeightOf({type, placement}, heights, options);
     const colour = colourForPileType(type.id);

@@ -16,11 +16,11 @@ separated by dunnage.**
 
 That gives a clean three-level decomposition:
 
-| Level | Dimension | Problem class |
-|---|---|---|
-| **Z — tiers** | vertical | small discrete choice (typically 2–5 tiers). Tier height = max pile OD in that tier + dunnage. |
-| **Y — lanes** | across deck | 1D packing across a 2.55 m width, with *conditional* pairwise separations |
-| **X — along deck** | longitudinal | 1D cutting-stock / interval packing per lane, plus a *stagger* decision |
+| Level              | Dimension    | Problem class                                                                                  |
+| ------------------ | ------------ | ---------------------------------------------------------------------------------------------- |
+| **Z — tiers**      | vertical     | small discrete choice (typically 2–5 tiers). Tier height = max pile OD in that tier + dunnage. |
+| **Y — lanes**      | across deck  | 1D packing across a 2.55 m width, with _conditional_ pairwise separations                      |
+| **X — along deck** | longitudinal | 1D cutting-stock / interval packing per lane, plus a _stagger_ decision                        |
 
 So the per-truck problem is **2D packing of axis-parallel rectangles with fixed orientation and
 disjunctive separation constraints** — not general 3D packing. No rotation about Z (piles must
@@ -59,10 +59,10 @@ separation is the largest requirement over all shared stations:
        |y_i − y_j|  ≥  max(R_i + r_j, r_i + R_j) + clearance
 ```
 
-Confirmed with the business, 2026-08-22: single-helix plates sit *beside* each
+Confirmed with the business, 2026-08-22: single-helix plates sit _beside_ each
 other horizontally, never riding over the neighbour's shaft — so tier height is a
 constant, not a function of x. And a double-helix pile forfeits the relaxation
-against *any* neighbour, single or double.
+against _any_ neighbour, single or double.
 
 Rule 2 is what makes staggering pay. Sliding a pile so its plates miss the
 neighbour's drops the requirement from `R_i + R_j` to `max(R_i + r_j, r_i + R_j)`
@@ -79,8 +79,8 @@ difference between packing at helix-OD pitch and packing at shaft-OD pitch — p
 truck.
 
 In OR terms this is a **2D packing with pairwise disjunctive (big-M) separation constraints**,
-which is a known but niche formulation. It is closest to *circle/cylinder packing in a rectangle*
-literature (Birgin et al.) crossed with *container loading with practical constraints*.
+which is a known but niche formulation. It is closest to _circle/cylinder packing in a rectangle_
+literature (Birgin et al.) crossed with _container loading with practical constraints_.
 
 **Consequence for tooling:** any generic packer forces you to approximate a double-helix pile as a
 rectangle of width = helix OD, everywhere along its length. That is safe but wasteful. Quantifying
@@ -88,14 +88,14 @@ that waste is your business case — see the baseline milestone in §7.
 
 ### 1.2 The other three sub-problems
 
-- **Weight distribution** is a *linear* function of the layout, so it is cheap either way. The
-  literature here is the *Container Loading Problem with Axle Weight constraints* (SCLPAW), which
+- **Weight distribution** is a _linear_ function of the layout, so it is cheap either way. The
+  literature here is the _Container Loading Problem with Axle Weight constraints_ (SCLPAW), which
   computes axle-group reactions by statics. **We do not need it** — see the scoping note in §2 —
   but the same linearity makes the reduced problem trivial: total mass is a sum, and the centroid
   is a weighted mean, both recomputable on every edit.
 - **Multi-truck assignment** is heterogeneous bin packing / set partitioning over a fleet with
   different deck sizes, tare masses, payload capacities and costs.
-- **Multi-phase with early shipment + storage** is a *multi-period* variant: each pile has a
+- **Multi-phase with early shipment + storage** is a _multi-period_ variant: each pile has a
   required-by phase `p` and may ship in any phase `q ≤ p` at a storage cost. This is lot-sizing
   bolted onto bin packing — an extra dimension on the assignment problem, not a new problem.
 
@@ -104,6 +104,7 @@ that waste is your business case — see the baseline milestone in §7.
 ## 2. Constraint inventory
 
 ### Geometric
+
 - Deck length, width, headboard, deck height above road
 - Tier count; dunnage 100×100 mm hardwood between tiers (Truck Loading Code)
 - Shaft clearance (hard), helix clearance (conditional, per §1.1)
@@ -112,7 +113,7 @@ that waste is your business case — see the baseline milestone in §7.
 
 ### Mass
 
-> **Scoped out, 2026-08-22.** Axle limits are *not modelled*. The business
+> **Scoped out, 2026-08-22.** Axle limits are _not modelled_. The business
 > confirmed the total payload limit is always reached first, so `maxGross − tare`
 > is the whole mass constraint. The axle tables below stay here as reference for
 > the day that stops being true — see §3.2. What was removed: individual axle,
@@ -121,24 +122,27 @@ that waste is your business case — see the baseline milestone in §7.
 
 - GVM / GCM (manufacturer ratings — the binding figure, alongside the 44 t
   general-access route limit)
-- Trailer:truck gross mass ratio ≤ 1.5 *(not yet modelled — needs multi-unit
-  combinations, which the single-deck `Vehicle` does not yet represent)*
+- Trailer:truck gross mass ratio ≤ 1.5 _(not yet modelled — needs multi-unit
+  combinations, which the single-deck `Vehicle` does not yet represent)_
 - Longitudinal and lateral balance — not legally specified, but a hard
   operational requirement, and answerable from the load centroid alone
 
 ### Stability
+
 - SRT ≥ 0.35g for NC trucks > 12 t GVM; TD trailers > 10 t GVM with load height > 2.8 m must be
   certified. Practically: keep CG low, put heavy/large-OD piles in the bottom tier.
 
 ### Restraint (drives layout, often overlooked)
+
 - Forward restraint ≥ 1.0 × payload weight; rearward, sideways 0.5; vertical 0.2
 - Aim for ~half from baulking/chocking, half from lashings + friction
 - Headboard rated to half the rated payload capacity
 - Pipe loads: front tier butted to headboard; **four chocks on top of the spacers per tier**;
   **≥ 2 chains/webbings per tier**, over or adjacent to the spacers
-- ⇒ the number of tiers and the dunnage positions are a *cost* (chains, chocks, labour), not free
+- ⇒ the number of tiers and the dunnage positions are a _cost_ (chains, chocks, labour), not free
 
 ### Regulatory / operational
+
 - Overdimension category → travel-time bans, pilots, permits (see §3.3) — a real cost in a quote
 
 ---
@@ -150,35 +154,35 @@ versioned data file, not in code** — see the live example in §3.4.
 
 ### 3.1 Dimensions (standard vehicles, general access)
 
-| | Limit |
-|---|---|
-| Width (incl. load) | **2.55 m** (excludes side marker lamps, indicators, collapsible mirrors ≤240 mm, tyre bulge) |
-| Height (incl. load) | **4.3 m** |
-| Rigid truck overall length | **12.6 m** not towing; **11.5 m** if towing |
-| Semi-trailer combination | **19 m** (18 m for some pre-1/12/2016 quads with two steering axles) |
+|                                               | Limit                                                                                                                     |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Width (incl. load)                            | **2.55 m** (excludes side marker lamps, indicators, collapsible mirrors ≤240 mm, tyre bulge)                              |
+| Height (incl. load)                           | **4.3 m**                                                                                                                 |
+| Rigid truck overall length                    | **12.6 m** not towing; **11.5 m** if towing                                                                               |
+| Semi-trailer combination                      | **19 m** (18 m for some pre-1/12/2016 quads with two steering axles)                                                      |
 | Truck + full/simple trailer, A-train, B-train | **20 m**; **22 m** for rigid + simple trailer, or a rear full trailer with reduced-width overhang on a certified underrun |
-| Forward distance | rigid 9.5 m (8.5 m if towing); semi-trailer 9.2 m; full/simple/pole trailer 8.5 m |
-| Rear overhang, heavy rigid | lesser of 4 m from rear axis or 70% of foremost-axle-to-rear-axis (4.25 m if rearmost axle steers) |
-| Rear overhang, semi-trailer | lesser of 4.3 m from rear axis or 50% of forward distance |
-| Rear overhang, full/pole trailer | lesser of 4 m or 50% of front axis to rear axis |
-| Rear overhang, simple trailer | lesser of 4 m or 50% of tow coupling to rear axis |
+| Forward distance                              | rigid 9.5 m (8.5 m if towing); semi-trailer 9.2 m; full/simple/pole trailer 8.5 m                                         |
+| Rear overhang, heavy rigid                    | lesser of 4 m from rear axis or 70% of foremost-axle-to-rear-axis (4.25 m if rearmost axle steers)                        |
+| Rear overhang, semi-trailer                   | lesser of 4.3 m from rear axis or 50% of forward distance                                                                 |
+| Rear overhang, full/pole trailer              | lesser of 4 m or 50% of front axis to rear axis                                                                           |
+| Rear overhang, simple trailer                 | lesser of 4 m or 50% of tow coupling to rear axis                                                                         |
 
 **Projecting loads.** Truck + full trailer may carry an overhanging load up to **2.3 m wide**
 (1.15 m each side of centreline), extending past the 20 m limit to **22 m** — a certified rear
 underrun system is required if that overhang exceeds 1 m. Any load overhanging > 1 m front/rear or
+
 > 200 mm to either side needs a 400 × 300 mm flag or hazard panel by day and specified red/white
-lamps by night.
+> lamps by night.
 
 ### 3.2 Mass — reference only, not implemented
 
-*These tables are not in the code.* Axle limits were scoped out (see §2); they are recorded here
+_These tables are not in the code._ Axle limits were scoped out (see §2); they are recorded here
 so that reinstating them is a lookup rather than a fresh research exercise.
-
 
 Individual axles (Class 1 roads), kg — S = single standard tyre, SL = large, SM = mega, T = twin:
 
-| S | SL | SM | T |
-|---|---|---|---|
+| S     | SL    | SM                     | T     |
+| ----- | ----- | ---------------------- | ----- |
 | 6 000 | 7 200 | 7 600 (7 200 steering) | 8 200 |
 
 Axle sets: tandem 11 000–14 500 depending on tyre/steer configuration and load sharing;
@@ -202,8 +206,8 @@ This trips people up, so be explicit in the model:
 1. **HPMV permit** — for **divisible or indivisible** loads that are **overlength and/or
    overweight** but **never overwidth or overheight**. Route-specific. This is the regime a normal
    pile load would use to go above 44 t or past standard length.
-2. **Overdimension permit** — only for **indivisible** loads. *A truckload of many piles is
-   divisible*, so you generally **cannot** use an overdimension permit to justify an oversize pile
+2. **Overdimension permit** — only for **indivisible** loads. _A truckload of many piles is
+   divisible_, so you generally **cannot** use an overdimension permit to justify an oversize pile
    load. A single very long pile is indivisible and can be. Encode this: `isDivisible = pileCount > 1`.
 3. **Overweight permit** — separate process, contact NZTA.
 
@@ -250,14 +254,14 @@ Not one that you can lift off the shelf, but the sub-problems are all well-studi
   placement; your lane structure is stronger and simpler.
 - **1D cutting stock / column generation** — the right frame for "what goes in one lane along the
   deck". Pattern enumeration + set covering is exact for realistic pile-length catalogues.
-- **Logic-based Benders / branch-and-check** — the right frame for the *interaction* between "which
+- **Logic-based Benders / branch-and-check** — the right frame for the _interaction_ between "which
   piles on which truck" (master) and "do they geometrically fit" (subproblem). Infeasible
   assignments feed back as no-good cuts. This is the standard way to stop the two levels from
   fighting each other.
 
 **What is genuinely novel in your problem** is the conditional helix separation, which does not
 appear in any of that literature. You will have to write it. The good news: it is a ~50-line
-feasibility predicate, not a research project — the difficulty is in the *search* that exploits it.
+feasibility predicate, not a research project — the difficulty is in the _search_ that exploits it.
 
 ---
 
@@ -265,12 +269,12 @@ feasibility predicate, not a research project — the difficulty is in the *sear
 
 **Commercial load planners** — all rectangular-first, subscription, and none model helices:
 
-| Product | Relevant capability | Gap for you |
-|---|---|---|
-| [Cargo-Planner](https://cargo-planner.com/road-trailer-loading-software/) | Best fit found. Explicit pipe/drum support and "pipe nesting", axle-group limits with re-optimisation, custom trailer builder (multi-deck, 8 axles), REST API + embeddable 3D SDK | No helix model; no phased delivery; NZ VDAM rules not built in; per-seat SaaS |
-| [ORTEC 3D Load Optimization](https://ortec.com/products/apps-and-services/3d-load-optimization) | Enterprise constraint-based load planning, strong visualisation | Heavyweight, enterprise sales cycle, not embeddable in a small static quoting tool |
-| [Load Xpert](https://www.loadxpert.com/load-planning-software/) | Flatbeds, axle-load printouts, 2D+3D | Desktop, rectangular items |
-| EasyCargo / CubeMaster / MaxLoad Pro / 3DLoadCalculator / LoadOptimizer.ai | General cartons/pallets | Not applicable to slender cylinders with appendages |
+| Product                                                                                         | Relevant capability                                                                                                                                                               | Gap for you                                                                        |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [Cargo-Planner](https://cargo-planner.com/road-trailer-loading-software/)                       | Best fit found. Explicit pipe/drum support and "pipe nesting", axle-group limits with re-optimisation, custom trailer builder (multi-deck, 8 axles), REST API + embeddable 3D SDK | No helix model; no phased delivery; NZ VDAM rules not built in; per-seat SaaS      |
+| [ORTEC 3D Load Optimization](https://ortec.com/products/apps-and-services/3d-load-optimization) | Enterprise constraint-based load planning, strong visualisation                                                                                                                   | Heavyweight, enterprise sales cycle, not embeddable in a small static quoting tool |
+| [Load Xpert](https://www.loadxpert.com/load-planning-software/)                                 | Flatbeds, axle-load printouts, 2D+3D                                                                                                                                              | Desktop, rectangular items                                                         |
+| EasyCargo / CubeMaster / MaxLoad Pro / 3DLoadCalculator / LoadOptimizer.ai                      | General cartons/pallets                                                                                                                                                           | Not applicable to slender cylinders with appendages                                |
 
 **Open source** — [binpackingjs](https://github.com/olragon/binpackingjs) (2D maximal-rectangles,
 3D pivot placement), `3d-bin-packing` on npm, [dwave-examples/3d-bin-packing](https://github.com/dwave-examples/3d-bin-packing)
@@ -292,13 +296,14 @@ should know that before writing a solver.
 ## 6. Recommended architecture
 
 ### Stack
+
 - **Vite + React + TypeScript**, deployed static (Cloudflare Pages / Netlify / GitHub Pages)
 - Solver in **plain TypeScript in a Web Worker** — keeps the UI responsive, no server, no customer
   data leaves the browser (a real selling point for commercially sensitive piling schedules)
 - **PapaParse** for CSV; JSON import/export for whole jobs so a quote is reproducible
 - **SVG for both views**, not WebGL. The 2D exploded top-down is obviously SVG. For the isometric
   view, use a true axonometric projection rendered as SVG too: it prints crisply into a quote PDF,
-  needs no WebGL, and is deterministic to snapshot-test. Add three.js later *only* if interactive
+  needs no WebGL, and is deterministic to snapshot-test. Add three.js later _only_ if interactive
   3D turns out to be needed.
 - Print stylesheet → PDF via the browser. Avoid a PDF library until it's proven necessary.
 
@@ -348,30 +353,30 @@ packing" toggles are just presets over the same function:
 Each phase ends with something usable. Nothing here requires the next phase to be worth having.
 
 **Phase 0 — Domain capture (do this before any code).**
-Sit with the yard crew. Get 5–10 *real* past loading plans with photos and the actual truck used —
+Sit with the yard crew. Get 5–10 _real_ past loading plans with photos and the actual truck used —
 these become your regression fixtures and the only honest measure of whether the optimiser is any
 good. Nail down the clearance rules (see the open questions in §8). Build the pile-type catalogue
-and the fleet catalogue as data. *Deliverable: `data/` + `fixtures/`.*
+and the fleet catalogue as data. _Deliverable: `data/` + `fixtures/`._
 
 **Phase 1 — Model, validate, visualise. No optimiser.**
 Domain types, VDAM ruleset, `validate()`, mass and centroid calculator, manual layout editor,
-both SVG views, CSV import. *Deliverable: a tool that checks a plan a human made.* This alone is
+both SVG views, CSV import. _Deliverable: a tool that checks a plan a human made._ This alone is
 worth shipping — it catches an over-payload or unbalanced load today.
 
 **Phase 2 — Baseline packer (the control).**
 Bounding-box lane packing, no helix intelligence. Run it over the Phase 0 fixtures and record
-trucks-used. *Deliverable: a number to beat, and your business case for Phase 3.*
+trucks-used. _Deliverable: a number to beat, and your business case for Phase 3._
 
 **Phase 3 — Helix-aware packer.**
 Conditional separation, longitudinal staggering, flip decisions, LNS. Report the delta vs baseline
-on every fixture. *Deliverable: the actual product differentiator, with evidence.*
+on every fixture. _Deliverable: the actual product differentiator, with evidence._
 
 **Phase 4 — Fleet selection across multiple trucks.**
-Heterogeneous bin packing, cost model, mixed truck/trailer combinations. *Deliverable: "this job
-needs 2× 8-wheeler + trailer and 1× semi, $X".*
+Heterogeneous bin packing, cost model, mixed truck/trailer combinations. _Deliverable: "this job
+needs 2× 8-wheeler + trailer and 1× semi, $X"._
 
 **Phase 5 — Multi-phase delivery with storage.**
-Ship-early-and-store trade-off. *Deliverable: phase-aware quoting.*
+Ship-early-and-store trade-off. _Deliverable: phase-aware quoting._
 
 **Phase 6 — Quoting polish.**
 Objective presets, manual override with live re-validation, printable loading plan with per-tier
@@ -389,14 +394,14 @@ diagrams, chain/chock/dunnage schedule, permit and travel-time flags.
 
 ### Risks
 
-| Risk | Mitigation |
-|---|---|
-| Clearance rules in the model don't match what the yard actually does | Phase 0; validate against real photographed loads before building the solver |
-| "Optimal" is expected to mean provably optimal | Set expectations now: near-optimal in 2 s beats optimal in 10 min for quoting. Show the utilisation %, not a claim of optimality |
-| Regulatory change invalidates saved quotes | Versioned ruleset data files; stamp version on every quote (§3.4) |
-| Solver too slow in-browser | Web Worker + hard time box + always return the best-so-far |
-| Overdimension/HPMV regimes conflated | Encode the divisible/indivisible distinction explicitly (§3.3) — getting this wrong produces unquotable plans |
-| The "payload always binds before axles" assumption stops holding | The axle tables stay documented in §3.2; reinstating them means a new ruleset version, not an edit to the current one |
+| Risk                                                                 | Mitigation                                                                                                                       |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Clearance rules in the model don't match what the yard actually does | Phase 0; validate against real photographed loads before building the solver                                                     |
+| "Optimal" is expected to mean provably optimal                       | Set expectations now: near-optimal in 2 s beats optimal in 10 min for quoting. Show the utilisation %, not a claim of optimality |
+| Regulatory change invalidates saved quotes                           | Versioned ruleset data files; stamp version on every quote (§3.4)                                                                |
+| Solver too slow in-browser                                           | Web Worker + hard time box + always return the best-so-far                                                                       |
+| Overdimension/HPMV regimes conflated                                 | Encode the divisible/indivisible distinction explicitly (§3.3) — getting this wrong produces unquotable plans                    |
+| The "payload always binds before axles" assumption stops holding     | The axle tables stay documented in §3.2; reinstating them means a new ruleset version, not an edit to the current one            |
 
 ---
 
@@ -406,7 +411,7 @@ Answer these before Phase 1 — several change the data model.
 
 **Geometry / helices**
 
-> ~~1. Does an overlapping single helix ride *over* the neighbour's shaft?~~
+> ~~1. Does an overlapping single helix ride _over_ the neighbour's shaft?~~
 > **Answered 2026-08-22: no — beside it, horizontally. Tier height is constant.**
 >
 > ~~2. Does "helices must not overlap" apply between a double-helix and a single-helix pile?~~
@@ -418,18 +423,12 @@ Answer these before Phase 1 — several change the data model.
 5. Can piles of different lengths share a lane end-to-end? Can a tier mix diameters (it wastes
    height, but may still win)?
 
-**Loading practice**
-6. Maximum tiers in practice? Is it limited by height, by the crane/hiab, or by chain count?
-7. Are piles ever bundled/strapped before loading? A bundle would be a composite item in the model.
-8. Does unloading order matter (multi-drop / multi-site jobs)? If yes, that's a real extra
-   constraint and should be scoped in early, not retrofitted.
+**Loading practice** 6. Maximum tiers in practice? Is it limited by height, by the crane/hiab, or by chain count? 7. Are piles ever bundled/strapped before loading? A bundle would be a composite item in the model. 8. Does unloading order matter (multi-drop / multi-site jobs)? If yes, that's a real extra
+constraint and should be scoped in early, not retrofitted.
 
-**Commercial**
-9. Cost model: per-truck flat rate, per-km, or per-tonne-km? What does a pilot vehicle or a
-   restricted-travel-time window actually cost?
-10. Storage cost for shipping a phase early — per pile per week, or a flat yard charge?
-11. Which truck/trailer configurations do you actually have access to, and are they owned or hired?
-    (Determines whether fleet selection is a choice or a constraint.)
+**Commercial** 9. Cost model: per-truck flat rate, per-km, or per-tonne-km? What does a pilot vehicle or a
+restricted-travel-time window actually cost? 10. Storage cost for shipping a phase early — per pile per week, or a flat yard charge? 11. Which truck/trailer configurations do you actually have access to, and are they owned or hired?
+(Determines whether fleet selection is a choice or a constraint.)
 
 ---
 

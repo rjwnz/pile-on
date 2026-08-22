@@ -35,8 +35,6 @@ export interface LoadSceneInput {
   readonly catalogue: Catalogue;
   readonly placements: readonly Placement[];
   readonly options: LoadingOptions;
-  /** See through the load, to find a pile buried inside it. */
-  readonly xray: boolean;
 }
 
 export interface LoadScene {
@@ -47,20 +45,8 @@ export interface LoadScene {
 }
 
 const DECK_COLOUR = 0xcbd5e1;
-const XRAY_OPACITY = 0.35;
 /** Enough segments that a shaft reads as round at print zoom. */
 const RADIAL_SEGMENTS = 20;
-
-function material(colour: string | number, xray: boolean): THREE.Material {
-  return new THREE.MeshLambertMaterial({
-    color: colour,
-    transparent: xray,
-    opacity: xray ? XRAY_OPACITY : 1,
-    // Without this, faded piles hide whatever is behind them anyway.
-    depthWrite: !xray,
-    side: xray ? THREE.DoubleSide : THREE.FrontSide,
-  });
-}
 
 /**
  * A cylinder lying along the deck.
@@ -75,7 +61,6 @@ function tube(
   z: number,
   radius: number,
   colour: string,
-  xray: boolean,
 ): THREE.Mesh {
   const geometry = new THREE.CylinderGeometry(
     radius,
@@ -84,13 +69,16 @@ function tube(
     RADIAL_SEGMENTS,
   );
   geometry.rotateZ(-Math.PI / 2);
-  const mesh = new THREE.Mesh(geometry, material(colour, xray));
+  const mesh = new THREE.Mesh(
+    geometry,
+    new THREE.MeshLambertMaterial({color: colour}),
+  );
   mesh.position.set((x0 + x1) / 2, y, z);
   return mesh;
 }
 
 export function buildLoadScene(input: LoadSceneInput): LoadScene {
-  const {vehicle, catalogue, placements, options, xray} = input;
+  const {vehicle, catalogue, placements, options} = input;
   const scene = new THREE.Scene();
   const content = new THREE.Group();
   content.name = 'load';
@@ -140,7 +128,6 @@ export function buildLoadScene(input: LoadSceneInput): LoadScene {
       axisZ,
       type.shaftRadius,
       colour.shaft,
-      xray,
     );
     shaft.name = `shaft:${placement.id}`;
     content.add(shaft);
@@ -155,7 +142,6 @@ export function buildLoadScene(input: LoadSceneInput): LoadScene {
         axisZ,
         segment.radius,
         colour.helix,
-        xray,
       );
       plate.name = `helix:${placement.id}:${index}`;
       content.add(plate);

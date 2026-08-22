@@ -68,7 +68,6 @@ export function ConsignmentView({
   placements,
   options,
   violations,
-  xray,
 }: {
   readonly consignment: Consignment;
   readonly index: number;
@@ -77,7 +76,6 @@ export function ConsignmentView({
   readonly placements: readonly Placement[];
   readonly options: LoadingOptions;
   readonly violations: readonly Violation[];
-  readonly xray: boolean;
 }) {
   const vehicle = findVehicle(catalogue, consignment.vehicleId);
   if (!vehicle) {
@@ -200,7 +198,6 @@ export function ConsignmentView({
           placements={placements}
           options={options}
           title="Loaded truck"
-          xray={xray}
         />
       </Suspense>
     </article>

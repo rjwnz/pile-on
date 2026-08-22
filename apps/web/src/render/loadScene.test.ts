@@ -48,13 +48,12 @@ function place(overrides: Partial<Placement> = {}): Placement {
   };
 }
 
-function build(placements: Placement[] = [place()], xray = false) {
+function build(placements: Placement[] = [place()]) {
   return buildLoadScene({
     vehicle: SEMI,
     catalogue: CATALOGUE,
     placements,
     options: OPTIONS,
-    xray,
   });
 }
 
@@ -155,28 +154,6 @@ describe('buildLoadScene', () => {
     const {content} = build([]);
 
     expect(meshesNamed(content, 'shaft:')).toHaveLength(0);
-  });
-});
-
-describe('x-ray', () => {
-  it('leaves solids opaque and depth-writing by default', () => {
-    const {content} = build();
-    const solid = meshesNamed(content, 'shaft:')[0]!
-      .material as THREE.MeshLambertMaterial;
-
-    expect(solid.transparent).toBe(false);
-    expect(solid.opacity).toBe(1);
-    expect(solid.depthWrite).toBe(true);
-  });
-
-  it('fades solids and stops them writing depth, so buried piles show', () => {
-    const {content} = build([place()], true);
-    const faded = meshesNamed(content, 'shaft:')[0]!
-      .material as THREE.MeshLambertMaterial;
-
-    expect(faded.transparent).toBe(true);
-    expect(faded.opacity).toBeCloseTo(0.35);
-    expect(faded.depthWrite).toBe(false);
   });
 });
 

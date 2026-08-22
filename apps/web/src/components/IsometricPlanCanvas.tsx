@@ -26,14 +26,12 @@ export function IsometricPlanCanvas({
   placements,
   options,
   title,
-  xray = false,
 }: {
   readonly vehicle: Vehicle;
   readonly catalogue: Catalogue;
   readonly placements: readonly Placement[];
   readonly options: LoadingOptions;
   readonly title: string;
-  readonly xray?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [unsupported, setUnsupported] = useState(false);
@@ -66,7 +64,6 @@ export function IsometricPlanCanvas({
       catalogue,
       placements,
       options,
-      xray,
     });
 
     const draw = () => {
@@ -89,7 +86,7 @@ export function IsometricPlanCanvas({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [vehicle, catalogue, placements, options, xray]);
+  }, [vehicle, catalogue, placements, options]);
 
   return (
     <figure className="space-y-1">

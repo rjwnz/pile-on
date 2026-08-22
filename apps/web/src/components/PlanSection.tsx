@@ -20,7 +20,6 @@ export function PlanSection() {
   const [unplaced, setUnplaced] = useState<
     readonly {pileTypeId: string; quantity: number; reason: string}[]
   >([]);
-  const [xray, setXray] = useState(false);
 
   const violations = useMemo(
     () => validatePlan(plan, catalogue, options),
@@ -84,20 +83,6 @@ export function PlanSection() {
         <Button variant="primary" onClick={arrange} disabled={!vehicle}>
           Arrange {scheduled} piles
         </Button>
-
-        {plan.consignments.length > 0 ? (
-          <label className="flex items-center gap-2 pb-1.5 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={xray}
-              onChange={event => setXray(event.target.checked)}
-            />
-            See through the load
-            <span className="text-xs text-slate-500">
-              (to find a pile buried inside it)
-            </span>
-          </label>
-        ) : null}
       </div>
 
       <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -147,7 +132,6 @@ export function PlanSection() {
               violations={violations.filter(
                 violation => violation.consignmentId === consignment.id,
               )}
-              xray={xray}
             />
           ))}
         </div>

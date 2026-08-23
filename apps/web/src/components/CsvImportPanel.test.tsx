@@ -44,7 +44,7 @@ describe('CsvImportPanel', () => {
     await user.click(screen.getByText(/Import pile types from CSV/));
     await user.type(
       screen.getByLabelText('pile types CSV text'),
-      'id,name,length,shaft_radius,mass\nA,A,nope,84,178\n,B,6000,84,178',
+      'id,name,length,shaft_diameter,mass\nA,A,nope,168,178\n,B,6000,168,178',
     );
     await user.click(screen.getByRole('button', {name: 'Import pasted rows'}));
 
@@ -78,7 +78,7 @@ describe('CsvImportPanel', () => {
     await user.click(screen.getByText(/Import pile types from CSV/));
     await user.type(
       screen.getByLabelText('pile types CSV text'),
-      'id\tname\tlength\tshaft_radius\tmass\nA\tPile A\t6000\t84\t178',
+      'id\tname\tlength\tshaft_diameter\tmass\nA\tPile A\t6000\t168\t178',
     );
     await user.click(screen.getByRole('button', {name: 'Import pasted rows'}));
 

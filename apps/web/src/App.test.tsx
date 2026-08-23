@@ -46,10 +46,10 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Id'), 'SP168-D6');
     await user.type(screen.getByLabelText('Name'), 'SP168 twin helix');
     await user.type(screen.getByLabelText(/^Length/), '6000');
-    await user.type(screen.getByLabelText(/^Shaft radius/), '84');
+    await user.type(screen.getByLabelText(/^Shaft diameter/), '168');
     await user.type(screen.getByLabelText(/^Mass/), '178');
     await user.type(screen.getByLabelText(/Plate 1 offset/), '400');
-    await user.type(screen.getByLabelText(/Plate 1 radius/), '225');
+    await user.type(screen.getByLabelText(/Plate 1 diameter/), '450');
     await user.type(screen.getByLabelText(/Plate 1 length/), '110');
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
 
@@ -70,7 +70,7 @@ describe('App', () => {
 
     const alert = screen.getByRole('alert');
     expect(within(alert).getByText('id')).toBeInTheDocument();
-    expect(within(alert).getByText('shaft_radius')).toBeInTheDocument();
+    expect(within(alert).getByText('shaft_diameter')).toBeInTheDocument();
     expect(within(alert).getByText('mass')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {name: /Pile types \(0\)/}),
@@ -84,7 +84,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
     await user.type(screen.getByLabelText('Id'), 'KEEP-ME');
     await user.type(screen.getByLabelText(/^Length/), '6000');
-    await user.type(screen.getByLabelText(/^Shaft radius/), '84');
+    await user.type(screen.getByLabelText(/^Shaft diameter/), '168');
     await user.type(screen.getByLabelText(/^Mass/), '178');
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
 

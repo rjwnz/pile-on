@@ -22,7 +22,6 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   payloadCapacity: 28200,
-  balanceTarget: null,
   towableBy: [],
 };
 
@@ -61,11 +60,17 @@ describe('balancingShift', () => {
   });
 
   it('stops at the headboard on the way forward', () => {
-    // A pile at 100 wants to come 2100 mm forward to reach a 1000 mm target,
-    // and there are only 100 mm of deck in front of it.
-    const forward: Vehicle = {...SEMI, balanceTarget: 1000};
+    // Mass sits aft, so the load wants to slide forward onto mid-deck — but a
+    // pile already hard against the headboard has only 100 mm to give, and it
+    // pins the whole load there.
+    const load = [
+      place({id: 'front', x: 100}),
+      place({id: 'a', x: 6500}),
+      place({id: 'b', x: 6500}),
+      place({id: 'c', x: 6500}),
+    ];
 
-    expect(balancingShift([place({x: 100})], CATALOGUE, forward)).toBe(-100);
+    expect(balancingShift(load, CATALOGUE, SEMI)).toBe(-100);
   });
 
   it('does not move a load that is already where it should be', () => {

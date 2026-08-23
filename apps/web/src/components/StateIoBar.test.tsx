@@ -28,7 +28,6 @@ const VEHICLE: Vehicle = {
   deckLength: 7200,
   deckWidth: 2450,
   payloadCapacity: 19400,
-  balanceTarget: null,
   towableBy: [],
 };
 

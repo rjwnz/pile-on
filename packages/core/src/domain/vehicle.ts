@@ -32,10 +32,6 @@ export interface Vehicle {
   readonly deckWidth: Millimetres;
   /** Mass this deck may carry: piles, dunnage and restraint together. */
   readonly payloadCapacity: Kilograms;
-  /** Where this deck wants its load centroid, from the headboard. Null means
-   * unstated (mid-length assumed) — kept separate so the assumption stays
-   * visible. */
-  readonly balanceTarget: Millimetres | null;
   /**
    * Ids of the trucks allowed to tow this row. Non-empty marks the row as a
    * trailer, which never moves on its own; empty is a self-propelled truck.
@@ -60,9 +56,9 @@ export function deckArea(vehicle: Vehicle): number {
   return vehicle.deckLength * vehicle.deckWidth;
 }
 
-/** Where the load centroid should sit along the deck, mid-length if unstated. */
+/** Where the load centroid should sit along the deck: always mid-length. */
 export function balanceTargetOf(vehicle: Vehicle): Millimetres {
-  return vehicle.balanceTarget ?? vehicle.deckLength / 2;
+  return vehicle.deckLength / 2;
 }
 
 /** Longitudinal span a load may occupy — headboard to tailgate, no overhang. */

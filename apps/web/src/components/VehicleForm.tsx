@@ -16,7 +16,6 @@ interface Draft {
   readonly deckLength: string;
   readonly deckWidth: string;
   readonly payloadCapacity: string;
-  readonly balanceTarget: string;
   readonly towableBy: string;
 }
 
@@ -27,7 +26,6 @@ const BLANK: Draft = {
   deckLength: '',
   deckWidth: '2450',
   payloadCapacity: '',
-  balanceTarget: '',
   towableBy: '',
 };
 
@@ -39,10 +37,6 @@ function toDraft(vehicle: Vehicle): Draft {
     deckLength: String(vehicle.deckLength),
     deckWidth: String(vehicle.deckWidth),
     payloadCapacity: String(vehicle.payloadCapacity),
-    // Blank means unstated, which is not the same as mid-deck — it is the
-    // absence of an opinion, and the form has to be able to express that.
-    balanceTarget:
-      vehicle.balanceTarget === null ? '' : String(vehicle.balanceTarget),
     towableBy: vehicle.towableBy.join('; '),
   };
 }
@@ -56,7 +50,6 @@ export function draftToRow(draft: Draft): CsvRow {
     deck_length: draft.deckLength,
     deck_width: draft.deckWidth,
     payload_capacity: draft.payloadCapacity,
-    balance_target: draft.balanceTarget,
     towable_by: draft.towableBy,
   };
 }
@@ -124,26 +117,12 @@ export function VehicleForm({
           onChange={v => set('payloadCapacity', v)}
         />
         <Field
-          label="Balance point from headboard"
-          suffix="mm"
-          type="number"
-          value={draft.balanceTarget}
-          placeholder="mid-deck"
-          onChange={v => set('balanceTarget', v)}
-        />
-        <Field
           label="Towable by (truck ids, separated by semicolons)"
           value={draft.towableBy}
           placeholder="self-propelled"
           onChange={v => set('towableBy', v)}
         />
       </div>
-
-      <p className="text-sm text-slate-600">
-        Leave the balance point blank unless you have a figure for it. A
-        semi-trailer wants its mass forward, a rigid truck does not. If you
-        leave it blank, the load balances to mid-deck, which is only a guess.
-      </p>
 
       {Number.isFinite(payload) && payload > 0 ? (
         <p className="text-sm text-slate-600">

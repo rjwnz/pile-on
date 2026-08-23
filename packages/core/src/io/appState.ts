@@ -47,8 +47,13 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  *     the deck for every vehicle, not the 4.3 m road limit less the deck. A
  *     version 8 file reads cleanly: its `deckHeight` is ignored, and the load
  *     is judged against the same 3 m every deck in the fleet is held to.
+ * 10 — dropped `vehicle.balanceTarget`. Every load now balances to mid-deck.
+ *     Bumped rather than defaulted because a version 9 file could carry a
+ *     stated off-centre target, and reading it as mid-deck would re-judge that
+ *     plan's balance — the one thing tolerance must not do. A file with no
+ *     target, or one already at mid-deck, means exactly what it meant.
  */
-export const STATE_FORMAT_VERSION = 9;
+export const STATE_FORMAT_VERSION = 10;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -186,9 +191,9 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     log.add('', 'must be an object');
     return null;
   }
-  // A version 1 file also carries `axles`, and a version 8 file a `deckHeight`.
-  // Both are read and discarded — neither is a constraint any more, so there is
-  // nothing to migrate.
+  // Older files carry fields no longer modelled — `axles` (v1), `deckHeight`
+  // (v8), `balanceTarget` (v9). All are read and discarded: none is a
+  // constraint any more, so there is nothing to migrate.
   const {id, name, kind, deckLength, deckWidth} = value;
   if (typeof id !== 'string' || !id) {
     log.add('id', 'must be a non-empty string');
@@ -220,11 +225,6 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     deckLength,
     deckWidth,
     payloadCapacity,
-    balanceTarget:
-      typeof value['balanceTarget'] === 'number' &&
-      Number.isFinite(value['balanceTarget'])
-        ? value['balanceTarget']
-        : null,
     // Absent before version 7: nothing towed, so nothing tows.
     towableBy: Array.isArray(value['towableBy'])
       ? value['towableBy'].filter(

@@ -13,18 +13,17 @@ import {
  *
  * A vehicle is a deck and a mass limit. There is no axle column: the payload
  * limit is always reached before any axle limit here, so axle positions and
- * tyre classes were data nobody had to maintain and nothing consulted.
- *
- * `balance_target` is optional and defaults to mid-deck.
+ * tyre classes were data nobody had to maintain and nothing consulted. The
+ * load is balanced to mid-deck, so there is no balance column either.
  *
  * `towable_by` marks a trailer: the ids of the trucks allowed to tow it,
  * semicolon-separated (commas belong to the CSV). Blank means the row is a
  * self-propelled truck.
  */
-export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,payload_capacity,balance_target,towable_by
-SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,28200,,
-RIGID-8,8-wheeler rigid,rigid,7200,2450,19400,,
-TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,15200,,RIGID-8
+export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,payload_capacity,towable_by
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,28200,
+RIGID-8,8-wheeler rigid,rigid,7200,2450,19400,
+TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,15200,RIGID-8
 `;
 
 function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
@@ -34,10 +33,6 @@ function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
   const deckLength = readNumber(row, 'deck_length', log, {min: 1});
   const deckWidth = readNumber(row, 'deck_width', log, {min: 1});
   const payloadCapacity = readNumber(row, 'payload_capacity', log, {min: 1});
-  const balanceTargetRaw = (row['balance_target'] ?? '').trim();
-  const balanceTarget = balanceTargetRaw
-    ? readNumber(row, 'balance_target', log, {min: 0, max: deckLength})
-    : null;
   const towableBy = readString(row, 'towable_by', log, {required: false})
     .split(';')
     .map(entry => entry.trim())
@@ -50,7 +45,6 @@ function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
     deckLength,
     deckWidth,
     payloadCapacity,
-    balanceTarget,
     towableBy,
   };
 }

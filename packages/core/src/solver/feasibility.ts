@@ -5,11 +5,7 @@ import {deckArea, payloadCapacity, type Vehicle} from '../domain/vehicle';
 import type {VdamRuleset} from '../rules/nzVdam';
 import type {Millimetres} from '../units';
 
-/**
- * Why a pile type can never go on this vehicle, or null if it can. Shared by
- * both arrangers; each passes its own usable span (the baseline stops at the
- * tailgate, the packer may use overhang).
- */
+/** Why a pile type can never go on this vehicle, or null if it can. */
 export function unplaceableReason(
   type: PileType,
   vehicle: Vehicle,

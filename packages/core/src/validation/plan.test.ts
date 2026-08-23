@@ -2,7 +2,6 @@ import {describe, expect, it} from '@jest/globals';
 import {
   consignmentMass,
   consignmentPayload,
-  loadOverhang,
   loadWidth,
   validatePlan,
 } from './plan';
@@ -35,8 +34,6 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  maxFrontOverhang: 0,
-  maxRearOverhang: 0,
   balanceTarget: null,
   towableBy: [],
 };
@@ -225,23 +222,7 @@ describe('width', () => {
 });
 
 describe('the envelope', () => {
-  /** The same semi, but with the yard willing to let a load hang out the back. */
-  const TOLERANT: Vehicle = {...SEMI, id: 'SEMI-OH', maxRearOverhang: 2000};
-  const TOLERANT_CATALOGUE: Catalogue = {
-    pileTypes: [SP168],
-    vehicles: [TOLERANT],
-  };
-
-  function onTolerant(placements: Placement[]): LoadPlan {
-    return {
-      consignments: [
-        {id: 'C1', vehicleId: 'SEMI-OH', trailerId: null, phase: null},
-      ],
-      placements,
-    };
-  }
-
-  it('rejects an overhang on a vehicle set to carry none', () => {
+  it('rejects a pile that overhangs the deck', () => {
     const violation = validatePlan(
       planWith([place({x: 7000})]),
       CATALOGUE,
@@ -251,49 +232,6 @@ describe('the envelope', () => {
     expect(violation!.rule).toBe('over-rear-overhang');
     expect(violation!.severity).toBe('error');
     expect(violation!.message).toContain('500 mm');
-  });
-
-  it('rejects an overhang past what the vehicle allows, and says the allowance', () => {
-    const violation = validatePlan(
-      onTolerant([place({x: 9000})]),
-      TOLERANT_CATALOGUE,
-      OPTIONS,
-    )[0];
-
-    expect(violation!.rule).toBe('over-rear-overhang');
-    expect(violation!.message).toContain('2500 mm');
-    expect(violation!.message).toContain('2000 mm allowed');
-  });
-
-  it('only notes an overhang the vehicle is allowed', () => {
-    const violation = validatePlan(
-      onTolerant([place({x: 7000})]),
-      TOLERANT_CATALOGUE,
-      OPTIONS,
-    )[0];
-
-    expect(violation!.rule).toBe('rear-overhang');
-    expect(violation!.severity).toBe('warning');
-  });
-
-  it('mentions flags and lamps once an allowed overhang passes a metre', () => {
-    expect(
-      validatePlan(
-        onTolerant([place({x: 7600})]),
-        TOLERANT_CATALOGUE,
-        OPTIONS,
-      )[0]!.message,
-    ).toContain('flags by day and lamps at night');
-  });
-
-  it('reports an overhang as either an error or a note, never both', () => {
-    const found = validatePlan(
-      planWith([place({x: 7000})]),
-      CATALOGUE,
-      OPTIONS,
-    );
-
-    expect(found.filter(v => v.rule.includes('overhang'))).toHaveLength(1);
   });
 
   it('flags a pile placed ahead of the headboard', () => {
@@ -315,55 +253,6 @@ describe('the envelope', () => {
 
   it('is happy with a pile just inside the side margin', () => {
     expect(rules(planWith([place({y: 950})]))).toEqual([]);
-  });
-});
-
-describe('loadOverhang', () => {
-  it('is zero for a load sitting wholly on the deck', () => {
-    expect(loadOverhang([place({x: 100})], CATALOGUE, SEMI)).toEqual({
-      front: 0,
-      rear: 0,
-    });
-  });
-
-  it('measures how far the furthest pile hangs off the back', () => {
-    expect(
-      loadOverhang(
-        [place({id: 'a', x: 100}), place({id: 'b', x: 7000})],
-        CATALOGUE,
-        SEMI,
-      ),
-    ).toEqual({front: 0, rear: 500});
-  });
-
-  it('measures a load pushed out past the headboard', () => {
-    expect(loadOverhang([place({x: -250})], CATALOGUE, SEMI).front).toBe(250);
-  });
-
-  it('ignores piles whose type is not in the catalogue', () => {
-    expect(
-      loadOverhang(
-        [
-          place({id: 'a', x: 100}),
-          place({id: 'b', pileTypeId: 'GHOST', x: 90000}),
-        ],
-        CATALOGUE,
-        SEMI,
-      ),
-    ).toEqual({front: 0, rear: 0});
-  });
-
-  it('agrees with the rule that rejects it', () => {
-    // The metric and the violation have to be reading the same geometry, or a
-    // truck can show a comfortable number beside a red badge.
-    const plan = planWith([place({x: 7000})]);
-    const violation = validatePlan(plan, CATALOGUE, OPTIONS).find(
-      v => v.rule === 'over-rear-overhang',
-    );
-
-    expect(violation!.message).toContain(
-      String(loadOverhang(plan.placements, CATALOGUE, SEMI).rear),
-    );
   });
 });
 

@@ -6,7 +6,6 @@ import {
   consignmentPayload,
   findVehicle,
   loadHeight,
-  loadOverhang,
   loadWidth,
   payloadCapacity,
   tiersOf,
@@ -106,14 +105,6 @@ function DeckView({
     vehicle.deckHeight + loadHeight(placements, catalogue, options);
   const width = loadWidth(placements, catalogue);
   const offset = balanceOffset(placements, catalogue, vehicle);
-  const overhang = loadOverhang(placements, catalogue, vehicle);
-  // Shown only when the load hangs out or the yard has said it may — a
-  // "0 of 0 mm" column on every deck is noise.
-  const showOverhang =
-    overhang.front > 0 ||
-    overhang.rear > 0 ||
-    vehicle.maxFrontOverhang > 0 ||
-    vehicle.maxRearOverhang > 0;
   const tiers = tiersOf(placements);
   const isometricTitle = heading ? `Loaded ${heading}` : 'Loaded truck';
 
@@ -125,11 +116,7 @@ function DeckView({
         </h4>
       ) : null}
 
-      <dl
-        className={`grid grid-cols-2 gap-3 text-sm ${
-          showOverhang ? 'sm:grid-cols-4 lg:grid-cols-7' : 'sm:grid-cols-6'
-        }`}
-      >
+      <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-6">
         <Metric label="Piles" value={String(placements.length)} />
         <Metric
           label="Load mass"
@@ -171,21 +158,6 @@ function DeckView({
               Math.abs(offset.lateral) > options.balance.lateral)
           }
         />
-        {showOverhang ? (
-          <Metric
-            label="Overhang"
-            value={`${Math.round(overhang.rear)} mm`}
-            detail={
-              overhang.front > 0
-                ? `rear, of ${vehicle.maxRearOverhang} allowed · ${Math.round(overhang.front)} mm past the headboard`
-                : `rear, of ${vehicle.maxRearOverhang} mm allowed`
-            }
-            over={
-              overhang.rear > vehicle.maxRearOverhang ||
-              overhang.front > vehicle.maxFrontOverhang
-            }
-          />
-        ) : null}
       </dl>
 
       <div className="space-y-3">

@@ -18,8 +18,6 @@ interface Draft {
   readonly deckHeight: string;
   readonly tare: string;
   readonly maxGross: string;
-  readonly maxFrontOverhang: string;
-  readonly maxRearOverhang: string;
   readonly balanceTarget: string;
   readonly towableBy: string;
 }
@@ -33,8 +31,6 @@ const BLANK: Draft = {
   deckHeight: '',
   tare: '',
   maxGross: '',
-  maxFrontOverhang: '0',
-  maxRearOverhang: '0',
   balanceTarget: '',
   towableBy: '',
 };
@@ -49,8 +45,6 @@ function toDraft(vehicle: Vehicle): Draft {
     deckHeight: String(vehicle.deckHeight),
     tare: String(vehicle.tare),
     maxGross: String(vehicle.maxGross),
-    maxFrontOverhang: String(vehicle.maxFrontOverhang),
-    maxRearOverhang: String(vehicle.maxRearOverhang),
     // Blank means unstated, which is not the same as mid-deck — it is the
     // absence of an opinion, and the form has to be able to express that.
     balanceTarget:
@@ -70,8 +64,6 @@ export function draftToRow(draft: Draft): CsvRow {
     deck_height: draft.deckHeight,
     tare: draft.tare,
     max_gross: draft.maxGross,
-    max_front_overhang: draft.maxFrontOverhang,
-    max_rear_overhang: draft.maxRearOverhang,
     balance_target: draft.balanceTarget,
     towable_by: draft.towableBy,
   };
@@ -154,20 +146,6 @@ export function VehicleForm({
           onChange={v => set('maxGross', v)}
         />
         <Field
-          label="Front overhang allowed"
-          suffix="mm"
-          type="number"
-          value={draft.maxFrontOverhang}
-          onChange={v => set('maxFrontOverhang', v)}
-        />
-        <Field
-          label="Rear overhang allowed"
-          suffix="mm"
-          type="number"
-          value={draft.maxRearOverhang}
-          onChange={v => set('maxRearOverhang', v)}
-        />
-        <Field
           label="Balance point from headboard"
           suffix="mm"
           type="number"
@@ -184,11 +162,9 @@ export function VehicleForm({
       </div>
 
       <p className="text-sm text-slate-600">
-        Enter the overhang this vehicle will actually carry, not a legal limit.
-        This model does not check axle spacing. Leave the balance point blank
-        unless you have a figure for it. A semi-trailer wants its mass forward,
-        a rigid truck does not. If you leave it blank, the load balances to
-        mid-deck, which is only a guess.
+        Leave the balance point blank unless you have a figure for it. A
+        semi-trailer wants its mass forward, a rigid truck does not. If you
+        leave it blank, the load balances to mid-deck, which is only a guess.
       </p>
 
       {Number.isFinite(payload) && payload > 0 ? (

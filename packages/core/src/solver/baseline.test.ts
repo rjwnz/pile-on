@@ -38,8 +38,6 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  maxFrontOverhang: 0,
-  maxRearOverhang: 0,
   balanceTarget: null,
   towableBy: [],
 };
@@ -272,28 +270,19 @@ describe('arrangeNaively', () => {
     expect(second.plan.placements.map(p => p.id)).toEqual(ids);
   });
 
-  /*
-   * `headboardGap` is where the arranger starts laying piles, not a bound it
-   * has to hold. Balancing the load may spend some of it, and that is allowed:
-   * the Truck Loading Code has the front tier butted up to the headboard for
-   * pipe loads. What may never happen is a pile projecting *past* the headboard
-   * on a vehicle whose yard has not allowed a front overhang.
-   */
   it('never projects a pile past the headboard', () => {
     const {plan} = arrangeNaively(job(['SP168-D6', 25]), CATALOGUE, OPTIONS);
 
     for (const placement of plan.placements) {
-      expect(placement.x).toBeGreaterThanOrEqual(-SEMI.maxFrontOverhang);
+      expect(placement.x).toBeGreaterThanOrEqual(0);
     }
   });
 
-  it('stays within the rear overhang the vehicle allows', () => {
+  it('stays within the deck length', () => {
     const {plan} = arrangeNaively(job(['SP168-D6', 25]), CATALOGUE, OPTIONS);
 
     for (const placement of plan.placements) {
-      expect(placement.x + SP168.length).toBeLessThanOrEqual(
-        SEMI.deckLength + SEMI.maxRearOverhang,
-      );
+      expect(placement.x + SP168.length).toBeLessThanOrEqual(SEMI.deckLength);
     }
   });
 

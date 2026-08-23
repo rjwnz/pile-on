@@ -14,8 +14,6 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  maxFrontOverhang: 0,
-  maxRearOverhang: 0,
   balanceTarget: null,
   towableBy: [],
 };
@@ -133,7 +131,7 @@ describe('VehicleSection', () => {
 });
 
 describe('the loading fields', () => {
-  it('round-trips overhang allowances and a stated balance point', async () => {
+  it('round-trips a stated balance point', async () => {
     const user = userEvent.setup();
     renderWith([SEMI]);
 
@@ -144,8 +142,6 @@ describe('the loading fields', () => {
     await user.type(screen.getByLabelText(/Deck height above road/), '1200');
     await user.type(screen.getByLabelText(/Tare/), '10600');
     await user.type(screen.getByLabelText(/Max gross/), '30000');
-    await user.clear(screen.getByLabelText(/Rear overhang allowed/));
-    await user.type(screen.getByLabelText(/Rear overhang allowed/), '900');
     await user.type(
       screen.getByLabelText(/Balance point from headboard/),
       '3000',
@@ -156,7 +152,6 @@ describe('the loading fields', () => {
     expect(row).toBeInTheDocument();
 
     await user.click(within(row).getByRole('button', {name: /Edit/}));
-    expect(screen.getByLabelText(/Rear overhang allowed/)).toHaveValue(900);
     expect(screen.getByLabelText(/Balance point from headboard/)).toHaveValue(
       3000,
     );

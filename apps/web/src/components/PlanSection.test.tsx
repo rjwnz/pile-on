@@ -39,8 +39,6 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  maxFrontOverhang: 0,
-  maxRearOverhang: 0,
   balanceTarget: null,
   towableBy: [],
 };
@@ -383,30 +381,6 @@ describe('the packer against the control', () => {
     await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
     expect(screen.getByText(/Movement 1 of 1/)).toBeInTheDocument();
-  });
-});
-
-describe('the overhang each vehicle allows', () => {
-  const TOLERANT: Vehicle = {...SEMI, maxRearOverhang: 1200};
-
-  it('stays out of the way when nothing hangs out and nothing may', async () => {
-    const user = userEvent.setup();
-    renderPlan();
-
-    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
-
-    expect(screen.queryByText('Overhang')).not.toBeInTheDocument();
-  });
-
-  it('shows what the load uses against what the vehicle allows', async () => {
-    const user = userEvent.setup();
-    renderPlan({vehicles: [TOLERANT]});
-
-    await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
-
-    const truck = screen.getByTestId('consignment-C1');
-    expect(within(truck).getByText('Overhang')).toBeInTheDocument();
-    expect(within(truck).getByText(/of 1200 mm allowed/)).toBeInTheDocument();
   });
 });
 

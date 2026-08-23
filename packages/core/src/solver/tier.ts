@@ -175,7 +175,7 @@ function candidatesFor(state: SweepState, input: TierInput): Candidate[] {
   const {catalogue, vehicle, options, massBudget, maxHalfWidth} = input;
   const halfDeck = vehicle.deckWidth / 2 - options.sideMargin;
   const start = options.headboardGap;
-  const span = vehicle.deckLength + vehicle.maxRearOverhang - start;
+  const span = vehicle.deckLength - start;
 
   const patterns = lanePatterns(
     state.remaining,

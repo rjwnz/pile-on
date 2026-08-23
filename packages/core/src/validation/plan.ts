@@ -22,7 +22,7 @@ import {
 } from '../domain/vehicle';
 import {requiredLateralSeparation} from '../geometry/separation';
 import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
-import {GEOMETRIC_EPSILON, toMetres, type Millimetres} from '../units';
+import {GEOMETRIC_EPSILON, toMetres} from '../units';
 import {groupBy} from '../collections';
 
 /**
@@ -81,38 +81,6 @@ export function consignmentPayload(
   return (
     consignmentMass(placements, catalogue) + ancillaryMass(placements, options)
   );
-}
-
-/** How far a load projects past each end of the deck. Zero when it does not. */
-export interface LoadOverhang {
-  readonly front: Millimetres;
-  readonly rear: Millimetres;
-}
-
-/**
- * What the load actually hangs out by, to put beside what the vehicle allows.
- *
- * The allowance lives on the vehicle, because VDAM states rear overhang against
- * axle spacing and that is a fact about a unit rather than about a job. This is
- * the other half of the sentence — without it a plan quietly using an overhang
- * looks exactly like one that does not.
- */
-export function loadOverhang(
-  placements: readonly Placement[],
-  catalogue: Catalogue,
-  vehicle: Vehicle,
-): LoadOverhang {
-  let front = 0;
-  let rear = 0;
-  for (const placement of placements) {
-    const type = findPileType(catalogue, placement.pileTypeId);
-    if (!type) {
-      continue;
-    }
-    front = Math.max(front, -placement.x);
-    rear = Math.max(rear, placement.x + type.length - vehicle.deckLength);
-  }
-  return {front, rear};
 }
 
 /** Widest point of the load, measured across the deck. */
@@ -475,16 +443,8 @@ function checkSupport(
   return violations;
 }
 
-/**
- * The load inside the space the vehicle actually has: along the deck, across
- * it, and clear of the side margins.
- *
- * Overhang is judged against what the yard has said this unit will accept, not
- * against VDAM's own rear-overhang formula — that one is stated as a fraction of
- * axle spacing, and axle positions are deliberately not modelled. An overhang
- * inside the allowance is still worth mentioning, because past a metre it needs
- * flags by day and lamps at night.
- */
+/** The load inside the space the vehicle actually has: along the deck, across
+ * it, and clear of the side margins. No overhang is allowed. */
 function checkEnvelope(
   consignmentId: string,
   placements: readonly Placement[],
@@ -509,42 +469,24 @@ function checkEnvelope(
     }
 
     const front = -placement.x;
-    if (front > vehicle.maxFrontOverhang + GEOMETRIC_EPSILON) {
+    if (front > GEOMETRIC_EPSILON) {
       violations.push(
         error(
           consignmentId,
           'ahead-of-headboard',
-          vehicle.maxFrontOverhang > 0
-            ? `${placement.id} projects ${Math.round(front)} mm ahead of the headboard, over the ${vehicle.maxFrontOverhang} mm allowed`
-            : `${placement.id} starts ${Math.round(front)} mm ahead of the headboard`,
+          `${placement.id} starts ${Math.round(front)} mm ahead of the headboard`,
         ),
       );
     }
 
     const overhang = placement.x + type.length - vehicle.deckLength;
-    if (overhang > vehicle.maxRearOverhang + GEOMETRIC_EPSILON) {
+    if (overhang > GEOMETRIC_EPSILON) {
       violations.push(
         error(
           consignmentId,
           'over-rear-overhang',
-          vehicle.maxRearOverhang > 0
-            ? `${placement.id} overhangs the deck by ${Math.round(overhang)} mm, over the ${vehicle.maxRearOverhang} mm allowed`
-            : `${placement.id} overhangs the deck by ${Math.round(overhang)} mm, and this vehicle is set to carry no overhang`,
+          `${placement.id} overhangs the deck by ${Math.round(overhang)} mm`,
         ),
-      );
-    } else if (overhang > GEOMETRIC_EPSILON) {
-      violations.push(
-        overhang > 1000
-          ? warning(
-              consignmentId,
-              'rear-overhang',
-              `${placement.id} overhangs the deck by ${Math.round(overhang)} mm — over 1 m, so it needs flags by day and lamps at night`,
-            )
-          : warning(
-              consignmentId,
-              'rear-overhang',
-              `${placement.id} overhangs the deck by ${Math.round(overhang)} mm`,
-            ),
       );
     }
 

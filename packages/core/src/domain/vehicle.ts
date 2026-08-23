@@ -33,11 +33,6 @@ export interface Vehicle {
   readonly tare: Kilograms;
   /** GVM for a rigid, GCM for a combination. */
   readonly maxGross: Kilograms;
-  /** How far a load may hang past each end of the deck. Not derived — VDAM
-   * states it against axle spacing, which is not modelled — but what the yard
-   * accepts on this unit. Zero is the safe default. */
-  readonly maxFrontOverhang: Millimetres;
-  readonly maxRearOverhang: Millimetres;
   /** Where this deck wants its load centroid, from the headboard. Null means
    * unstated (mid-length assumed) — kept separate so the assumption stays
    * visible. */
@@ -71,12 +66,9 @@ export function balanceTargetOf(vehicle: Vehicle): Millimetres {
   return vehicle.balanceTarget ?? vehicle.deckLength / 2;
 }
 
-/** Longitudinal span a load may occupy, overhang allowances included. */
+/** Longitudinal span a load may occupy — headboard to tailgate, no overhang. */
 export function loadableSpan(
   vehicle: Vehicle,
 ): readonly [Millimetres, Millimetres] {
-  return [
-    -vehicle.maxFrontOverhang,
-    vehicle.deckLength + vehicle.maxRearOverhang,
-  ];
+  return [0, vehicle.deckLength];
 }

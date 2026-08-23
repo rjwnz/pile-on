@@ -238,8 +238,7 @@ export function arrangeNaively(
     )
     .sort((a, b) => b.type.length - a.type.length || b.type.mass - a.type.mass);
 
-  // The baseline stops at the tailgate — it does not use overhang — so the
-  // usable span it reports is the deck alone.
+  // Usable span is the deck alone.
   const deckOnly = (vehicle: Vehicle) => ({
     length: vehicle.deckLength - options.headboardGap,
     width: vehicle.deckWidth - options.sideMargin * 2,

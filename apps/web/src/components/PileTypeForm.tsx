@@ -2,11 +2,21 @@ import {useState} from 'react';
 import {
   maxRadius,
   parsePileTypeEntry,
+  pilePartOf,
+  pileTypeCode,
   type CsvRow,
+  type PilePart,
   type PileType,
 } from '@pile-on/core';
-import {Button, EntityForm, Field, useValidatedSubmit} from './ui';
+import {Button, EntityForm, Field, SelectField, useValidatedSubmit} from './ui';
 
+/**
+ * A pile ships in pieces: one starter, which carries the helices, and any
+ * number of plain-shaft extensions joined to it on site. Each piece is loaded
+ * separately, so each is its own catalogue entry — the model is unchanged. The
+ * form groups them under a pile-type code and a part; the core parser builds
+ * the id the model stores from the two.
+ */
 interface HelixDraft {
   readonly offset: string;
   readonly diameter: string;
@@ -14,7 +24,8 @@ interface HelixDraft {
 }
 
 interface Draft {
-  readonly id: string;
+  readonly pileType: string;
+  readonly part: PilePart;
   readonly name: string;
   readonly length: string;
   readonly shaftDiameter: string;
@@ -23,7 +34,8 @@ interface Draft {
 }
 
 const BLANK: Draft = {
-  id: '',
+  pileType: '',
+  part: 'starter',
   name: '',
   length: '',
   shaftDiameter: '',
@@ -31,10 +43,12 @@ const BLANK: Draft = {
   helices: [{offset: '', diameter: '', length: ''}],
 };
 
-/** The geometry stores radii; the form takes and shows diameters. */
+/** The geometry stores radii; the form takes and shows diameters. The code and
+ * part come back off the stored id, so an entry opens as it was entered. */
 function toDraft(type: PileType): Draft {
   return {
-    id: type.id,
+    pileType: pileTypeCode(type),
+    part: pilePartOf(type),
     name: type.name,
     length: String(type.length),
     shaftDiameter: String(type.shaftRadius * 2),
@@ -47,20 +61,25 @@ function toDraft(type: PileType): Draft {
   };
 }
 
-/** Flatten the draft into the CSV row shape the importer's validator consumes. */
+/** Flatten the draft into the CSV row shape the importer's validator consumes,
+ * so hand entry and CSV import go through exactly the same rules. */
 export function draftToRow(draft: Draft): CsvRow {
   const row: Record<string, string> = {
-    id: draft.id,
+    pile_type: draft.pileType,
+    part: draft.part,
     name: draft.name,
     length: draft.length,
     shaft_diameter: draft.shaftDiameter,
     mass: draft.mass,
   };
-  draft.helices.forEach((helix, index) => {
-    row[`helix${index + 1}_offset`] = helix.offset;
-    row[`helix${index + 1}_diameter`] = helix.diameter;
-    row[`helix${index + 1}_length`] = helix.length;
-  });
+  // Only a starter carries plates; an extension is a plain shaft.
+  if (draft.part === 'starter') {
+    draft.helices.forEach((helix, index) => {
+      row[`helix${index + 1}_offset`] = helix.offset;
+      row[`helix${index + 1}_diameter`] = helix.diameter;
+      row[`helix${index + 1}_length`] = helix.length;
+    });
+  }
   return row;
 }
 
@@ -103,7 +122,21 @@ export function PileTypeForm({
       onCancel={onCancel}
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="Id" value={draft.id} onChange={v => set('id', v)} />
+        <Field
+          label="Pile type"
+          placeholder="e.g. SP1"
+          value={draft.pileType}
+          onChange={v => set('pileType', v)}
+        />
+        <SelectField
+          label="Part"
+          value={draft.part}
+          onChange={part => set('part', part)}
+          options={[
+            {value: 'starter', label: 'Starter'},
+            {value: 'extension', label: 'Extension'},
+          ]}
+        />
         <Field label="Name" value={draft.name} onChange={v => set('name', v)} />
         <Field
           label="Length"
@@ -128,67 +161,73 @@ export function PileTypeForm({
         />
       </div>
 
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-slate-700">
-          Helices: {helixCount === 1 ? 'one helix.' : `${helixCount} plates.`}
-          {helixCount === 1
-            ? ' Its plate can interleave with another single-helix pile.'
-            : ' No interleaving allowed against any neighbour.'}
-        </legend>
+      {draft.part === 'extension' ? (
+        <p className="text-sm text-slate-600">
+          An extension is a plain shaft — no helices. Add them to the starter.
+        </p>
+      ) : (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-slate-700">
+            Helices: {helixCount === 1 ? 'one helix.' : `${helixCount} plates.`}
+            {helixCount === 1
+              ? ' Its plate can interleave with another single-helix pile.'
+              : ' No interleaving allowed against any neighbour.'}
+          </legend>
 
-        {draft.helices.map((helix, index) => (
-          <div
-            key={index}
-            className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
-          >
-            <Field
-              label={`Plate ${index + 1} offset from butt`}
-              suffix="mm"
-              type="number"
-              value={helix.offset}
-              onChange={v => setHelix(index, {offset: v})}
-            />
-            <Field
-              label={`Plate ${index + 1} diameter`}
-              suffix="mm"
-              type="number"
-              value={helix.diameter}
-              onChange={v => setHelix(index, {diameter: v})}
-            />
-            <Field
-              label={`Plate ${index + 1} length`}
-              suffix="mm"
-              type="number"
-              value={helix.length}
-              onChange={v => setHelix(index, {length: v})}
-            />
-            <div className="flex items-end pb-1">
-              <Button
-                variant="quiet"
-                onClick={() =>
-                  set(
-                    'helices',
-                    draft.helices.filter((_, i) => i !== index),
-                  )
-                }
-              >
-                Remove
-              </Button>
+          {draft.helices.map((helix, index) => (
+            <div
+              key={index}
+              className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]"
+            >
+              <Field
+                label={`Plate ${index + 1} offset from butt`}
+                suffix="mm"
+                type="number"
+                value={helix.offset}
+                onChange={v => setHelix(index, {offset: v})}
+              />
+              <Field
+                label={`Plate ${index + 1} diameter`}
+                suffix="mm"
+                type="number"
+                value={helix.diameter}
+                onChange={v => setHelix(index, {diameter: v})}
+              />
+              <Field
+                label={`Plate ${index + 1} length`}
+                suffix="mm"
+                type="number"
+                value={helix.length}
+                onChange={v => setHelix(index, {length: v})}
+              />
+              <div className="flex items-end pb-1">
+                <Button
+                  variant="quiet"
+                  onClick={() =>
+                    set(
+                      'helices',
+                      draft.helices.filter((_, i) => i !== index),
+                    )
+                  }
+                >
+                  Remove
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        <Button
-          onClick={() =>
-            set('helices', [
-              ...draft.helices,
-              {offset: '', diameter: '', length: ''},
-            ])
-          }
-        >
-          Add a plate
-        </Button>
-      </fieldset>
+          <Button
+            onClick={() =>
+              set('helices', [
+                ...draft.helices,
+                {offset: '', diameter: '', length: ''},
+              ])
+            }
+          >
+            Add a plate
+          </Button>
+        </fieldset>
+      )}
     </EntityForm>
   );
 }

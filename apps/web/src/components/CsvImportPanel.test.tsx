@@ -32,9 +32,9 @@ describe('CsvImportPanel', () => {
 
     expect(onImport).toHaveBeenCalledTimes(1);
     const [items, replace] = onImport.mock.calls[0] as [unknown[], boolean];
-    expect(items).toHaveLength(2);
+    expect(items).toHaveLength(3);
     expect(replace).toBe(false);
-    expect(screen.getByRole('status')).toHaveTextContent('Imported 2 rows.');
+    expect(screen.getByRole('status')).toHaveTextContent('Imported 3 rows.');
   });
 
   it('reports every bad row instead of importing', async () => {
@@ -44,7 +44,7 @@ describe('CsvImportPanel', () => {
     await user.click(screen.getByText(/Import pile types from CSV/));
     await user.type(
       screen.getByLabelText('pile types CSV text'),
-      'id,name,length,shaft_diameter,mass\nA,A,nope,168,178\n,B,6000,168,178',
+      'pile_type,part,name,length,shaft_diameter,mass\nA,starter,A,nope,168,178\n,starter,B,6000,168,178',
     );
     await user.click(screen.getByRole('button', {name: 'Import pasted rows'}));
 
@@ -54,7 +54,7 @@ describe('CsvImportPanel', () => {
       within(alert).getByText(/This CSV was not imported \(2\)/),
     ).toBeInTheDocument();
     expect(within(alert).getByText('row 1 / length')).toBeInTheDocument();
-    expect(within(alert).getByText('row 2 / id')).toBeInTheDocument();
+    expect(within(alert).getByText('row 2 / pile_type')).toBeInTheDocument();
   });
 
   it('passes the replace choice through', async () => {
@@ -78,14 +78,14 @@ describe('CsvImportPanel', () => {
     await user.click(screen.getByText(/Import pile types from CSV/));
     await user.type(
       screen.getByLabelText('pile types CSV text'),
-      'id\tname\tlength\tshaft_diameter\tmass\nA\tPile A\t6000\t168\t178',
+      'pile_type\tpart\tname\tlength\tshaft_diameter\tmass\nA\tstarter\tPile A\t6000\t168\t178',
     );
     await user.click(screen.getByRole('button', {name: 'Import pasted rows'}));
 
     expect(onImport).toHaveBeenCalledTimes(1);
     expect(
       (onImport.mock.calls[0] as [{id: string}[], boolean])[0][0]!.id,
-    ).toBe('A');
+    ).toBe('A-starter');
   });
 
   it('leaves the import button disabled until there is something to import', async () => {

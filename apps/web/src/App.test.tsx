@@ -43,8 +43,8 @@ describe('App', () => {
     render(<App />);
 
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
-    await user.type(screen.getByLabelText('Id'), 'SP168-D6');
-    await user.type(screen.getByLabelText('Name'), 'SP168 twin helix');
+    await user.type(screen.getByLabelText('Pile type'), 'SP1');
+    await user.type(screen.getByLabelText('Name'), 'SP1 twin helix');
     await user.type(screen.getByLabelText(/^Length/), '6000');
     await user.type(screen.getByLabelText(/^Shaft diameter/), '168');
     await user.type(screen.getByLabelText(/^Mass/), '178');
@@ -53,11 +53,35 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/Plate 1 length/), '110');
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
 
-    const row = screen.getByRole('row', {name: /SP168-D6/});
-    expect(within(row).getByText('SP168 twin helix')).toBeInTheDocument();
+    const row = screen.getByRole('row', {name: /SP1 twin helix/});
+    // The table lists the pile-type code and its part in their own columns.
+    expect(within(row).getByText('SP1')).toBeInTheDocument();
+    expect(within(row).getByText('starter')).toBeInTheDocument();
     expect(within(row).getByText('6.00 m')).toBeInTheDocument();
     expect(within(row).getByText('450 mm')).toBeInTheDocument();
     expect(within(row).getByText(/interleaves/)).toBeInTheDocument();
+  });
+
+  it('adds an extension, which has no helix fields', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', {name: 'Add pile type'}));
+    await user.type(screen.getByLabelText('Pile type'), 'SP1');
+    await user.selectOptions(screen.getByLabelText('Part'), 'extension');
+
+    // The plate fields are gone the moment it is an extension.
+    expect(screen.queryByLabelText(/Plate 1 diameter/)).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/^Length/), '3000');
+    await user.type(screen.getByLabelText(/^Shaft diameter/), '168');
+    await user.type(screen.getByLabelText(/^Mass/), '90');
+    await user.click(screen.getByRole('button', {name: 'Add pile type'}));
+
+    const row = screen.getByRole('row', {name: /SP1 extension/});
+    expect(within(row).getByText('extension')).toBeInTheDocument();
+    expect(within(row).getByText('3.00 m')).toBeInTheDocument();
+    expect(within(row).getByText('plain shaft')).toBeInTheDocument();
   });
 
   it('refuses an invalid pile type and says why', async () => {
@@ -69,7 +93,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
 
     const alert = screen.getByRole('alert');
-    expect(within(alert).getByText('id')).toBeInTheDocument();
+    expect(within(alert).getByText('pile_type')).toBeInTheDocument();
     expect(within(alert).getByText('shaft_diameter')).toBeInTheDocument();
     expect(within(alert).getByText('mass')).toBeInTheDocument();
     expect(
@@ -82,7 +106,7 @@ describe('App', () => {
     const first = render(<App />);
 
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
-    await user.type(screen.getByLabelText('Id'), 'KEEP-ME');
+    await user.type(screen.getByLabelText('Pile type'), 'KEEP-ME');
     await user.type(screen.getByLabelText(/^Length/), '6000');
     await user.type(screen.getByLabelText(/^Shaft diameter/), '168');
     await user.type(screen.getByLabelText(/^Mass/), '178');

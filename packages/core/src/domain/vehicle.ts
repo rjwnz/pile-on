@@ -20,7 +20,9 @@ export const VEHICLE_KIND_LABELS: Readonly<Record<VehicleKind, string>> = {
 /**
  * A deck to load, and the mass it may carry. Deliberately no axles: payload is
  * always reached before any axle limit in this operation, so mass compliance
- * is `payloadCapacity` and nothing else.
+ * is `payloadCapacity` and nothing else. The operator states that capacity
+ * directly — tare and gross rating are not modelled, because the load figure
+ * is the only one the packer and the rules ever consult.
  */
 export interface Vehicle {
   readonly id: string;
@@ -30,9 +32,8 @@ export interface Vehicle {
   readonly deckWidth: Millimetres;
   /** Deck surface height above the road — counts against the 4.3 m limit. */
   readonly deckHeight: Millimetres;
-  readonly tare: Kilograms;
-  /** GVM for a rigid, GCM for a combination. */
-  readonly maxGross: Kilograms;
+  /** Mass this deck may carry: piles, dunnage and restraint together. */
+  readonly payloadCapacity: Kilograms;
   /** Where this deck wants its load centroid, from the headboard. Null means
    * unstated (mid-length assumed) — kept separate so the assumption stays
    * visible. */
@@ -53,7 +54,7 @@ export function isTrailer(vehicle: Vehicle): boolean {
 
 /** Mass available for piles, dunnage and restraint. */
 export function payloadCapacity(vehicle: Vehicle): Kilograms {
-  return vehicle.maxGross - vehicle.tare;
+  return vehicle.payloadCapacity;
 }
 
 /** Usable deck area, in square millimetres. */

@@ -1,6 +1,5 @@
 import {
   JOB_CSV_EXAMPLE,
-  NZ_VDAM_2016,
   combinationsOf,
   isSingleHelix,
   jobQuantity,
@@ -28,16 +27,14 @@ export function JobSection() {
   const mass = totalPileMass(job, state.catalogue);
 
   /*
-   * The largest movement payload in the fleet — truck plus trailer, capped by
-   * the route limit — used only to say how heavy this job is in truck terms.
-   * It is not a movement-count estimate — geometry decides that, and for
-   * small-diameter piles a deck runs out of room long before it runs out of
-   * tonnes. Showing the share is what tells a quoter which of the two they are
-   * up against.
+   * The largest movement payload in the fleet — truck plus trailer — used only
+   * to say how heavy this job is in truck terms. It is not a movement-count
+   * estimate — geometry decides that, and for small-diameter piles a deck runs
+   * out of room long before it runs out of tonnes. Showing the share is what
+   * tells a quoter which of the two they are up against.
    */
   const largestPayload = combinationsOf(state.catalogue).reduce(
-    (most, combo) =>
-      Math.max(most, movementPayloadCapacity(combo, NZ_VDAM_2016)),
+    (most, combo) => Math.max(most, movementPayloadCapacity(combo)),
     0,
   );
   const massShare = largestPayload > 0 ? mass / largestPayload : null;

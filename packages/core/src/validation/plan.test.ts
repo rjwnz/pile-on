@@ -32,8 +32,7 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   deckHeight: 1350,
-  tare: 15800,
-  maxGross: 44000,
+  payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
 };
@@ -488,8 +487,7 @@ describe('movements with a trailer', () => {
     kind: 'rigid',
     deckLength: 7200,
     deckHeight: 1200,
-    tare: 10600,
-    maxGross: 30000,
+    payloadCapacity: 19400,
   };
   const TRAILER: Vehicle = {
     ...SEMI,
@@ -497,8 +495,7 @@ describe('movements with a trailer', () => {
     kind: 'full_trailer',
     deckLength: 8100,
     deckHeight: 1150,
-    tare: 6800,
-    maxGross: 22000,
+    payloadCapacity: 15200,
     towableBy: ['RIGID-8'],
   };
   const FLEET: Catalogue = {
@@ -595,24 +592,24 @@ describe('movements with a trailer', () => {
     expect(solo[0]!.message).not.toMatch(/deck:/);
   });
 
-  // One pile carrying a deck's worth of mass, so the mass rules can be
-  // exercised without inventing a geometrically legal 60-pile layout.
-  const SLAB: PileType = {
-    id: 'SLAB',
-    name: 'SLAB',
-    length: 6000,
-    shaftRadius: 84,
-    mass: 15000,
-    helices: [],
-  };
-  const HEAVY_FLEET: Catalogue = {
-    pileTypes: [SP168, SLAB],
-    vehicles: [RIGID, TRAILER],
-  };
+  it('judges each deck against its own payload, with no combined cap', () => {
+    // One pile carrying a deck's worth of mass, so the payload rule can be
+    // exercised without inventing a geometrically legal 60-pile layout.
+    const SLAB: PileType = {
+      id: 'SLAB',
+      name: 'SLAB',
+      length: 6000,
+      shaftRadius: 84,
+      mass: 15000,
+      helices: [],
+    };
+    const heavyFleet: Catalogue = {
+      pileTypes: [SP168, SLAB],
+      vehicles: [RIGID, TRAILER],
+    };
 
-  it('caps what the combination may gross at the route limit', () => {
-    // 15 t per deck is inside each deck's own payload (19.4 t and 15.2 t),
-    // but with 17.4 t of tares the combination grosses past 44 t.
+    // 15 t on each deck sits inside each deck's own payload (19.4 t and
+    // 15.2 t). With the combination cap gone, that is simply legal.
     const rules = movement(
       'TRAILER-4A',
       [
@@ -629,33 +626,11 @@ describe('movements with a trailer', () => {
           pileTypeId: 'SLAB',
         }),
       ],
-      HEAVY_FLEET,
+      heavyFleet,
     ).map(v => v.rule);
 
-    expect(rules).toContain('over-combined-gross');
-    // Neither deck is over its own payload — the cap is the only mass problem.
     expect(rules).not.toContain('over-payload');
-  });
-
-  it('warns when the trailer grosses more than 1.5 times the truck', () => {
-    // A bare truck (10.6 t) towing 6.8 t of trailer plus 15 t of pile: the
-    // trailer grosses about twice the truck.
-    const found = movement(
-      'TRAILER-4A',
-      [
-        place({
-          id: 'R1',
-          consignmentId: 'C1',
-          deck: 'trailer',
-          pileTypeId: 'SLAB',
-        }),
-      ],
-      HEAVY_FLEET,
-    );
-
-    expect(found.map(v => v.rule)).toContain('trailer-heavy');
-    expect(found.find(v => v.rule === 'trailer-heavy')!.severity).toBe(
-      'warning',
-    );
+    expect(rules).not.toContain('over-combined-gross');
+    expect(rules).not.toContain('trailer-heavy');
   });
 });

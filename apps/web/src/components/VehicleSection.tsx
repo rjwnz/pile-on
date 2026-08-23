@@ -2,7 +2,6 @@ import {
   NZ_VDAM_2016,
   VEHICLE_CSV_EXAMPLE,
   VEHICLE_KIND_LABELS,
-  isOverGrossMass,
   isOverHeight,
   isTrailer,
   parseVehicleRows,
@@ -48,7 +47,6 @@ export function VehicleSection() {
                 <th className="py-2 pr-3 text-right font-medium">
                   Deck height
                 </th>
-                <th className="py-2 pr-3 text-right font-medium">Tare</th>
                 <th className="py-2 pr-3 text-right font-medium">Payload</th>
                 <th className="py-2 font-medium">
                   <span className="sr-only">Actions</span>
@@ -57,9 +55,8 @@ export function VehicleSection() {
             </thead>
             <tbody>
               {vehicles.map(vehicle => {
-                // Flag on sight: gross above general access needs an HPMV
-                // permit, and a bare deck over the height limit is a data error.
-                const needsPermit = isOverGrossMass(vehicle.maxGross);
+                // A bare deck already over the height limit is a data error,
+                // worth flagging before anything is loaded onto it.
                 const deckTooTall = isOverHeight(vehicle.deckHeight);
                 return (
                   <tr key={vehicle.id} className="border-b border-slate-100">
@@ -126,20 +123,7 @@ export function VehicleSection() {
                       ) : null}
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums">
-                      {vehicle.tare.toLocaleString('en-NZ')} kg
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
                       {payloadCapacity(vehicle).toLocaleString('en-NZ')} kg
-                      {needsPermit ? (
-                        <div
-                          className="text-xs text-amber-700"
-                          title="This is above the general-access gross mass limit. A load like this needs an HPMV permit and an approved route."
-                        >
-                          Needs an HPMV permit (over{' '}
-                          {NZ_VDAM_2016.maxGrossMass.toLocaleString('en-NZ')} kg
-                          gross)
-                        </div>
-                      ) : null}
                     </td>
                     <td className="py-2 text-right whitespace-nowrap">
                       <Button

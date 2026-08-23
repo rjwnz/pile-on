@@ -38,8 +38,7 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   deckHeight: 1350,
-  tare: 15800,
-  maxGross: 44000,
+  payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
 };
@@ -251,7 +250,7 @@ describe('what will not fit', () => {
 
   it('stops rather than opening trucks forever when nothing more fits', () => {
     // A payload that takes one pile and its bearers, and no more.
-    const tiny: Vehicle = {...SEMI, tare: 43700, maxGross: 44000};
+    const tiny: Vehicle = {...SEMI, payloadCapacity: 300};
     const {plan, unplaced} = pack(
       job(['SP168-D6', 4]),
       {...CATALOGUE, vehicles: [tiny]},
@@ -461,8 +460,7 @@ describe('the fleet', () => {
     kind: 'rigid',
     deckLength: 7200,
     deckHeight: 1200,
-    tare: 10600,
-    maxGross: 30000,
+    payloadCapacity: 19400,
   };
   const TRAILER: Vehicle = {
     ...SEMI,
@@ -471,8 +469,7 @@ describe('the fleet', () => {
     kind: 'full_trailer',
     deckLength: 8100,
     deckHeight: 1150,
-    tare: 6800,
-    maxGross: 22000,
+    payloadCapacity: 15200,
     towableBy: ['RIGID-8'],
   };
 
@@ -517,24 +514,6 @@ describe('the fleet', () => {
     for (const placement of plan.placements) {
       expect(placement.id).toContain(`-${placement.deck}-`);
     }
-  });
-
-  it('keeps the combination under the route cap, and legal throughout', () => {
-    // Piles heavy enough that both decks filling to their own payloads would
-    // gross the combination past 44 t.
-    const heavy: PileType = {...SP139, id: 'HEAVY', mass: 950};
-    const fleet: Catalogue = {
-      pileTypes: [heavy],
-      vehicles: [
-        {...RIGID, maxGross: 40000},
-        {...TRAILER, maxGross: 30000},
-      ],
-    };
-    const {plan} = pack(job(['HEAVY', 60]), fleet, OPTIONS);
-
-    expect(
-      validatePlan(plan, fleet, OPTIONS).filter(v => v.severity === 'error'),
-    ).toEqual([]);
   });
 
   it('picks whichever truck fits the job, not just the first row', () => {

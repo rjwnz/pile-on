@@ -15,8 +15,7 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   deckHeight: 1350,
-  tare: 15800,
-  maxGross: 44000,
+  payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
 };
@@ -30,7 +29,6 @@ const HARD = [
   'over-rear-overhang',
   'ahead-of-headboard',
   'outside-side-margin',
-  'over-combined-gross',
   'phantom-deck',
   'not-towable',
   'vehicle-is-trailer',
@@ -41,7 +39,6 @@ const HARD = [
 const trailer = fc.record({
   deckLength: fc.integer({min: 5000, max: 9000}),
   deckHeight: fc.integer({min: 900, max: 1400}),
-  tare: fc.integer({min: 4000, max: 9000}),
   payload: fc.integer({min: 8000, max: 18000}),
 });
 const fleet: fc.Arbitrary<Vehicle[]> = fc
@@ -57,8 +54,7 @@ const fleet: fc.Arbitrary<Vehicle[]> = fc
             kind: 'full_trailer' as const,
             deckLength: towed.deckLength,
             deckHeight: towed.deckHeight,
-            tare: towed.tare,
-            maxGross: towed.tare + towed.payload,
+            payloadCapacity: towed.payload,
             towableBy: [SEMI.id],
           },
         ]

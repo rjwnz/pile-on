@@ -1,8 +1,6 @@
 import {Suspense, lazy, memo, useRef} from 'react';
 import {
-  NZ_VDAM_2016,
   balanceOffset,
-  combinationGross,
   consignmentPayload,
   findVehicle,
   loadHeight,
@@ -241,20 +239,14 @@ function Movement({
 
   const errors = violations.filter(v => v.severity === 'error');
   const warnings = violations.filter(v => v.severity === 'warning');
-  const gross = trailer
-    ? combinationGross(
-        vehicle,
-        trailer,
-        truckPlacements,
-        trailerPlacements,
-        catalogue,
-        options,
-      )
+  // Only a truck-and-trailer movement gets a combined line; a solo truck's
+  // single deck already says everything its own metrics do.
+  const combinedLoad = trailer
+    ? consignmentPayload(truckPlacements, catalogue, options) +
+      consignmentPayload(trailerPlacements, catalogue, options)
     : null;
-  const truckGross =
-    vehicle.tare + consignmentPayload(truckPlacements, catalogue, options);
-  const trailerGross = trailer
-    ? trailer.tare + consignmentPayload(trailerPlacements, catalogue, options)
+  const combinedCapacity = trailer
+    ? payloadCapacity(vehicle) + payloadCapacity(trailer)
     : null;
 
   return (
@@ -281,24 +273,13 @@ function Movement({
         )}
       </header>
 
-      {gross !== null && trailerGross !== null ? (
+      {combinedLoad !== null && combinedCapacity !== null ? (
         <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
           <Metric
-            label="Combination gross"
-            value={`${toTonnes(gross).toFixed(2)} t`}
-            detail={`of ${toTonnes(NZ_VDAM_2016.maxGrossMass).toFixed(0)} t route limit`}
-            over={gross > NZ_VDAM_2016.maxGrossMass}
-          />
-          <Metric
-            label="Trailer : truck"
-            value={
-              truckGross > 0 ? `${(trailerGross / truckGross).toFixed(2)}` : '—'
-            }
-            detail={`of ${NZ_VDAM_2016.maxTrailerToTruckMassRatio} allowed`}
-            over={
-              trailerGross >
-              NZ_VDAM_2016.maxTrailerToTruckMassRatio * truckGross
-            }
+            label="Combined load"
+            value={`${toTonnes(combinedLoad).toFixed(2)} t`}
+            detail={`of ${toTonnes(combinedCapacity).toFixed(1)} t across both decks`}
+            over={combinedLoad > combinedCapacity}
           />
         </dl>
       ) : null}

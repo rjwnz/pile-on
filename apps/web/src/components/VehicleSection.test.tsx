@@ -12,8 +12,7 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   deckHeight: 1350,
-  tare: 15800,
-  maxGross: 44000,
+  payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
 };
@@ -33,28 +32,13 @@ function renderWith(vehicles: Vehicle[] = []) {
 beforeEach(() => localStorage.clear());
 
 describe('VehicleSection', () => {
-  it('lists a vehicle with its deck and derived payload', () => {
+  it('lists a vehicle with its deck and load capacity', () => {
     renderWith([SEMI]);
 
     const row = screen.getByRole('row', {name: /SEMI-45/});
     expect(within(row).getByText('Semi-trailer')).toBeInTheDocument();
     expect(within(row).getByText('12.50 × 2.45 m')).toBeInTheDocument();
-    expect(within(row).getByText('15,800 kg')).toBeInTheDocument();
     expect(within(row).getByText('28,200 kg')).toBeInTheDocument();
-  });
-
-  it('does not flag a permit at exactly the general-access gross mass', () => {
-    renderWith([SEMI]);
-
-    expect(screen.queryByText(/HPMV permit/)).not.toBeInTheDocument();
-  });
-
-  it('flags an HPMV permit above the general-access gross mass', () => {
-    renderWith([{...SEMI, maxGross: 50000}]);
-
-    expect(
-      screen.getByText(/Needs an HPMV permit \(over 44,000 kg gross\)/),
-    ).toBeInTheDocument();
   });
 
   it('flags a deck that breaks the height limit before anything is loaded', () => {
@@ -73,10 +57,11 @@ describe('VehicleSection', () => {
     await user.type(screen.getByLabelText('Id'), 'RIGID-8');
     await user.type(screen.getByLabelText(/^Deck length/), '7200');
     await user.type(screen.getByLabelText(/^Deck height/), '1200');
-    await user.type(screen.getByLabelText(/^Tare/), '10600');
-    await user.type(screen.getByLabelText(/^Max gross/), '30000');
+    await user.type(screen.getByLabelText(/^Load capacity/), '19400');
 
-    expect(screen.getByText(/Payload capacity/)).toHaveTextContent('19,400 kg');
+    expect(screen.getByText(/covers everything on the deck/)).toHaveTextContent(
+      '19,400 kg',
+    );
 
     await user.click(screen.getByRole('button', {name: 'Add vehicle'}));
 
@@ -85,7 +70,7 @@ describe('VehicleSection', () => {
     ).toBeInTheDocument();
   });
 
-  it('refuses a gross mass that leaves no payload', async () => {
+  it('refuses a load capacity that is not a positive number', async () => {
     const user = userEvent.setup();
     renderWith();
 
@@ -93,13 +78,10 @@ describe('VehicleSection', () => {
     await user.type(screen.getByLabelText('Id'), 'BAD');
     await user.type(screen.getByLabelText(/^Deck length/), '7200');
     await user.type(screen.getByLabelText(/^Deck height/), '1200');
-    await user.type(screen.getByLabelText(/^Tare/), '30000');
-    await user.type(screen.getByLabelText(/^Max gross/), '20000');
+    await user.type(screen.getByLabelText(/^Load capacity/), '0');
     await user.click(screen.getByRole('button', {name: 'Add vehicle'}));
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'must exceed tare (30000), leaving no payload',
-    );
+    expect(screen.getByRole('alert')).toHaveTextContent(/payload_capacity/);
   });
 
   it('edits an existing vehicle in place', async () => {
@@ -140,8 +122,7 @@ describe('the loading fields', () => {
     await user.type(screen.getByLabelText(/Deck length/), '7200');
     await user.type(screen.getByLabelText(/Deck width/), '2450');
     await user.type(screen.getByLabelText(/Deck height above road/), '1200');
-    await user.type(screen.getByLabelText(/Tare/), '10600');
-    await user.type(screen.getByLabelText(/Max gross/), '30000');
+    await user.type(screen.getByLabelText(/Load capacity/), '19400');
     await user.type(
       screen.getByLabelText(/Balance point from headboard/),
       '3000',

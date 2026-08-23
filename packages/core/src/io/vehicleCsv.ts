@@ -21,10 +21,10 @@ import {
  * semicolon-separated (commas belong to the CSV). Blank means the row is a
  * self-propelled truck.
  */
-export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,balance_target,towable_by
-SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,,
-RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000,,
-TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,1150,6800,22000,,RIGID-8
+export const VEHICLE_CSV_EXAMPLE = `id,name,kind,deck_length,deck_width,deck_height,payload_capacity,balance_target,towable_by
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,28200,,
+RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,19400,,
+TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,1150,15200,,RIGID-8
 `;
 
 function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
@@ -34,8 +34,7 @@ function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
   const deckLength = readNumber(row, 'deck_length', log, {min: 1});
   const deckWidth = readNumber(row, 'deck_width', log, {min: 1});
   const deckHeight = readNumber(row, 'deck_height', log, {min: 0});
-  const tare = readNumber(row, 'tare', log, {min: 0});
-  const maxGross = readNumber(row, 'max_gross', log, {min: 1});
+  const payloadCapacity = readNumber(row, 'payload_capacity', log, {min: 1});
   const balanceTargetRaw = (row['balance_target'] ?? '').trim();
   const balanceTarget = balanceTargetRaw
     ? readNumber(row, 'balance_target', log, {min: 0, max: deckLength})
@@ -45,10 +44,6 @@ function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
     .map(entry => entry.trim())
     .filter(Boolean);
 
-  if (maxGross > 0 && tare > 0 && maxGross <= tare) {
-    log.add('max_gross', `must exceed tare (${tare}), leaving no payload`);
-  }
-
   return {
     id,
     name,
@@ -56,8 +51,7 @@ function parseVehicleRow(row: CsvRow, log: IssueLog): Vehicle {
     deckLength,
     deckWidth,
     deckHeight,
-    tare,
-    maxGross,
+    payloadCapacity,
     balanceTarget,
     towableBy,
   };

@@ -1,5 +1,4 @@
 import {describe, expect, it} from '@jest/globals';
-import {NZ_VDAM_2016} from '../rules/nzVdam';
 import {
   EMPTY_CATALOGUE,
   EMPTY_PLAN,
@@ -32,8 +31,7 @@ const VEHICLE: Vehicle = {
   deckLength: 7200,
   deckWidth: 2450,
   deckHeight: 1200,
-  tare: 10600,
-  maxGross: 30000,
+  payloadCapacity: 19400,
   balanceTarget: null,
   towableBy: [],
 };
@@ -109,8 +107,7 @@ describe('composing the fleet into combinations', () => {
     id: 'TRAILER-4A',
     kind: 'full_trailer',
     deckLength: 8100,
-    tare: 6800,
-    maxGross: 22000,
+    payloadCapacity: 15200,
     towableBy: ['RIGID-8'],
   };
   const FLEET: Catalogue = {
@@ -147,30 +144,17 @@ describe('composing the fleet into combinations', () => {
   });
 
   describe('movementPayloadCapacity', () => {
-    it('sums the deck payloads when the route cap is not binding', () => {
-      // Payloads total 17,000 kg; the cap leaves 36,000, so the decks bind.
-      const lightTruck = {...TRUCK, tare: 5000, maxGross: 15000};
-      const lightTrailer = {...TRAILER, tare: 3000, maxGross: 10000};
-      expect(
-        movementPayloadCapacity(
-          {truck: lightTruck, trailer: lightTrailer},
-          NZ_VDAM_2016,
-        ),
-      ).toBe(10000 + 7000);
+    it('sums the two decks own load capacities', () => {
+      // 19,400 on the truck plus 15,200 on the trailer, nothing else to cap it.
+      expect(movementPayloadCapacity({truck: TRUCK, trailer: TRAILER})).toBe(
+        19400 + 15200,
+      );
     });
 
-    it('caps a heavy combination at what the route allows it to gross', () => {
-      // Deck payloads total 34,600 kg, but 44,000 minus both tares (17,400)
-      // leaves only 26,600 kg of legal load.
-      expect(
-        movementPayloadCapacity({truck: TRUCK, trailer: TRAILER}, NZ_VDAM_2016),
-      ).toBe(26600);
-    });
-
-    it('is the plain payload for a truck running solo under the cap', () => {
-      expect(
-        movementPayloadCapacity({truck: TRUCK, trailer: null}, NZ_VDAM_2016),
-      ).toBe(19400);
+    it('is the plain load capacity for a truck running solo', () => {
+      expect(movementPayloadCapacity({truck: TRUCK, trailer: null})).toBe(
+        19400,
+      );
     });
   });
 });

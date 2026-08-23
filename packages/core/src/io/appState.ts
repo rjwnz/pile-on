@@ -39,8 +39,12 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  *     wrongly — the one thing tolerance must not do. Version 6 files read
  *     cleanly: no vehicle tows, no consignment has a trailer, every placement
  *     is on the truck deck, and the file means exactly what it meant.
+ * 8 — `vehicle.tare` and `vehicle.maxGross` became a single `payloadCapacity`,
+ *     the figure the operator now states directly. Version 7 files read
+ *     cleanly: their `maxGross - tare` is the payload capacity, so the load
+ *     limit carries over unchanged even though the two source fields are gone.
  */
-export const STATE_FORMAT_VERSION = 7;
+export const STATE_FORMAT_VERSION = 8;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -180,20 +184,28 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
   }
   // A version 1 file also carries `axles`. It is read and discarded — payload
   // capacity is the mass constraint now, so there is nothing to migrate.
-  const {id, name, kind, deckLength, deckWidth, deckHeight, tare, maxGross} =
-    value;
+  const {id, name, kind, deckLength, deckWidth, deckHeight} = value;
   if (typeof id !== 'string' || !id) {
     log.add('id', 'must be a non-empty string');
     return null;
   }
+  // Version 8 stores `payloadCapacity` directly. A version 7 file has `tare`
+  // and `maxGross` instead; its capacity is the difference, so an old file
+  // means exactly what it meant.
+  const payloadCapacity =
+    typeof value['payloadCapacity'] === 'number'
+      ? value['payloadCapacity']
+      : typeof value['maxGross'] === 'number' &&
+          typeof value['tare'] === 'number'
+        ? value['maxGross'] - value['tare']
+        : undefined;
   if (
     typeof deckLength !== 'number' ||
     typeof deckWidth !== 'number' ||
     typeof deckHeight !== 'number' ||
-    typeof tare !== 'number' ||
-    typeof maxGross !== 'number'
+    typeof payloadCapacity !== 'number'
   ) {
-    log.add('', 'deck dimensions, tare and maxGross must be numbers');
+    log.add('', 'deck dimensions and payload capacity must be numbers');
     return null;
   }
 
@@ -204,8 +216,7 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     deckLength,
     deckWidth,
     deckHeight,
-    tare,
-    maxGross,
+    payloadCapacity,
     balanceTarget:
       typeof value['balanceTarget'] === 'number' &&
       Number.isFinite(value['balanceTarget'])

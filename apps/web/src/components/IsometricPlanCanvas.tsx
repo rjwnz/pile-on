@@ -120,8 +120,8 @@ export function IsometricPlanCanvas({
       >
         {unsupported ? (
           <p className="p-6 text-sm text-slate-600">
-            This browser cannot show the 3D view — it has no WebGL. The tier
-            plans above show the same load.
+            This browser cannot show the 3D view because it has no WebGL. The
+            tier plans above show the same load.
           </p>
         ) : (
           <canvas ref={canvasRef} className="block h-full w-full" />

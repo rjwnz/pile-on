@@ -75,7 +75,7 @@ describe('empty catalogue', () => {
     renderJob({pileTypes: []});
 
     expect(
-      screen.getByText(/No pile types in the catalogue yet/),
+      screen.getByText(/No pile types yet\. Add them on the/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
@@ -168,7 +168,7 @@ describe('mass summary', () => {
     renderJob({job});
 
     expect(
-      screen.getByText(/Add a vehicle to see how this compares with a deck/),
+      screen.getByText(/Add a vehicle to compare this with one deck load/),
     ).toBeInTheDocument();
   });
 
@@ -177,7 +177,9 @@ describe('mass summary', () => {
     renderJob({job, vehicles: [SEMI]});
 
     expect(
-      screen.getByText(/13% of your largest payload, so this job is almost/),
+      screen.getByText(
+        /13% of your largest payload, so deck space will limit this job/,
+      ),
     ).toBeInTheDocument();
   });
 

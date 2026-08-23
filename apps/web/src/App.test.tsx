@@ -12,7 +12,7 @@ describe('App', () => {
     render(<App />);
 
     expect(
-      screen.getByRole('heading', {name: 'Pile-On', level: 1}),
+      screen.getByRole('heading', {name: 'Pile On', level: 1}),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {name: /Pile types \(0\)/}),

@@ -22,13 +22,20 @@ function Workspace() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6 text-slate-900">
       <header className="space-y-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Pile-On</h1>
-          <p className="text-sm text-slate-600">
-            Load planning for steel screw piles on NZ flat-deck transport.
-            Catalogues are held in your browser and never leave it — export the
-            JSON to keep or share a session.
-          </p>
+        <div className="flex items-center gap-4 rounded-xl bg-brand px-5 py-3">
+          <img
+            src="./brand/pile-on-logo-dark.svg"
+            alt=""
+            className="h-11 w-auto"
+          />
+          <div>
+            <h1 className="text-lg font-semibold text-white">Pile On</h1>
+            <p className="text-xs text-slate-300">
+              Plan how to load steel screw piles onto flat-deck trucks. Your
+              data stays in this browser. Export a file to save your work or
+              share it.
+            </p>
+          </div>
         </div>
         <StateIoBar />
       </header>
@@ -43,7 +50,7 @@ function Workspace() {
             onClick={() => setTab(entry.id)}
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
               tab === entry.id
-                ? 'border-sky-700 text-sky-800'
+                ? 'border-brand-amber text-brand'
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -58,10 +65,10 @@ function Workspace() {
       {tab === 'plan' ? <PlanSection /> : null}
 
       <footer className="text-xs text-slate-500">
-        Limits from Land Transport Rule: Vehicle Dimensions and Mass 2016
-        (ruleset <code>{NZ_VDAM_2016.version}</code>, effective{' '}
-        {NZ_VDAM_2016.effectiveFrom}). Every exported file records the ruleset
-        it was built under.
+        These limits come from the Land Transport Rule: Vehicle Dimensions and
+        Mass 2016 (<code>{NZ_VDAM_2016.version}</code>, effective{' '}
+        {NZ_VDAM_2016.effectiveFrom}). Every file you export records which
+        ruleset it used.
       </footer>
     </div>
   );

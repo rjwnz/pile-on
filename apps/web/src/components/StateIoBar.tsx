@@ -24,7 +24,7 @@ function summarise(state: AppState): string {
       : 'no schedule';
   const planPart =
     state.plan.consignments.length > 0
-      ? `${state.plan.consignments.length} consignments`
+      ? `${state.plan.consignments.length} movements`
       : 'no plan';
   return `${pileTypes.length} pile types, ${vehicles.length} vehicles, ${jobPart}, ${planPart}`;
 }
@@ -73,20 +73,22 @@ export function StateIoBar() {
     dispatch({type: 'replaceState', state: next});
     setWarnings(findDanglingReferences(next));
     setPending(null);
-    setNotice(`Imported — ${IMPORT_MODE_LABELS[mode].split(' —')[0]!}.`);
+    setNotice(
+      `Imported: ${IMPORT_MODE_LABELS[mode].split(/[,:]/)[0]!.trim()}.`,
+    );
   }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={handleExport}>Export JSON</Button>
+        <Button onClick={handleExport}>Export</Button>
 
         <label className="flex items-center gap-2 text-sm text-slate-700">
-          <span className="font-medium">Import JSON</span>
+          <span className="font-medium">Import</span>
           <input
             type="file"
             accept=".json,application/json"
-            aria-label="Import state JSON file"
+            aria-label="Import a saved file"
             onChange={event => void handleFile(event.target.files?.[0])}
             className="text-sm"
           />
@@ -102,7 +104,7 @@ export function StateIoBar() {
       <IssueList issues={issues} title="This file was not imported" />
 
       {pending ? (
-        <div className="space-y-3 rounded border border-sky-300 bg-sky-50 p-3">
+        <div className="space-y-3 rounded border border-brand/25 bg-brand/5 p-3">
           <p className="text-sm text-slate-800">
             File contains <strong>{summarise(pending)}</strong>
             {pending.savedAt ? `, saved ${pending.savedAt.slice(0, 10)}` : ''}.
@@ -138,7 +140,7 @@ export function StateIoBar() {
       {warnings.length > 0 ? (
         <IssueList
           issues={warnings}
-          title="Imported, but the existing plan now references things that are gone"
+          title="Imported, but your plan now refers to things that no longer exist"
         />
       ) : null}
     </div>

@@ -34,7 +34,7 @@ export function PileTypeSection() {
     >
       {pileTypes.length === 0 ? (
         <EmptyState>
-          No pile types yet. Add one by hand, or import a CSV below.
+          No pile types yet. Add one below, or import a CSV.
         </EmptyState>
       ) : (
         <div className="overflow-x-auto">
@@ -82,11 +82,14 @@ export function PileTypeSection() {
                         }
                         title={
                           isSingleHelix(type)
-                            ? 'Single helix — plates may interleave with another single-helix pile'
-                            : 'Multiple helices — full plate-to-plate separation against any neighbour'
+                            ? 'One helix. Its plate can interleave with another single-helix pile, saving deck length.'
+                            : 'More than one helix. It needs full clearance from every neighbour, so it cannot interleave.'
                         }
                       >
-                        {type.helices.length} ·{' '}
+                        {type.helices.length === 1
+                          ? '1 helix'
+                          : `${type.helices.length} helices`}{' '}
+                        ·{' '}
                         {isSingleHelix(type) ? 'interleaves' : 'no interleave'}
                       </span>
                     )}

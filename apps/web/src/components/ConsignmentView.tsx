@@ -121,7 +121,7 @@ function DeckView({
     <section className="space-y-4">
       {heading ? (
         <h4 className="border-t border-slate-200 pt-3 text-sm font-semibold text-slate-700">
-          {heading} — {vehicle.name}
+          {heading}: {vehicle.name}
         </h4>
       ) : null}
 
@@ -196,8 +196,8 @@ function DeckView({
             catalogue={catalogue}
             tier={tier}
             placements={placements.filter(p => p.tier === tier)}
-            title={`Tier ${tier + 1}${position === 0 ? ' — on the deck' : ''}${
-              position === tiers.length - 1 && tiers.length > 1 ? ' — top' : ''
+            title={`Tier ${tier + 1}${position === 0 ? ' (on the deck)' : ''}${
+              position === tiers.length - 1 && tiers.length > 1 ? ' (top)' : ''
             }`}
           />
         ))}

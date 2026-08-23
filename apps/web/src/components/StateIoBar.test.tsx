@@ -71,7 +71,7 @@ async function upload(
   const file = new File([serialiseAppState(state)], 'saved.json', {
     type: 'application/json',
   });
-  await user.upload(screen.getByLabelText('Import state JSON file'), file);
+  await user.upload(screen.getByLabelText('Import a saved file'), file);
 }
 
 beforeEach(() => localStorage.clear());
@@ -90,7 +90,7 @@ describe('export', () => {
       });
 
     renderBar();
-    await user.click(screen.getByRole('button', {name: 'Export JSON'}));
+    await user.click(screen.getByRole('button', {name: 'Export'}));
 
     expect(created[0]).toMatch(/^pile-on-\d{4}-\d{2}-\d{2}\.json$/);
     expect(screen.getByRole('status')).toHaveTextContent('Exported.');
@@ -140,7 +140,7 @@ describe('import', () => {
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent(
-      'the existing plan now references things that are gone',
+      'your plan now refers to things that no longer exist',
     );
     expect(
       within(alert).getByText(/needs 12 of missing pile type "A"/),
@@ -157,7 +157,7 @@ describe('import', () => {
     await upload(user, INCOMING);
     await user.click(
       await screen.findByRole('radio', {
-        name: /Everything — catalogue, schedule and plan/,
+        name: /Everything: catalogue, schedule and plan/,
       }),
     );
     await user.click(screen.getByRole('button', {name: 'Import'}));
@@ -179,17 +179,17 @@ describe('import', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('rejects a file that is not a Pile-On export', async () => {
+  it('rejects a file that is not a Pile On export', async () => {
     const user = userEvent.setup();
     renderBar();
 
     const file = new File(['{"hello":"world"}'], 'other.json', {
       type: 'application/json',
     });
-    await user.upload(screen.getByLabelText('Import state JSON file'), file);
+    await user.upload(screen.getByLabelText('Import a saved file'), file);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'this may not be a Pile-On file',
+      'this may not be a Pile On file',
     );
     expect(screen.getByRole('row', {name: /^A/})).toBeInTheDocument();
   });
@@ -203,10 +203,10 @@ describe('import', () => {
       'future.json',
       {type: 'application/json'},
     );
-    await user.upload(screen.getByLabelText('Import state JSON file'), file);
+    await user.upload(screen.getByLabelText('Import a saved file'), file);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Update Pile-On.',
+      'Update Pile On.',
     );
   });
 
@@ -217,7 +217,7 @@ describe('import', () => {
     await upload(user, CURRENT);
     await user.click(
       await screen.findByRole('radio', {
-        name: /Everything — catalogue, schedule and plan/,
+        name: /Everything: catalogue, schedule and plan/,
       }),
     );
     await user.click(screen.getByRole('button', {name: 'Import'}));

@@ -72,9 +72,8 @@ export function JobSection() {
 
       {pileTypes.length === 0 ? (
         <EmptyState>
-          No pile types in the catalogue yet. Add them on the{' '}
-          <strong>Pile types</strong> tab first — a schedule can only draw on
-          types that exist.
+          No pile types yet. Add them on the <strong>Pile types</strong> tab
+          first. A schedule can only use types that exist.
         </EmptyState>
       ) : (
         <div className="overflow-x-auto">
@@ -109,7 +108,11 @@ export function JobSection() {
                     <td className="py-2 pr-3 text-xs">
                       {type.helices.length === 0
                         ? 'plain shaft'
-                        : `${type.helices.length} · ${
+                        : `${
+                            type.helices.length === 1
+                              ? '1 helix'
+                              : `${type.helices.length} helices`
+                          } · ${
                             isSingleHelix(type)
                               ? 'interleaves'
                               : 'no interleave'
@@ -164,11 +167,10 @@ export function JobSection() {
             {toTonnes(mass).toFixed(2)} t
           </strong>
           {massShare === null
-            ? '. Add a vehicle to see how this compares with a deck.'
+            ? '. Add a vehicle to compare this with one deck load.'
             : massShare < 0.5
-              ? ` — ${Math.round(massShare * 100)}% of your largest payload, so this job is almost
-                 certainly limited by deck space rather than mass.`
-              : ` — ${Math.round(massShare * 100)}% of your largest payload.`}{' '}
+              ? `. That is ${Math.round(massShare * 100)}% of your largest payload, so deck space will limit this job, not weight.`
+              : `. That is ${Math.round(massShare * 100)}% of your largest payload.`}{' '}
           Pack it on the Loading plan tab for a truck count.
         </p>
       ) : null}

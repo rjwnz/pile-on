@@ -1,1 +1,22 @@
 @import 'tailwindcss';
+
+/*
+ * Brand palette: navy carries the chrome, amber is the single highlight per
+ * surface (active tab, the O in the logo). Semantic colours — red errors,
+ * amber-100/700 warnings, green confirmations — are separate and unchanged.
+ */
+@theme {
+  --color-brand: #1c355e;
+  --color-brand-deep: #16294a;
+  --color-brand-amber: #f6a81c;
+}
+
+/* Panels sit on a faint cool ground so the white cards read as surfaces. */
+body {
+  background-color: #f8fafc;
+}
+
+/* Buttons are clickable — show it. Disabled buttons keep their own cursor. */
+button:not(:disabled) {
+  cursor: pointer;
+}

@@ -34,7 +34,7 @@ export function VehicleSection() {
     >
       {vehicles.length === 0 ? (
         <EmptyState>
-          No vehicles yet. Add one by hand, or import a CSV below.
+          No vehicles yet. Add one below, or import a CSV.
         </EmptyState>
       ) : (
         <div className="overflow-x-auto">
@@ -133,11 +133,11 @@ export function VehicleSection() {
                       {needsPermit ? (
                         <div
                           className="text-xs text-amber-700"
-                          title="Above the general-access gross mass. Divisible loads need an HPMV permit; the route must be approved for it."
+                          title="This is above the general-access gross mass limit. A load like this needs an HPMV permit and an approved route."
                         >
-                          HPMV permit — over{' '}
+                          Needs an HPMV permit (over{' '}
                           {NZ_VDAM_2016.maxGrossMass.toLocaleString('en-NZ')} kg
-                          gross
+                          gross)
                         </div>
                       ) : null}
                     </td>

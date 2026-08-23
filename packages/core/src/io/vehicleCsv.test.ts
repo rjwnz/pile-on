@@ -27,7 +27,6 @@ describe('parseVehicleRows', () => {
       deckLength: 12500,
       deckWidth: 2450,
       payloadCapacity: 28200,
-      balanceTarget: null,
       towableBy: [],
     });
   });
@@ -119,35 +118,6 @@ describe('parseVehicleEntry', () => {
 
     expect(result.ok).toBe(false);
     expect(!result.ok && result.issues[0]!.path).toBe('id');
-  });
-});
-
-describe('the loading columns', () => {
-  it('reads a stated balance target', () => {
-    const result = parseVehicleEntry({
-      ...GOOD,
-      balance_target: '5400',
-    });
-
-    expect(result.ok && result.value.balanceTarget).toBe(5400);
-  });
-
-  it('defaults balance target to unstated when absent', () => {
-    const result = parseVehicleEntry(GOOD);
-
-    expect(result.ok && result.value.balanceTarget).toBeNull();
-  });
-
-  it('reads a blank balance target as unstated, not as the headboard', () => {
-    const result = parseVehicleEntry({...GOOD, balance_target: '   '});
-
-    expect(result.ok && result.value.balanceTarget).toBeNull();
-  });
-
-  it('rejects a balance target that is not on the deck', () => {
-    expect(
-      messages(parseVehicleRows([{...GOOD, balance_target: '13000'}])),
-    ).toEqual(['row 1 / balance_target: must be at most 12500, got 13000']);
   });
 });
 

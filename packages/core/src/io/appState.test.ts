@@ -29,7 +29,6 @@ const VEHICLE: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   payloadCapacity: 28200,
-  balanceTarget: null,
   towableBy: [],
 };
 
@@ -303,7 +302,6 @@ describe('parseAppState — malformed entries', () => {
           deckLength: 7200,
           deckWidth: 2450,
           payloadCapacity: 19400,
-          balanceTarget: null,
         },
       ],
     });
@@ -336,7 +334,6 @@ describe('reading a version 1 file', () => {
           deckWidth: 2450,
           tare: 15800,
           maxGross: 44000,
-          balanceTarget: null,
           axles: [
             {xFromFront: 0, tyreClass: 'SL', setId: 'steer', steering: true},
             {xFromFront: 3550, tyreClass: 'T', setId: 'drive', steering: false},
@@ -361,7 +358,6 @@ describe('reading a version 1 file', () => {
       deckLength: 12500,
       deckWidth: 2450,
       payloadCapacity: 28200,
-      balanceTarget: null,
       towableBy: [],
     });
   });
@@ -611,7 +607,7 @@ describe('loading options', () => {
 });
 
 describe('reading a version 5 vehicle', () => {
-  it('defaults the loading fields it does not carry', () => {
+  it('reads the deck and mass from a file that predates the loading fields', () => {
     const v5 = JSON.stringify({
       formatVersion: 5,
       catalogue: {
@@ -631,36 +627,10 @@ describe('reading a version 5 vehicle', () => {
     const result = parseAppState(v5);
 
     expect(result.ok && result.value.catalogue.vehicles[0]).toMatchObject({
-      balanceTarget: null,
+      id: 'SEMI-45',
+      deckLength: 12500,
+      payloadCapacity: 28200,
     });
-  });
-
-  it('keeps a balance target that is there, and rejects a nonsensical one', () => {
-    const withTarget = (balanceTarget: unknown) =>
-      JSON.stringify({
-        formatVersion: STATE_FORMAT_VERSION,
-        catalogue: {
-          pileTypes: [],
-          vehicles: [
-            {
-              id: 'S',
-              kind: 'semi_trailer',
-              deckLength: 12500,
-              deckWidth: 2450,
-              payloadCapacity: 28200,
-              balanceTarget,
-            },
-          ],
-        },
-      });
-
-    const good = parseAppState(withTarget(5400));
-    expect(good.ok && good.value.catalogue.vehicles[0]!.balanceTarget).toBe(
-      5400,
-    );
-
-    const bad = parseAppState(withTarget('halfway'));
-    expect(bad.ok && bad.value.catalogue.vehicles[0]!.balanceTarget).toBeNull();
   });
 });
 

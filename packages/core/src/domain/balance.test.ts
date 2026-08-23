@@ -24,7 +24,6 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   payloadCapacity: 28200,
-  balanceTarget: null,
   towableBy: [],
 };
 
@@ -102,20 +101,11 @@ describe('loadCentroid', () => {
 });
 
 describe('balanceOffset', () => {
-  it('measures against mid-deck when no target is stated', () => {
+  it('measures against mid-deck', () => {
     const offset = balanceOffset([place({x: 0})], CATALOGUE, SEMI);
 
     // Centroid 3000, mid-deck 6250.
     expect(offset).toEqual({longitudinal: -3250, lateral: 0});
-  });
-
-  it('measures against a stated target instead', () => {
-    const forward: Vehicle = {...SEMI, balanceTarget: 3000};
-
-    expect(balanceOffset([place({x: 0})], CATALOGUE, forward)).toEqual({
-      longitudinal: 0,
-      lateral: 0,
-    });
   });
 
   it('reads positive as aft and to the right', () => {

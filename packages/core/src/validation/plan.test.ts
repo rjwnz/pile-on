@@ -32,7 +32,6 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   payloadCapacity: 28200,
-  balanceTarget: null,
   towableBy: [],
 };
 
@@ -287,13 +286,6 @@ describe('balance', () => {
 
   it('accepts a load sitting on the balance point', () => {
     expect(balanceRules([place({x: 3250})])).toEqual([]);
-  });
-
-  it('respects a balance target the yard has actually stated', () => {
-    const forward: Vehicle = {...SEMI, balanceTarget: 5000};
-
-    expect(balanceRules([place({x: 2000})], forward)).toEqual([]);
-    expect(balanceRules([place({x: 3250})], forward)).toContain('unbalanced');
   });
 
   it('flags a load down one side of the deck', () => {

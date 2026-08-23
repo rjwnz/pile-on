@@ -12,7 +12,6 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   payloadCapacity: 28200,
-  balanceTarget: null,
   towableBy: [],
 };
 
@@ -102,42 +101,11 @@ describe('VehicleSection', () => {
 });
 
 describe('the loading fields', () => {
-  it('round-trips a stated balance point', async () => {
+  it('does not ask for a balance point — the load is always mid-deck', async () => {
     const user = userEvent.setup();
-    renderWith([SEMI]);
+    renderWith();
 
-    await user.click(screen.getByRole('button', {name: /Add vehicle/}));
-    await user.type(screen.getByLabelText(/^Id/), 'RIGID-8');
-    await user.type(screen.getByLabelText(/Deck length/), '7200');
-    await user.type(screen.getByLabelText(/Deck width/), '2450');
-    await user.type(screen.getByLabelText(/Load capacity/), '19400');
-    await user.type(
-      screen.getByLabelText(/Balance point from headboard/),
-      '3000',
-    );
-    await user.click(screen.getByRole('button', {name: /^Add vehicle$/}));
-
-    const row = await screen.findByRole('row', {name: /RIGID-8/});
-    expect(row).toBeInTheDocument();
-
-    await user.click(within(row).getByRole('button', {name: /Edit/}));
-    expect(screen.getByLabelText(/Balance point from headboard/)).toHaveValue(
-      3000,
-    );
-  });
-
-  it('shows an unstated balance point as blank, not as mid-deck', () => {
-    render(
-      <AppStateProvider
-        initialState={{
-          ...emptyAppState('2026-08-22T00:00:00.000Z'),
-          catalogue: {pileTypes: [], vehicles: [SEMI]},
-        }}
-        storage={undefined}
-      >
-        <VehicleSection />
-      </AppStateProvider>,
-    );
+    await user.click(screen.getByRole('button', {name: 'Add vehicle'}));
 
     expect(
       screen.queryByLabelText(/Balance point from headboard/),

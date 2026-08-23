@@ -28,7 +28,6 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   payloadCapacity: 28200,
-  balanceTarget: null,
   towableBy: [],
 };
 

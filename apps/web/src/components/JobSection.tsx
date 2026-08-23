@@ -13,8 +13,10 @@ import {
   type Result,
   type JobLine,
 } from '@pile-on/core';
+import {groupPileTypes} from '../lib/pileTypeGroups';
 import {useAppState} from '../state/AppStateProvider';
 import {CsvImportPanel} from './CsvImportPanel';
+import {PileTypeBadge} from './PileTypeBadge';
 import {QuantityCell} from './QuantityCell';
 import {Button, EmptyState, Field, Panel} from './ui';
 
@@ -22,6 +24,7 @@ export function JobSection() {
   const {state, dispatch} = useAppState();
   const {pileTypes} = state.catalogue;
   const {job} = state;
+  const groups = groupPileTypes(pileTypes);
 
   const pileCount = totalPileCount(job);
   const mass = totalPileMass(job, state.catalogue);
@@ -86,59 +89,64 @@ export function JobSection() {
               </tr>
             </thead>
             <tbody>
-              {pileTypes.map(type => {
-                const quantity = jobQuantity(job, type.id);
-                return (
-                  <tr
-                    key={type.id}
-                    className={`border-b border-slate-100 ${
-                      quantity > 0 ? '' : 'text-slate-400'
-                    }`}
-                  >
-                    <td className="py-2 pr-3">
-                      <div className="font-mono text-xs">{type.id}</div>
-                      <div className="text-xs text-slate-500">{type.name}</div>
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {toMetres(type.length).toFixed(2)} m
-                    </td>
-                    <td className="py-2 pr-3 text-xs">
-                      {type.helices.length === 0
-                        ? 'plain shaft'
-                        : `${
-                            type.helices.length === 1
-                              ? '1 helix'
-                              : `${type.helices.length} helices`
-                          } · ${
-                            isSingleHelix(type)
-                              ? 'interleaves'
-                              : 'no interleave'
-                          }`}
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {type.mass} kg
-                    </td>
-                    <td className="py-2 pr-3">
-                      <QuantityCell
-                        label={`Quantity of ${type.id}`}
-                        value={quantity}
-                        onCommit={next =>
-                          dispatch({
-                            type: 'setJobQuantity',
-                            pileTypeId: type.id,
-                            quantity: next,
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="py-2 text-right tabular-nums">
-                      {quantity > 0
-                        ? `${(type.mass * quantity).toLocaleString('en-NZ')} kg`
-                        : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
+              {groups.map(group =>
+                group.members.map((type, index) => {
+                  const quantity = jobQuantity(job, type.id);
+                  const lastInGroup = index === group.members.length - 1;
+                  return (
+                    <tr
+                      key={type.id}
+                      className={`border-b ${
+                        lastInGroup ? 'border-slate-300' : 'border-slate-100'
+                      } ${quantity > 0 ? '' : 'text-slate-400'}`}
+                    >
+                      <td className="py-2 pr-3">
+                        <PileTypeBadge code={group.code} />
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          {type.name}
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3 text-right tabular-nums">
+                        {toMetres(type.length).toFixed(2)} m
+                      </td>
+                      <td className="py-2 pr-3 text-xs">
+                        {type.helices.length === 0
+                          ? 'plain shaft'
+                          : `${
+                              type.helices.length === 1
+                                ? '1 helix'
+                                : `${type.helices.length} helices`
+                            } · ${
+                              isSingleHelix(type)
+                                ? 'interleaves'
+                                : 'no interleave'
+                            }`}
+                      </td>
+                      <td className="py-2 pr-3 text-right tabular-nums">
+                        {type.mass} kg
+                      </td>
+                      <td className="py-2 pr-3">
+                        <QuantityCell
+                          label={`Quantity of ${type.id}`}
+                          value={quantity}
+                          onCommit={next =>
+                            dispatch({
+                              type: 'setJobQuantity',
+                              pileTypeId: type.id,
+                              quantity: next,
+                            })
+                          }
+                        />
+                      </td>
+                      <td className="py-2 text-right tabular-nums">
+                        {quantity > 0
+                          ? `${(type.mass * quantity).toLocaleString('en-NZ')} kg`
+                          : '—'}
+                      </td>
+                    </tr>
+                  );
+                }),
+              )}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-slate-300 font-medium">

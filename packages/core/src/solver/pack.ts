@@ -503,12 +503,7 @@ function shiftRange(
     const start = placement.x;
     const end = start + type.length;
 
-    ranges = intersect(ranges, [
-      [
-        -start,
-        vehicle.deckLength - end,
-      ],
-    ]);
+    ranges = intersect(ranges, [[-start, vehicle.deckLength - end]]);
 
     if (support) {
       ranges = intersect(

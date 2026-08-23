@@ -149,7 +149,6 @@ describe('the loading columns', () => {
       messages(parseVehicleRows([{...GOOD, balance_target: '13000'}])),
     ).toEqual(['row 1 / balance_target: must be at most 12500, got 13000']);
   });
-
 });
 
 describe('the towable_by column', () => {

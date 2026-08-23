@@ -22,7 +22,7 @@ import {
 } from '../domain/vehicle';
 import {requiredLateralSeparation} from '../geometry/separation';
 import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
-import {GEOMETRIC_EPSILON, toMetres, type Millimetres} from '../units';
+import {GEOMETRIC_EPSILON, toMetres} from '../units';
 import {groupBy} from '../collections';
 
 /**

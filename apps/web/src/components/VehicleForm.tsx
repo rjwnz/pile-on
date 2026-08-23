@@ -15,7 +15,6 @@ interface Draft {
   readonly kind: VehicleKind;
   readonly deckLength: string;
   readonly deckWidth: string;
-  readonly deckHeight: string;
   readonly payloadCapacity: string;
   readonly balanceTarget: string;
   readonly towableBy: string;
@@ -27,7 +26,6 @@ const BLANK: Draft = {
   kind: 'rigid',
   deckLength: '',
   deckWidth: '2450',
-  deckHeight: '',
   payloadCapacity: '',
   balanceTarget: '',
   towableBy: '',
@@ -40,7 +38,6 @@ function toDraft(vehicle: Vehicle): Draft {
     kind: vehicle.kind,
     deckLength: String(vehicle.deckLength),
     deckWidth: String(vehicle.deckWidth),
-    deckHeight: String(vehicle.deckHeight),
     payloadCapacity: String(vehicle.payloadCapacity),
     // Blank means unstated, which is not the same as mid-deck — it is the
     // absence of an opinion, and the form has to be able to express that.
@@ -58,7 +55,6 @@ export function draftToRow(draft: Draft): CsvRow {
     kind: draft.kind,
     deck_length: draft.deckLength,
     deck_width: draft.deckWidth,
-    deck_height: draft.deckHeight,
     payload_capacity: draft.payloadCapacity,
     balance_target: draft.balanceTarget,
     towable_by: draft.towableBy,
@@ -119,13 +115,6 @@ export function VehicleForm({
           type="number"
           value={draft.deckWidth}
           onChange={v => set('deckWidth', v)}
-        />
-        <Field
-          label="Deck height above road"
-          suffix="mm"
-          type="number"
-          value={draft.deckHeight}
-          onChange={v => set('deckHeight', v)}
         />
         <Field
           label="Load capacity"

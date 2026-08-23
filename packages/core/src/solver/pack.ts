@@ -9,6 +9,7 @@ import {
   type VehicleCombination,
 } from '../domain/catalogue';
 import type {Job} from '../domain/job';
+import {MAX_LOAD_HEIGHT} from '../domain/loading';
 import {maxRadius} from '../domain/pile';
 import type {DeckRole, Placement} from '../domain/placement';
 import {
@@ -20,7 +21,6 @@ import {
 import {loadCentroid} from '../domain/balance';
 import type {PlacedPile} from '../domain/placement';
 import {requiredLateralSeparation} from '../geometry/separation';
-import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
 import {coveredSpans} from '../validation/plan';
 import type {Kilograms, Millimetres} from '../units';
 import {groupBy} from '../collections';
@@ -91,13 +91,12 @@ export function pack(
   job: Job,
   catalogue: Catalogue,
   options: PackingOptions,
-  ruleset: VdamRuleset = NZ_VDAM_2016,
 ): PackResult {
-  const flipped = packFleetOnce(job, catalogue, options, ruleset);
+  const flipped = packFleetOnce(job, catalogue, options);
   if (!options.allowFlips) {
     return flipped;
   }
-  const plain = packFleetOnce(job, catalogue, withoutFlips(options), ruleset);
+  const plain = packFleetOnce(job, catalogue, withoutFlips(options));
   return better(flipped, plain, catalogue);
 }
 
@@ -161,9 +160,8 @@ function packOneDeck(
   catalogue: Catalogue,
   vehicle: Vehicle,
   options: PackingOptions,
-  ruleset: VdamRuleset,
 ): DeckLoad {
-  const maxLoadHeight = ruleset.maxHeight - vehicle.deckHeight;
+  const maxLoadHeight = MAX_LOAD_HEIGHT;
   const payload = payloadCapacity(vehicle);
 
   const available = new Map(remaining);
@@ -309,7 +307,6 @@ function packMovement(
   remaining: ReadonlyMap<string, number>,
   catalogue: Catalogue,
   options: PackingOptions,
-  ruleset: VdamRuleset,
 ): MovementLoad {
   const reach = (vehicle: Vehicle) => vehicle.deckLength;
   const decks: {role: DeckRole; vehicle: Vehicle}[] = combo.trailer
@@ -322,7 +319,7 @@ function packMovement(
   const available = new Map(remaining);
   const loads: Partial<Record<DeckRole, DeckLoad>> = {};
   for (const {role, vehicle} of decks) {
-    const load = packOneDeck(available, catalogue, vehicle, options, ruleset);
+    const load = packOneDeck(available, catalogue, vehicle, options);
     loads[role] = load;
     for (const [id, count] of load.consumed) {
       available.set(id, (available.get(id) ?? 0) - count);
@@ -351,7 +348,6 @@ function packFleetOnce(
   job: Job,
   catalogue: Catalogue,
   options: PackingOptions,
-  ruleset: VdamRuleset,
 ): PackResult {
   const combos = combinationsOf(catalogue);
   const usableOf = (vehicle: Vehicle) => ({
@@ -371,7 +367,7 @@ function packFleetOnce(
       // findDanglingReferences is what reports this; the packer just cannot act.
       continue;
     }
-    const reason = unplaceableOnFleet(type, combos, options, ruleset, usableOf);
+    const reason = unplaceableOnFleet(type, combos, options, usableOf);
     if (reason) {
       unplaced.push({pileTypeId: type.id, quantity: line.quantity, reason});
       continue;
@@ -388,13 +384,7 @@ function packFleetOnce(
   while (outstanding() > 0) {
     let best: MovementLoad | null = null;
     for (const combo of combos) {
-      const candidate = packMovement(
-        combo,
-        remaining,
-        catalogue,
-        options,
-        ruleset,
-      );
+      const candidate = packMovement(combo, remaining, catalogue, options);
       if (
         !best ||
         candidate.placed > best.placed ||

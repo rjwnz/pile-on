@@ -8,7 +8,6 @@ const GOOD: CsvRow = {
   kind: 'semi_trailer',
   deck_length: '12500',
   deck_width: '2450',
-  deck_height: '1350',
   payload_capacity: '28200',
 };
 
@@ -27,7 +26,6 @@ describe('parseVehicleRows', () => {
       kind: 'semi_trailer',
       deckLength: 12500,
       deckWidth: 2450,
-      deckHeight: 1350,
       payloadCapacity: 28200,
       balanceTarget: null,
       towableBy: [],

@@ -30,8 +30,6 @@ export interface Vehicle {
   readonly kind: VehicleKind;
   readonly deckLength: Millimetres;
   readonly deckWidth: Millimetres;
-  /** Deck surface height above the road — counts against the 4.3 m limit. */
-  readonly deckHeight: Millimetres;
   /** Mass this deck may carry: piles, dunnage and restraint together. */
   readonly payloadCapacity: Kilograms;
   /** Where this deck wants its load centroid, from the headboard. Null means

@@ -6,7 +6,11 @@ import {
   type LoadPlan,
   type VehicleCombination,
 } from '../domain/catalogue';
-import {tierHeightFor, type LoadingOptions} from '../domain/loading';
+import {
+  MAX_LOAD_HEIGHT,
+  tierHeightFor,
+  type LoadingOptions,
+} from '../domain/loading';
 import type {Job, JobLine} from '../domain/job';
 import {maxRadius, type PileType} from '../domain/pile';
 import type {DeckRole, Placement} from '../domain/placement';
@@ -15,7 +19,6 @@ import {
   payloadCapacity,
   type Vehicle,
 } from '../domain/vehicle';
-import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
 import type {Kilograms, Millimetres} from '../units';
 import {shiftToBalance} from './balance';
 import {unplaceableOnFleet} from './feasibility';
@@ -168,7 +171,6 @@ export function arrangeNaively(
   job: Job,
   catalogue: Catalogue,
   options: LoadingOptions,
-  ruleset: VdamRuleset = NZ_VDAM_2016,
 ): ArrangeResult {
   const placements: Placement[] = [];
   const consignments: {
@@ -247,8 +249,7 @@ export function arrangeNaively(
       return 0;
     }
     const tierHeight = tierHeightFor(type, options);
-    const maxLoadHeight = ruleset.maxHeight - deck.vehicle.deckHeight;
-    if (deck.heightUsed + tierHeight > maxLoadHeight) {
+    if (deck.heightUsed + tierHeight > MAX_LOAD_HEIGHT) {
       return 0;
     }
     const spare =
@@ -263,13 +264,7 @@ export function arrangeNaively(
   }
 
   for (const {line, type} of demand) {
-    const reason = unplaceableOnFleet(
-      type,
-      [combo],
-      options,
-      ruleset,
-      deckOnly,
-    );
+    const reason = unplaceableOnFleet(type, [combo], options, deckOnly);
     if (reason) {
       unplaced.push({pileTypeId: type.id, quantity: line.quantity, reason});
       continue;

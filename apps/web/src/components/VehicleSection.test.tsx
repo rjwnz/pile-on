@@ -11,7 +11,6 @@ const SEMI: Vehicle = {
   kind: 'semi_trailer',
   deckLength: 12500,
   deckWidth: 2450,
-  deckHeight: 1350,
   payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
@@ -41,14 +40,6 @@ describe('VehicleSection', () => {
     expect(within(row).getByText('28,200 kg')).toBeInTheDocument();
   });
 
-  it('flags a deck that breaks the height limit before anything is loaded', () => {
-    renderWith([{...SEMI, deckHeight: 4400}]);
-
-    expect(
-      screen.getByText(/over the 4.3 m limit before any load/),
-    ).toBeInTheDocument();
-  });
-
   it('adds a vehicle through the form', async () => {
     const user = userEvent.setup();
     renderWith();
@@ -56,7 +47,6 @@ describe('VehicleSection', () => {
     await user.click(screen.getByRole('button', {name: 'Add vehicle'}));
     await user.type(screen.getByLabelText('Id'), 'RIGID-8');
     await user.type(screen.getByLabelText(/^Deck length/), '7200');
-    await user.type(screen.getByLabelText(/^Deck height/), '1200');
     await user.type(screen.getByLabelText(/^Load capacity/), '19400');
 
     expect(screen.getByText(/covers everything on the deck/)).toHaveTextContent(
@@ -77,7 +67,6 @@ describe('VehicleSection', () => {
     await user.click(screen.getByRole('button', {name: 'Add vehicle'}));
     await user.type(screen.getByLabelText('Id'), 'BAD');
     await user.type(screen.getByLabelText(/^Deck length/), '7200');
-    await user.type(screen.getByLabelText(/^Deck height/), '1200');
     await user.type(screen.getByLabelText(/^Load capacity/), '0');
     await user.click(screen.getByRole('button', {name: 'Add vehicle'}));
 
@@ -121,7 +110,6 @@ describe('the loading fields', () => {
     await user.type(screen.getByLabelText(/^Id/), 'RIGID-8');
     await user.type(screen.getByLabelText(/Deck length/), '7200');
     await user.type(screen.getByLabelText(/Deck width/), '2450');
-    await user.type(screen.getByLabelText(/Deck height above road/), '1200');
     await user.type(screen.getByLabelText(/Load capacity/), '19400');
     await user.type(
       screen.getByLabelText(/Balance point from headboard/),

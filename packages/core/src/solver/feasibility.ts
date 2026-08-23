@@ -1,8 +1,11 @@
 import type {VehicleCombination} from '../domain/catalogue';
-import {tierHeightFor, type LoadingOptions} from '../domain/loading';
+import {
+  MAX_LOAD_HEIGHT,
+  tierHeightFor,
+  type LoadingOptions,
+} from '../domain/loading';
 import {maxRadius, type PileType} from '../domain/pile';
 import {deckArea, payloadCapacity, type Vehicle} from '../domain/vehicle';
-import type {VdamRuleset} from '../rules/nzVdam';
 import type {Millimetres} from '../units';
 
 /** Why a pile type can never go on this vehicle, or null if it can. */
@@ -10,7 +13,6 @@ export function unplaceableReason(
   type: PileType,
   vehicle: Vehicle,
   options: LoadingOptions,
-  ruleset: VdamRuleset,
   usable: {readonly length: Millimetres; readonly width: Millimetres},
 ): string | null {
   if (usable.width < maxRadius(type) * 2) {
@@ -20,9 +22,8 @@ export function unplaceableReason(
     return `too long for the deck — ${type.length} mm on a ${vehicle.deckLength} mm deck`;
   }
   const tierHeight = tierHeightFor(type, options);
-  const maxLoadHeight = ruleset.maxHeight - vehicle.deckHeight;
-  if (tierHeight > maxLoadHeight) {
-    return `a single tier is ${tierHeight} mm, over the ${maxLoadHeight} mm available under the height limit`;
+  if (tierHeight > MAX_LOAD_HEIGHT) {
+    return `a single tier is ${tierHeight} mm, over the ${MAX_LOAD_HEIGHT} mm a deck can carry`;
   }
   const payload = payloadCapacity(vehicle);
   if (type.mass + options.ancillaryMassPerTier > payload) {
@@ -42,7 +43,6 @@ export function unplaceableOnFleet(
   type: PileType,
   combinations: readonly VehicleCombination[],
   options: LoadingOptions,
-  ruleset: VdamRuleset,
   usableOf: (vehicle: Vehicle) => {
     readonly length: Millimetres;
     readonly width: Millimetres;
@@ -61,13 +61,7 @@ export function unplaceableOnFleet(
 
   let nearest: {vehicle: Vehicle; reason: string} | null = null;
   for (const deck of decks.values()) {
-    const reason = unplaceableReason(
-      type,
-      deck,
-      options,
-      ruleset,
-      usableOf(deck),
-    );
+    const reason = unplaceableReason(type, deck, options, usableOf(deck));
     if (!reason) {
       return null;
     }

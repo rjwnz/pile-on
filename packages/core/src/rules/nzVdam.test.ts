@@ -3,7 +3,6 @@ import {
   NZ_VDAM_2016,
   isDivisibleLoad,
   isOverGrossMass,
-  isOverHeight,
   isOverWidth,
 } from './nzVdam';
 
@@ -11,11 +10,6 @@ describe('dimension checks', () => {
   it('treats 2550 mm as the last legal width', () => {
     expect(isOverWidth(2550)).toBe(false);
     expect(isOverWidth(2551)).toBe(true);
-  });
-
-  it('treats 4300 mm as the last legal height', () => {
-    expect(isOverHeight(4300)).toBe(false);
-    expect(isOverHeight(4301)).toBe(true);
   });
 });
 

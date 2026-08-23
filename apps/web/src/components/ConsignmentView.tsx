@@ -1,5 +1,6 @@
 import {Suspense, lazy, memo, useRef} from 'react';
 import {
+  MAX_LOAD_HEIGHT,
   balanceOffset,
   consignmentPayload,
   findVehicle,
@@ -99,8 +100,7 @@ function DeckView({
   // applies to, and showing the piles alone would flatter the load.
   const mass = consignmentPayload(placements, catalogue, options);
   const payload = payloadCapacity(vehicle);
-  const height =
-    vehicle.deckHeight + loadHeight(placements, catalogue, options);
+  const height = loadHeight(placements, catalogue, options);
   const width = loadWidth(placements, catalogue);
   const offset = balanceOffset(placements, catalogue, vehicle);
   const tiers = tiersOf(placements);
@@ -127,10 +127,10 @@ function DeckView({
           value={payload > 0 ? `${Math.round((mass / payload) * 100)}%` : '—'}
         />
         <Metric
-          label="Loaded height"
+          label="Load height"
           value={`${toMetres(height).toFixed(2)} m`}
-          detail="of 4.3 m"
-          over={height > 4300}
+          detail={`of ${toMetres(MAX_LOAD_HEIGHT).toFixed(1)} m above deck`}
+          over={height > MAX_LOAD_HEIGHT}
         />
         <Metric
           label="Loaded width"

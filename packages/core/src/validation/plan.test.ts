@@ -31,7 +31,6 @@ const SEMI: Vehicle = {
   kind: 'semi_trailer',
   deckLength: 12500,
   deckWidth: 2450,
-  deckHeight: 1350,
   payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
@@ -182,14 +181,14 @@ describe('mass', () => {
 });
 
 describe('height', () => {
-  it('accepts a load inside the 4.3 m limit', () => {
+  it('accepts a load inside the 3 m above-deck limit', () => {
     const plan = planWith([place({tier: 0}), place({id: 'b', tier: 1})]);
 
     expect(rules(plan)).not.toContain('over-height');
   });
 
   it('flags a load over the height limit', () => {
-    // 1350 deck + 6 tiers × 550 = 4650.
+    // 6 tiers × 550 = 3300 mm above the deck, over the 3 m a deck can carry.
     const stacked = Array.from({length: 6}, (_, tier) =>
       place({id: `t${tier}`, tier}),
     );
@@ -486,7 +485,6 @@ describe('movements with a trailer', () => {
     id: 'RIGID-8',
     kind: 'rigid',
     deckLength: 7200,
-    deckHeight: 1200,
     payloadCapacity: 19400,
   };
   const TRAILER: Vehicle = {
@@ -494,7 +492,6 @@ describe('movements with a trailer', () => {
     id: 'TRAILER-4A',
     kind: 'full_trailer',
     deckLength: 8100,
-    deckHeight: 1150,
     payloadCapacity: 15200,
     towableBy: ['RIGID-8'],
   };

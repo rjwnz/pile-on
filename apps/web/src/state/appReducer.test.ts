@@ -20,7 +20,6 @@ function vehicle(id: string): Vehicle {
     kind: 'rigid',
     deckLength: 7200,
     deckWidth: 2450,
-    deckHeight: 1200,
     payloadCapacity: 19400,
     balanceTarget: null,
     towableBy: [],

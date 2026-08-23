@@ -1,8 +1,6 @@
 import {
-  NZ_VDAM_2016,
   VEHICLE_CSV_EXAMPLE,
   VEHICLE_KIND_LABELS,
-  isOverHeight,
   isTrailer,
   parseVehicleRows,
   payloadCapacity,
@@ -44,9 +42,6 @@ export function VehicleSection() {
                 <th className="py-2 pr-3 font-medium">Kind</th>
                 <th className="py-2 pr-3 font-medium">Tows</th>
                 <th className="py-2 pr-3 text-right font-medium">Deck</th>
-                <th className="py-2 pr-3 text-right font-medium">
-                  Deck height
-                </th>
                 <th className="py-2 pr-3 text-right font-medium">Payload</th>
                 <th className="py-2 font-medium">
                   <span className="sr-only">Actions</span>
@@ -55,9 +50,6 @@ export function VehicleSection() {
             </thead>
             <tbody>
               {vehicles.map(vehicle => {
-                // A bare deck already over the height limit is a data error,
-                // worth flagging before anything is loaded onto it.
-                const deckTooTall = isOverHeight(vehicle.deckHeight);
                 return (
                   <tr key={vehicle.id} className="border-b border-slate-100">
                     <td className="py-2 pr-3">
@@ -112,15 +104,6 @@ export function VehicleSection() {
                     <td className="py-2 pr-3 text-right tabular-nums">
                       {toMetres(vehicle.deckLength).toFixed(2)} ×{' '}
                       {toMetres(vehicle.deckWidth).toFixed(2)} m
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {toMetres(vehicle.deckHeight).toFixed(2)} m
-                      {deckTooTall ? (
-                        <div className="text-xs text-red-700">
-                          over the {toMetres(NZ_VDAM_2016.maxHeight).toFixed(1)}{' '}
-                          m limit before any load
-                        </div>
-                      ) : null}
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums">
                       {payloadCapacity(vehicle).toLocaleString('en-NZ')} kg

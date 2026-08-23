@@ -77,6 +77,13 @@ export const DEFAULT_LOADING_OPTIONS: LoadingOptions = Object.freeze({
   ancillaryMassPerTier: 60,
 });
 
+/**
+ * The most load any deck in the fleet may carry above its own surface. Every
+ * truck and trailer here tops out at the same 3 m — set by the stanchions, not
+ * by the 4.3 m road limit — so it is one figure, not a per-vehicle input.
+ */
+export const MAX_LOAD_HEIGHT: Millimetres = 3000;
+
 /** Height a tier of this pile type occupies, including its bearers. */
 export function tierHeightFor(
   type: PileType,

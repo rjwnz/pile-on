@@ -43,8 +43,12 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  *     the figure the operator now states directly. Version 7 files read
  *     cleanly: their `maxGross - tare` is the payload capacity, so the load
  *     limit carries over unchanged even though the two source fields are gone.
+ * 9 — dropped `vehicle.deckHeight`. The height limit is now a flat 3 m above
+ *     the deck for every vehicle, not the 4.3 m road limit less the deck. A
+ *     version 8 file reads cleanly: its `deckHeight` is ignored, and the load
+ *     is judged against the same 3 m every deck in the fleet is held to.
  */
-export const STATE_FORMAT_VERSION = 8;
+export const STATE_FORMAT_VERSION = 9;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -182,9 +186,10 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     log.add('', 'must be an object');
     return null;
   }
-  // A version 1 file also carries `axles`. It is read and discarded — payload
-  // capacity is the mass constraint now, so there is nothing to migrate.
-  const {id, name, kind, deckLength, deckWidth, deckHeight} = value;
+  // A version 1 file also carries `axles`, and a version 8 file a `deckHeight`.
+  // Both are read and discarded — neither is a constraint any more, so there is
+  // nothing to migrate.
+  const {id, name, kind, deckLength, deckWidth} = value;
   if (typeof id !== 'string' || !id) {
     log.add('id', 'must be a non-empty string');
     return null;
@@ -202,7 +207,6 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
   if (
     typeof deckLength !== 'number' ||
     typeof deckWidth !== 'number' ||
-    typeof deckHeight !== 'number' ||
     typeof payloadCapacity !== 'number'
   ) {
     log.add('', 'deck dimensions and payload capacity must be numbers');
@@ -215,7 +219,6 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     kind: (typeof kind === 'string' ? kind : 'rigid') as Vehicle['kind'],
     deckLength,
     deckWidth,
-    deckHeight,
     payloadCapacity,
     balanceTarget:
       typeof value['balanceTarget'] === 'number' &&

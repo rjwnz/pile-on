@@ -51,14 +51,6 @@ export function isOverWidth(
   return width > ruleset.maxWidth;
 }
 
-/** Whether a loaded height (deck height plus load) is within general access. */
-export function isOverHeight(
-  height: Millimetres,
-  ruleset: VdamRuleset = NZ_VDAM_2016,
-): boolean {
-  return height > ruleset.maxHeight;
-}
-
 /**
  * Whether a gross mass is above general access and so needs an HPMV permit.
  *

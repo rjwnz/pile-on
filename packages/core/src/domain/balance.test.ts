@@ -23,7 +23,6 @@ const SEMI: Vehicle = {
   kind: 'semi_trailer',
   deckLength: 12500,
   deckWidth: 2450,
-  deckHeight: 1350,
   payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],

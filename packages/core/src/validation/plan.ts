@@ -6,6 +6,7 @@ import {
 } from '../domain/catalogue';
 import {balanceOffset, isBalanced} from '../domain/balance';
 import {
+  MAX_LOAD_HEIGHT,
   ancillaryMass,
   axisHeightOf,
   loadHeight,
@@ -256,14 +257,13 @@ function deckViolations(
     );
   }
 
-  const height =
-    vehicle.deckHeight + loadHeight(placements, catalogue, options);
-  if (height > ruleset.maxHeight) {
+  const height = loadHeight(placements, catalogue, options);
+  if (height > MAX_LOAD_HEIGHT) {
     violations.push(
       error(
         consignmentId,
         'over-height',
-        `loaded height is ${toMetres(height).toFixed(2)} m, over the ${toMetres(ruleset.maxHeight).toFixed(1)} m limit`,
+        `load stands ${toMetres(height).toFixed(2)} m above the deck, over the ${toMetres(MAX_LOAD_HEIGHT).toFixed(1)} m the fleet can carry`,
       ),
     );
   }

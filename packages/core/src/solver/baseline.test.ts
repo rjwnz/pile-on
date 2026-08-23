@@ -35,7 +35,6 @@ const SEMI: Vehicle = {
   kind: 'semi_trailer',
   deckLength: 12500,
   deckWidth: 2450,
-  deckHeight: 1350,
   payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
@@ -187,16 +186,19 @@ describe('arrangeNaively', () => {
   });
 
   it('stops adding tiers at the height limit', () => {
-    // A 2 m deck leaves 2.3 m; each SP168 tier is 100 + 450 = 550 mm, so 4 fit
-    // — but maxTiers caps it at 4 anyway, so lower the deck ceiling instead.
-    const tall: Vehicle = {...SEMI, deckHeight: 3200};
+    // Each tier of this fat pile stands 100 + 1400 = 1500 mm, so two reach the
+    // 3 m a deck can carry and a third never boards, however many are waiting.
+    const fat: PileType = {
+      ...SP168,
+      id: 'FAT',
+      helices: [{offsetFromButt: 400, radius: 700, length: 110}],
+    };
     const {plan} = arrangeNaively(
-      job(['SP168-D6', 40]),
-      {...CATALOGUE, vehicles: [tall]},
+      job(['FAT', 40]),
+      {...CATALOGUE, pileTypes: [fat], vehicles: [SEMI]},
       OPTIONS,
     );
 
-    // 4300 − 3200 = 1100 mm available, so two 550 mm tiers per truck.
     const tiersOnFirst = new Set(
       plan.placements.filter(p => p.consignmentId === 'C1').map(p => p.tier),
     );
@@ -325,7 +327,6 @@ describe('arrangeNaively with a trailer in the fleet', () => {
     name: 'Rigid',
     kind: 'rigid',
     deckLength: 7200,
-    deckHeight: 1200,
     payloadCapacity: 19400,
   };
   const TRAILER: Vehicle = {
@@ -334,7 +335,6 @@ describe('arrangeNaively with a trailer in the fleet', () => {
     name: 'Trailer',
     kind: 'full_trailer',
     deckLength: 8100,
-    deckHeight: 1150,
     payloadCapacity: 15200,
     towableBy: ['RIGID-8'],
   };

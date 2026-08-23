@@ -37,7 +37,6 @@ const SEMI: Vehicle = {
   kind: 'semi_trailer',
   deckLength: 12500,
   deckWidth: 2450,
-  deckHeight: 1350,
   payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
@@ -459,7 +458,6 @@ describe('the fleet', () => {
     name: '8-wheeler rigid',
     kind: 'rigid',
     deckLength: 7200,
-    deckHeight: 1200,
     payloadCapacity: 19400,
   };
   const TRAILER: Vehicle = {
@@ -468,7 +466,6 @@ describe('the fleet', () => {
     name: '4-axle full trailer',
     kind: 'full_trailer',
     deckLength: 8100,
-    deckHeight: 1150,
     payloadCapacity: 15200,
     towableBy: ['RIGID-8'],
   };

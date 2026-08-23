@@ -3,8 +3,9 @@ import {parsePileTypeEntry, parsePileTypeRows} from './pileTypeCsv';
 import type {CsvRow} from './fields';
 
 const GOOD: CsvRow = {
-  id: 'SP168-D6',
-  name: 'SP168 6.0 m twin helix',
+  pile_type: 'SP1',
+  part: 'starter',
+  name: 'SP1 twin helix',
   length: '6000',
   shaft_diameter: '168',
   mass: '178',
@@ -30,8 +31,8 @@ describe('parsePileTypeRows', () => {
 
     expect(result.ok).toBe(true);
     expect(result.ok && result.value[0]).toEqual({
-      id: 'SP168-D6',
-      name: 'SP168 6.0 m twin helix',
+      id: 'SP1-starter',
+      name: 'SP1 twin helix',
       length: 6000,
       shaftRadius: 84,
       mass: 178,
@@ -39,6 +40,18 @@ describe('parsePileTypeRows', () => {
         {offsetFromButt: 400, radius: 225, length: 110},
         {offsetFromButt: 1100, radius: 175, length: 110},
       ],
+    });
+  });
+
+  it('builds an extension id from the length and drops its helix columns', () => {
+    const result = parsePileTypeRows([
+      {...GOOD, part: 'extension', name: '', length: '3000'},
+    ]);
+
+    expect(result.ok && result.value[0]).toMatchObject({
+      id: 'SP1-ext-3000',
+      name: 'SP1 extension',
+      helices: [],
     });
   });
 
@@ -52,7 +65,7 @@ describe('parsePileTypeRows', () => {
     const result = parsePileTypeRows([
       {
         ...GOOD,
-        id: 'SP139-S4',
+        pile_type: 'SP3',
         helix2_offset: '',
         helix2_diameter: '',
         helix2_length: '',
@@ -89,19 +102,19 @@ describe('parsePileTypeRows', () => {
     ).toEqual([400, 1100]);
   });
 
-  it('falls back to the id when the name is blank', () => {
+  it('falls back to a name built from the type and part when it is blank', () => {
     const result = parsePileTypeRows([{...GOOD, name: ''}]);
 
-    expect(result.ok && result.value[0]!.name).toBe('SP168-D6');
+    expect(result.ok && result.value[0]!.name).toBe('SP1 starter');
   });
 
   it('reports every problem in a row, not just the first', () => {
     const result = parsePileTypeRows([
-      {...GOOD, id: '', length: 'six metres', mass: '-4'},
+      {...GOOD, pile_type: '', length: 'six metres', mass: '-4'},
     ]);
 
     expect(messages(result)).toEqual([
-      'row 1 / id: is required',
+      'row 1 / pile_type: is required',
       'row 1 / length: "six metres" is not a number',
       'row 1 / mass: must be at least 0.0001, got -4',
     ]);
@@ -110,11 +123,17 @@ describe('parsePileTypeRows', () => {
   it('tags issues with the row they came from', () => {
     const result = parsePileTypeRows([
       GOOD,
-      {...GOOD, id: 'B', shaft_diameter: ''},
-      {...GOOD, id: 'C', mass: 'heavy'},
+      {...GOOD, pile_type: 'SP2', shaft_diameter: ''},
+      {...GOOD, pile_type: 'SP3', mass: 'heavy'},
     ]);
 
     expect(paths(result)).toEqual(['row 2 / shaft_diameter', 'row 3 / mass']);
+  });
+
+  it('rejects a part that is neither starter nor extension', () => {
+    expect(messages(parsePileTypeRows([{...GOOD, part: 'middle'}]))).toContain(
+      'row 1 / part: "middle" is not one of starter, extension',
+    );
   });
 
   it('rejects a helix sitting off the end of the pile', () => {
@@ -137,7 +156,7 @@ describe('parsePileTypeRows', () => {
     const result = parsePileTypeRows([GOOD, GOOD]);
 
     expect(messages(result)).toEqual([
-      'row 2 / id: "SP168-D6" appears more than once',
+      'row 2 / id: "SP1-starter" appears more than once',
     ]);
   });
 });

@@ -53,9 +53,10 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/Plate 1 length/), '110');
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
 
-    // Starter is the default part, so the id it builds is SP1-starter.
-    const row = screen.getByRole('row', {name: /SP1-starter/});
-    expect(within(row).getByText('SP1 twin helix')).toBeInTheDocument();
+    const row = screen.getByRole('row', {name: /SP1 twin helix/});
+    // The table lists the pile-type code and its part in their own columns.
+    expect(within(row).getByText('SP1')).toBeInTheDocument();
+    expect(within(row).getByText('starter')).toBeInTheDocument();
     expect(within(row).getByText('6.00 m')).toBeInTheDocument();
     expect(within(row).getByText('450 mm')).toBeInTheDocument();
     expect(within(row).getByText(/interleaves/)).toBeInTheDocument();
@@ -77,7 +78,9 @@ describe('App', () => {
     await user.type(screen.getByLabelText(/^Mass/), '90');
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
 
-    const row = screen.getByRole('row', {name: /SP1-ext-3000/});
+    const row = screen.getByRole('row', {name: /SP1 extension/});
+    expect(within(row).getByText('extension')).toBeInTheDocument();
+    expect(within(row).getByText('3.00 m')).toBeInTheDocument();
     expect(within(row).getByText('plain shaft')).toBeInTheDocument();
   });
 
@@ -90,7 +93,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', {name: 'Add pile type'}));
 
     const alert = screen.getByRole('alert');
-    expect(within(alert).getByText('id')).toBeInTheDocument();
+    expect(within(alert).getByText('pile_type')).toBeInTheDocument();
     expect(within(alert).getByText('shaft_diameter')).toBeInTheDocument();
     expect(within(alert).getByText('mass')).toBeInTheDocument();
     expect(

@@ -2,7 +2,10 @@ import {useState} from 'react';
 import {
   maxRadius,
   parsePileTypeEntry,
+  pilePartOf,
+  pileTypeCode,
   type CsvRow,
+  type PilePart,
   type PileType,
 } from '@pile-on/core';
 import {Button, EntityForm, Field, SelectField, useValidatedSubmit} from './ui';
@@ -11,12 +14,9 @@ import {Button, EntityForm, Field, SelectField, useValidatedSubmit} from './ui';
  * A pile ships in pieces: one starter, which carries the helices, and any
  * number of plain-shaft extensions joined to it on site. Each piece is loaded
  * separately, so each is its own catalogue entry — the model is unchanged. The
- * form just groups them under a pile-type code and a part, and builds the id
- * the model stores from the two (plus the length, so one type can have several
- * extension lengths without their ids colliding).
+ * form groups them under a pile-type code and a part; the core parser builds
+ * the id the model stores from the two.
  */
-type PilePart = 'starter' | 'extension';
-
 interface HelixDraft {
   readonly offset: string;
   readonly diameter: string;
@@ -43,33 +43,12 @@ const BLANK: Draft = {
   helices: [{offset: '', diameter: '', length: ''}],
 };
 
-const STARTER_ID = /^(.+)-starter$/;
-const EXTENSION_ID = /^(.+)-ext-\d+$/;
-
-/** Recover the pile-type code and part from a stored id, so an existing entry
- * opens in the same shape it was entered. A pile imported by CSV keeps an
- * arbitrary id: read the part off its helices and treat the id as the code. */
-function partsOf(type: PileType): {pileType: string; part: PilePart} {
-  const starter = STARTER_ID.exec(type.id);
-  if (starter) {
-    return {pileType: starter[1]!, part: 'starter'};
-  }
-  const extension = EXTENSION_ID.exec(type.id);
-  if (extension) {
-    return {pileType: extension[1]!, part: 'extension'};
-  }
-  return {
-    pileType: type.id,
-    part: type.helices.length > 0 ? 'starter' : 'extension',
-  };
-}
-
-/** The geometry stores radii; the form takes and shows diameters. */
+/** The geometry stores radii; the form takes and shows diameters. The code and
+ * part come back off the stored id, so an entry opens as it was entered. */
 function toDraft(type: PileType): Draft {
-  const {pileType, part} = partsOf(type);
   return {
-    pileType,
-    part,
+    pileType: pileTypeCode(type),
+    part: pilePartOf(type),
     name: type.name,
     length: String(type.length),
     shaftDiameter: String(type.shaftRadius * 2),
@@ -82,29 +61,13 @@ function toDraft(type: PileType): Draft {
   };
 }
 
-/** The id the model stores. Blank code yields a blank id, so the validator's
- * "id is required" catches an unnamed pile type. */
-function deriveId(draft: Draft): string {
-  const code = draft.pileType.trim();
-  if (!code) {
-    return '';
-  }
-  return draft.part === 'starter'
-    ? `${code}-starter`
-    : `${code}-ext-${draft.length.trim()}`;
-}
-
-/** A readable fallback name when the operator does not type their own. */
-function defaultName(draft: Draft): string {
-  const code = draft.pileType.trim();
-  return code ? `${code} ${draft.part}` : '';
-}
-
-/** Flatten the draft into the CSV row shape the importer's validator consumes. */
+/** Flatten the draft into the CSV row shape the importer's validator consumes,
+ * so hand entry and CSV import go through exactly the same rules. */
 export function draftToRow(draft: Draft): CsvRow {
   const row: Record<string, string> = {
-    id: deriveId(draft),
-    name: draft.name.trim() || defaultName(draft),
+    pile_type: draft.pileType,
+    part: draft.part,
+    name: draft.name,
     length: draft.length,
     shaft_diameter: draft.shaftDiameter,
     mass: draft.mass,

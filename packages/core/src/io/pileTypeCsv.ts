@@ -1,6 +1,11 @@
 /**
  * CSV shape for the pile type catalogue.
  *
+ * A row is one shippable piece: a `pile_type` code (SP1, SP3) and a `part`,
+ * either `starter` or `extension`. The starter carries the helices; extensions
+ * are plain shaft, so their helix columns are ignored. The catalogue id is
+ * built from the two — one pile type can list several extension lengths.
+ *
  * Helices are flat, numbered columns (`helix1_diameter`, `helix2_diameter`, …)
  * rather than a packed string or a second file, because the people maintaining
  * this catalogue maintain it in Excel. The parser scans upward from 1 until it
@@ -14,10 +19,18 @@
  * sheet written against the old header still imports.
  */
 
-import type {Helix, PileType} from '../domain/pile';
+import {
+  PILE_PARTS,
+  pileId,
+  pileName,
+  type Helix,
+  type PilePart,
+  type PileType,
+} from '../domain/pile';
 import type {Millimetres} from '../units';
 import {IssueLog, type Result} from '../validation/result';
 import {
+  readEnum,
   readNumber,
   readString,
   reportDuplicateIds,
@@ -27,9 +40,10 @@ import {
 /** Superseded by `helixN_length`; still read so old sheets keep importing. */
 const LEGACY_LENGTH_SUFFIX = 'thickness';
 
-export const PILE_TYPE_CSV_EXAMPLE = `id,name,length,shaft_diameter,mass,helix1_offset,helix1_diameter,helix1_length,helix2_offset,helix2_diameter,helix2_length
-SP168-D6,SP168 6.0 m twin helix,6000,168,178,400,450,110,1100,350,110
-SP139-S4,SP139 4.5 m single helix,4500,140,96,350,350,90,,,
+export const PILE_TYPE_CSV_EXAMPLE = `pile_type,part,name,length,shaft_diameter,mass,helix1_offset,helix1_diameter,helix1_length,helix2_offset,helix2_diameter,helix2_length
+SP1,starter,,6000,168,178,400,450,110,1100,350,110
+SP1,extension,,3000,168,90,,,,,,
+SP3,starter,,4500,140,96,350,350,90,,,
 `;
 
 function helixColumnsPresent(row: CsvRow, index: number): boolean {
@@ -84,13 +98,15 @@ function readHelices(row: CsvRow, pileLength: number, log: IssueLog): Helix[] {
 
 /** Map one CSV row to a pile type, collecting every problem it has. */
 function parsePileTypeRow(row: CsvRow, log: IssueLog): PileType {
-  const id = readString(row, 'id', log);
-  const name = readString(row, 'name', log, {required: false}) || id;
+  const code = readString(row, 'pile_type', log);
+  const part = readEnum<PilePart>(row, 'part', PILE_PARTS, log, 'starter');
+  const name = readString(row, 'name', log, {required: false});
   const length = readNumber(row, 'length', log, {min: 1});
   const shaftDiameter = readNumber(row, 'shaft_diameter', log, {min: 1});
   const shaftRadius = shaftDiameter / 2;
   const mass = readNumber(row, 'mass', log, {min: 0.0001});
-  const helices = readHelices(row, length, log);
+  // An extension is a plain shaft; any helix columns on its row are ignored.
+  const helices = part === 'starter' ? readHelices(row, length, log) : [];
 
   for (const [index, helix] of helices.entries()) {
     if (helix.radius > 0 && helix.radius < shaftRadius) {
@@ -101,7 +117,14 @@ function parsePileTypeRow(row: CsvRow, log: IssueLog): PileType {
     }
   }
 
-  return {id, name, length, shaftRadius, mass, helices};
+  return {
+    id: pileId(code, part, length),
+    name: name || pileName(code, part),
+    length,
+    shaftRadius,
+    mass,
+    helices,
+  };
 }
 
 /**

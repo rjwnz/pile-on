@@ -2,6 +2,8 @@ import {
   PILE_TYPE_CSV_EXAMPLE,
   isSingleHelix,
   parsePileTypeRows,
+  pilePartOf,
+  pileTypeCode,
   toMetres,
   type PileType,
 } from '@pile-on/core';
@@ -41,7 +43,8 @@ export function PileTypeSection() {
           <table className="w-full min-w-[52rem] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-slate-600">
-                <th className="py-2 pr-3 font-medium">Id</th>
+                <th className="py-2 pr-3 font-medium">Pile type</th>
+                <th className="py-2 pr-3 font-medium">Part</th>
                 <th className="py-2 pr-3 font-medium">Name</th>
                 <th className="py-2 pr-3 text-right font-medium">Length</th>
                 <th className="py-2 pr-3 text-right font-medium">Shaft ⌀</th>
@@ -56,7 +59,10 @@ export function PileTypeSection() {
             <tbody>
               {pileTypes.map(type => (
                 <tr key={type.id} className="border-b border-slate-100">
-                  <td className="py-2 pr-3 font-mono text-xs">{type.id}</td>
+                  <td className="py-2 pr-3 font-mono text-xs">
+                    {pileTypeCode(type)}
+                  </td>
+                  <td className="py-2 pr-3 capitalize">{pilePartOf(type)}</td>
                   <td className="py-2 pr-3">{type.name}</td>
                   <td className="py-2 pr-3 text-right tabular-nums">
                     {toMetres(type.length).toFixed(2)} m

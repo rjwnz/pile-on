@@ -14,20 +14,14 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   deckHeight: 1350,
-  tare: 15800,
-  maxGross: 44000,
+  payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
 };
 
 describe('payloadCapacity', () => {
-  it('is gross less tare', () => {
+  it('reports the stated load capacity', () => {
     expect(payloadCapacity(SEMI)).toBe(28200);
-  });
-
-  it('goes negative on a nonsense catalogue entry rather than clamping', () => {
-    // Surfacing the bad data beats hiding it behind a floor of zero.
-    expect(payloadCapacity({...SEMI, maxGross: 10000})).toBe(-5800);
   });
 });
 

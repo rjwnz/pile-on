@@ -1,5 +1,4 @@
 import type {Kilograms} from '../units';
-import type {VdamRuleset} from '../rules/nzVdam';
 import type {PileType} from './pile';
 import type {Placement} from './placement';
 import {deckArea, isTrailer, payloadCapacity, type Vehicle} from './vehicle';
@@ -65,18 +64,15 @@ export function combinationDeckArea(combo: VehicleCombination): number {
 }
 
 /**
- * Mass a movement can actually carry: the decks' own payloads, capped by what
- * the route allows the combination to gross.
+ * Mass a movement can actually carry: the decks' own payloads added up. Each
+ * deck's stated capacity is the whole story — there is no separate combination
+ * gross limit, because the operator's load figures already account for it.
  */
-export function movementPayloadCapacity(
-  combo: VehicleCombination,
-  ruleset: VdamRuleset,
-): Kilograms {
-  const decksPayload =
+export function movementPayloadCapacity(combo: VehicleCombination): Kilograms {
+  return (
     payloadCapacity(combo.truck) +
-    (combo.trailer ? payloadCapacity(combo.trailer) : 0);
-  const tares = combo.truck.tare + (combo.trailer?.tare ?? 0);
-  return Math.min(decksPayload, ruleset.maxGrossMass - tares);
+    (combo.trailer ? payloadCapacity(combo.trailer) : 0)
+  );
 }
 
 /**

@@ -162,10 +162,9 @@ function packOneDeck(
   vehicle: Vehicle,
   options: PackingOptions,
   ruleset: VdamRuleset,
-  massAllowance: Kilograms,
 ): DeckLoad {
   const maxLoadHeight = ruleset.maxHeight - vehicle.deckHeight;
-  const payload = Math.min(payloadCapacity(vehicle), massAllowance);
+  const payload = payloadCapacity(vehicle);
 
   const available = new Map(remaining);
   const consumed = new Map<string, number>();
@@ -299,9 +298,8 @@ interface MovementLoad {
 /**
  * Pack one candidate movement against the remaining demand.
  *
- * Both deck budgets are carved out of the route cap's headroom in sequence,
- * which is what keeps the combined gross legal by construction: whatever the
- * truck deck takes, the trailer deck can only have what the cap still allows.
+ * Each deck fills to its own stated payload capacity — there is no combined
+ * gross cap to share out, so a deck is bounded only by what it can carry.
  * The longer deck packs first so the long piles land where they fit, but the
  * loads keep their roles — a pile packed on the trailer's row is a trailer
  * placement whichever deck went first.
@@ -313,9 +311,6 @@ function packMovement(
   options: PackingOptions,
   ruleset: VdamRuleset,
 ): MovementLoad {
-  const combinedTare = combo.truck.tare + (combo.trailer?.tare ?? 0);
-  const headroom = ruleset.maxGrossMass - combinedTare;
-
   const reach = (vehicle: Vehicle) => vehicle.deckLength;
   const decks: {role: DeckRole; vehicle: Vehicle}[] = combo.trailer
     ? [
@@ -326,18 +321,9 @@ function packMovement(
 
   const available = new Map(remaining);
   const loads: Partial<Record<DeckRole, DeckLoad>> = {};
-  let massUsed = 0;
   for (const {role, vehicle} of decks) {
-    const load = packOneDeck(
-      available,
-      catalogue,
-      vehicle,
-      options,
-      ruleset,
-      headroom - massUsed,
-    );
+    const load = packOneDeck(available, catalogue, vehicle, options, ruleset);
     loads[role] = load;
-    massUsed += load.mass;
     for (const [id, count] of load.consumed) {
       available.set(id, (available.get(id) ?? 0) - count);
     }

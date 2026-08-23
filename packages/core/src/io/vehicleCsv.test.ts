@@ -9,8 +9,7 @@ const GOOD: CsvRow = {
   deck_length: '12500',
   deck_width: '2450',
   deck_height: '1350',
-  tare: '15800',
-  max_gross: '44000',
+  payload_capacity: '28200',
 };
 
 function messages(result: ReturnType<typeof parseVehicleRows>): string[] {
@@ -29,8 +28,7 @@ describe('parseVehicleRows', () => {
       deckLength: 12500,
       deckWidth: 2450,
       deckHeight: 1350,
-      tare: 15800,
-      maxGross: 44000,
+      payloadCapacity: 28200,
       balanceTarget: null,
       towableBy: [],
     });
@@ -75,28 +73,32 @@ describe('parseVehicleRows', () => {
     expect(result.ok && result.value[0]!.kind).toBe('semi_trailer');
   });
 
-  it('rejects a gross mass that leaves no payload', () => {
-    expect(messages(parseVehicleRows([{...GOOD, max_gross: '15000'}]))).toEqual(
-      ['row 1 / max_gross: must exceed tare (15800), leaving no payload'],
-    );
+  it('rejects a load capacity that is not a positive number', () => {
+    expect(
+      messages(parseVehicleRows([{...GOOD, payload_capacity: '0'}])),
+    ).toEqual(['row 1 / payload_capacity: must be at least 1, got 0']);
   });
 
   it('reports every problem in a row, not just the first', () => {
     expect(
       messages(
-        parseVehicleRows([{...GOOD, id: '', deck_length: 'long', tare: ''}]),
+        parseVehicleRows([
+          {...GOOD, id: '', deck_length: 'long', payload_capacity: ''},
+        ]),
       ),
     ).toEqual([
       'row 1 / id: is required',
       'row 1 / deck_length: "long" is not a number',
-      'row 1 / tare: is required',
+      'row 1 / payload_capacity: is required',
     ]);
   });
 
   it('tags issues with the row they came from', () => {
     expect(
-      messages(parseVehicleRows([GOOD, {...GOOD, id: 'B', max_gross: ''}])),
-    ).toEqual(['row 2 / max_gross: is required']);
+      messages(
+        parseVehicleRows([GOOD, {...GOOD, id: 'B', payload_capacity: ''}]),
+      ),
+    ).toEqual(['row 2 / payload_capacity: is required']);
   });
 
   it('flags duplicate ids', () => {

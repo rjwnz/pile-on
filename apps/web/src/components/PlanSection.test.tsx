@@ -37,8 +37,7 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   deckHeight: 1350,
-  tare: 15800,
-  maxGross: 44000,
+  payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
 };
@@ -392,8 +391,7 @@ describe('the fleet', () => {
     kind: 'rigid',
     deckLength: 7200,
     deckHeight: 1200,
-    tare: 10600,
-    maxGross: 30000,
+    payloadCapacity: 19400,
   };
   const TRAILER: Vehicle = {
     ...SEMI,
@@ -402,8 +400,7 @@ describe('the fleet', () => {
     kind: 'full_trailer',
     deckLength: 8100,
     deckHeight: 1150,
-    tare: 6800,
-    maxGross: 22000,
+    payloadCapacity: 15200,
     towableBy: ['RIGID-8'],
   };
 
@@ -447,10 +444,8 @@ describe('the fleet', () => {
     ).toBeInTheDocument();
     expect(within(movement).getByText(/Truck deck:/)).toBeInTheDocument();
     expect(within(movement).getByText(/Trailer deck:/)).toBeInTheDocument();
-    expect(within(movement).getByText('Combination gross')).toBeInTheDocument();
-    expect(
-      within(movement).getByText(/of 44 t route limit/),
-    ).toBeInTheDocument();
+    expect(within(movement).getByText('Combined load')).toBeInTheDocument();
+    expect(within(movement).getByText(/across both decks/)).toBeInTheDocument();
   });
 
   it('shows no combination strip for a truck running solo', async () => {
@@ -461,7 +456,7 @@ describe('the fleet', () => {
 
     const movement = screen.getByTestId('consignment-C1');
     expect(
-      within(movement).queryByText('Combination gross'),
+      within(movement).queryByText('Combined load'),
     ).not.toBeInTheDocument();
     expect(
       within(movement).queryByText(/Truck deck —/),

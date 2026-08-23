@@ -29,8 +29,7 @@ const VEHICLE: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   deckHeight: 1350,
-  tare: 15800,
-  maxGross: 44000,
+  payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
 };
@@ -134,14 +133,17 @@ describe('parseAppState', () => {
     ]);
   });
 
-  it('reports a vehicle with non-numeric masses', () => {
+  it('reports a vehicle with a non-numeric load capacity', () => {
     const raw = JSON.stringify({
       formatVersion: STATE_FORMAT_VERSION,
-      catalogue: {pileTypes: [], vehicles: [{id: 'V', tare: 'heavy'}]},
+      catalogue: {
+        pileTypes: [],
+        vehicles: [{id: 'V', payloadCapacity: 'heavy'}],
+      },
     });
 
     expect(messages(parseAppState(raw))).toEqual([
-      'catalogue / vehicles[0]: deck dimensions, tare and maxGross must be numbers',
+      'catalogue / vehicles[0]: deck dimensions and payload capacity must be numbers',
     ]);
   });
 
@@ -302,8 +304,7 @@ describe('parseAppState — malformed entries', () => {
           deckLength: 7200,
           deckWidth: 2450,
           deckHeight: 1200,
-          tare: 10600,
-          maxGross: 30000,
+          payloadCapacity: 19400,
           balanceTarget: null,
         },
       ],
@@ -363,8 +364,7 @@ describe('reading a version 1 file', () => {
       deckLength: 12500,
       deckWidth: 2450,
       deckHeight: 1350,
-      tare: 15800,
-      maxGross: 44000,
+      payloadCapacity: 28200,
       balanceTarget: null,
       towableBy: [],
     });
@@ -653,8 +653,7 @@ describe('reading a version 5 vehicle', () => {
               deckLength: 12500,
               deckWidth: 2450,
               deckHeight: 1350,
-              tare: 15800,
-              maxGross: 44000,
+              payloadCapacity: 28200,
               balanceTarget,
             },
           ],

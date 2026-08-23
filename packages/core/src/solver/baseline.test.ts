@@ -36,8 +36,7 @@ const SEMI: Vehicle = {
   deckLength: 12500,
   deckWidth: 2450,
   deckHeight: 1350,
-  tare: 15800,
-  maxGross: 44000,
+  payloadCapacity: 28200,
   balanceTarget: null,
   towableBy: [],
 };
@@ -176,7 +175,7 @@ describe('arrangeNaively', () => {
 
   it('opens a second truck when the payload runs out', () => {
     // 3 t payload takes 16 × 178 kg = 2,848 kg; the 17th would be 3,026 kg.
-    const light: Vehicle = {...SEMI, tare: 41000, maxGross: 44000};
+    const light: Vehicle = {...SEMI, payloadCapacity: 3000};
     const {plan} = arrangeNaively(
       job(['SP168-D6', 20]),
       {...CATALOGUE, vehicles: [light]},
@@ -327,8 +326,7 @@ describe('arrangeNaively with a trailer in the fleet', () => {
     kind: 'rigid',
     deckLength: 7200,
     deckHeight: 1200,
-    tare: 10600,
-    maxGross: 30000,
+    payloadCapacity: 19400,
   };
   const TRAILER: Vehicle = {
     ...SEMI,
@@ -337,8 +335,7 @@ describe('arrangeNaively with a trailer in the fleet', () => {
     kind: 'full_trailer',
     deckLength: 8100,
     deckHeight: 1150,
-    tare: 6800,
-    maxGross: 22000,
+    payloadCapacity: 15200,
     towableBy: ['RIGID-8'],
   };
   const FLEET: Catalogue = {

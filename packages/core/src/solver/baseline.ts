@@ -193,9 +193,6 @@ export function arrangeNaively(
     return {plan: {consignments: [], placements: []}, unplaced};
   }
 
-  const combinedTare = combo.truck.tare + (combo.trailer?.tare ?? 0);
-  const grossHeadroom = ruleset.maxGrossMass - combinedTare;
-
   let movement: OpenMovement | null = null;
   function openMovement(): OpenMovement {
     const id = `C${consignments.length + 1}`;
@@ -245,11 +242,7 @@ export function arrangeNaively(
   });
 
   /** Whether this deck can take one more tier of this type, and how many piles. */
-  function tierCapacity(
-    deck: OpenDeck,
-    type: PileType,
-    spareGross: Kilograms,
-  ): number {
+  function tierCapacity(deck: OpenDeck, type: PileType): number {
     if (deck.closed || deck.tier >= options.maxTiers) {
       return 0;
     }
@@ -258,14 +251,10 @@ export function arrangeNaively(
     if (deck.heightUsed + tierHeight > maxLoadHeight) {
       return 0;
     }
-    const sparePayload =
+    const spare =
       payloadCapacity(deck.vehicle) -
       deck.massUsed -
       options.ancillaryMassPerTier;
-    const spare = Math.min(
-      sparePayload,
-      spareGross - options.ancillaryMassPerTier,
-    );
     const byMass = Math.floor(spare / type.mass);
     return Math.max(
       0,
@@ -292,11 +281,7 @@ export function arrangeNaively(
         movement = openMovement();
       }
 
-      const used = movement.decks.reduce((sum, deck) => sum + deck.massUsed, 0);
-      const spareGross = grossHeadroom - used;
-      const deck = movement.decks.find(
-        entry => tierCapacity(entry, type, spareGross) > 0,
-      );
+      const deck = movement.decks.find(entry => tierCapacity(entry, type) > 0);
 
       if (!deck) {
         // Neither deck takes even one pile. A fresh movement whose decks both
@@ -308,8 +293,7 @@ export function arrangeNaively(
           unplaced.push({
             pileTypeId: type.id,
             quantity: remaining,
-            reason:
-              'no room on the naive combination once tares and bearers are counted',
+            reason: 'no room on the naive combination once bearers are counted',
           });
           break;
         }
@@ -318,7 +302,7 @@ export function arrangeNaively(
       }
 
       const cells = cellsFor(deck.vehicle, type, options);
-      const take = Math.min(remaining, tierCapacity(deck, type, spareGross));
+      const take = Math.min(remaining, tierCapacity(deck, type));
 
       for (let index = 0; index < take; index++) {
         const cell = cells[index]!;

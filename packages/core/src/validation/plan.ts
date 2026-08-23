@@ -227,39 +227,6 @@ export function validatePlan(
           ),
         ),
       );
-
-      const gross = combinationGross(
-        vehicle,
-        trailer,
-        truckPlacements,
-        trailerPlacements,
-        catalogue,
-        options,
-      );
-      if (gross > ruleset.maxGrossMass) {
-        violations.push(
-          error(
-            consignment.id,
-            'over-combined-gross',
-            `combination grosses ${gross.toLocaleString('en-NZ')} kg — both tares plus both loads — over the ${ruleset.maxGrossMass.toLocaleString('en-NZ')} kg route limit by ${(gross - ruleset.maxGrossMass).toLocaleString('en-NZ')} kg`,
-          ),
-        );
-      }
-
-      const truckGross =
-        vehicle.tare + consignmentPayload(truckPlacements, catalogue, options);
-      const trailerGross =
-        trailer.tare +
-        consignmentPayload(trailerPlacements, catalogue, options);
-      if (trailerGross > ruleset.maxTrailerToTruckMassRatio * truckGross) {
-        violations.push(
-          warning(
-            consignment.id,
-            'trailer-heavy',
-            `trailer grosses ${trailerGross.toLocaleString('en-NZ')} kg against the truck's ${truckGross.toLocaleString('en-NZ')} kg — over ${ruleset.maxTrailerToTruckMassRatio} times, which VDAM does not allow to be towed`,
-          ),
-        );
-      }
     }
   }
 
@@ -335,27 +302,6 @@ function deckViolations(
   );
 
   return violations;
-}
-
-/**
- * What a truck-and-trailer movement grosses: both tares plus everything the
- * payload has to carry on each deck. Shared by the route-cap rule and the UI,
- * so the number on screen is the number the rule judged.
- */
-export function combinationGross(
-  truck: Vehicle,
-  trailer: Vehicle,
-  truckPlacements: readonly Placement[],
-  trailerPlacements: readonly Placement[],
-  catalogue: Catalogue,
-  options: LoadingOptions,
-): number {
-  return (
-    truck.tare +
-    trailer.tare +
-    consignmentPayload(truckPlacements, catalogue, options) +
-    consignmentPayload(trailerPlacements, catalogue, options)
-  );
 }
 
 /**

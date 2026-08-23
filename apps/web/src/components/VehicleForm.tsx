@@ -16,8 +16,7 @@ interface Draft {
   readonly deckLength: string;
   readonly deckWidth: string;
   readonly deckHeight: string;
-  readonly tare: string;
-  readonly maxGross: string;
+  readonly payloadCapacity: string;
   readonly balanceTarget: string;
   readonly towableBy: string;
 }
@@ -29,8 +28,7 @@ const BLANK: Draft = {
   deckLength: '',
   deckWidth: '2450',
   deckHeight: '',
-  tare: '',
-  maxGross: '',
+  payloadCapacity: '',
   balanceTarget: '',
   towableBy: '',
 };
@@ -43,8 +41,7 @@ function toDraft(vehicle: Vehicle): Draft {
     deckLength: String(vehicle.deckLength),
     deckWidth: String(vehicle.deckWidth),
     deckHeight: String(vehicle.deckHeight),
-    tare: String(vehicle.tare),
-    maxGross: String(vehicle.maxGross),
+    payloadCapacity: String(vehicle.payloadCapacity),
     // Blank means unstated, which is not the same as mid-deck — it is the
     // absence of an opinion, and the form has to be able to express that.
     balanceTarget:
@@ -62,8 +59,7 @@ export function draftToRow(draft: Draft): CsvRow {
     deck_length: draft.deckLength,
     deck_width: draft.deckWidth,
     deck_height: draft.deckHeight,
-    tare: draft.tare,
-    max_gross: draft.maxGross,
+    payload_capacity: draft.payloadCapacity,
     balance_target: draft.balanceTarget,
     towable_by: draft.towableBy,
   };
@@ -88,7 +84,7 @@ export function VehicleForm({
     setDraft(current => ({...current, [key]: value}));
   }
 
-  const payload = Number(draft.maxGross) - Number(draft.tare);
+  const payload = Number(draft.payloadCapacity);
 
   return (
     <EntityForm
@@ -132,18 +128,11 @@ export function VehicleForm({
           onChange={v => set('deckHeight', v)}
         />
         <Field
-          label="Tare"
+          label="Load capacity"
           suffix="kg"
           type="number"
-          value={draft.tare}
-          onChange={v => set('tare', v)}
-        />
-        <Field
-          label="Max gross (GVM/GCM)"
-          suffix="kg"
-          type="number"
-          value={draft.maxGross}
-          onChange={v => set('maxGross', v)}
+          value={draft.payloadCapacity}
+          onChange={v => set('payloadCapacity', v)}
         />
         <Field
           label="Balance point from headboard"
@@ -169,9 +158,10 @@ export function VehicleForm({
 
       {Number.isFinite(payload) && payload > 0 ? (
         <p className="text-sm text-slate-600">
-          Payload capacity <strong>{payload.toLocaleString('en-NZ')} kg</strong>
-          , before dunnage and lashings. This is the weight limit on the load.
-          Axle limits are not modelled, because you reach payload first.
+          Load capacity <strong>{payload.toLocaleString('en-NZ')} kg</strong>{' '}
+          covers everything on the deck — piles, dunnage and lashings together.
+          This is the weight limit the packer holds the load to. Axle and gross
+          limits are not modelled, because you reach load capacity first.
         </p>
       ) : null}
     </EntityForm>

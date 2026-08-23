@@ -21,8 +21,7 @@ function vehicle(id: string): Vehicle {
     deckLength: 7200,
     deckWidth: 2450,
     deckHeight: 1200,
-    tare: 10600,
-    maxGross: 30000,
+    payloadCapacity: 19400,
     balanceTarget: null,
     towableBy: [],
   };

@@ -82,8 +82,8 @@ export const IMPORT_MODES = ['catalogue-only', 'catalogue-and-plan'] as const;
 export type ImportMode = (typeof IMPORT_MODES)[number];
 
 export const IMPORT_MODE_LABELS: Readonly<Record<ImportMode, string>> = {
-  'catalogue-only': 'Catalogue only — keep my current schedule and plan',
-  'catalogue-and-plan': 'Everything — catalogue, schedule and plan',
+  'catalogue-only': 'Catalogue only, keep my current schedule and plan',
+  'catalogue-and-plan': 'Everything: catalogue, schedule and plan',
 };
 
 export function serialiseAppState(state: AppState): string {
@@ -402,11 +402,11 @@ export function parseAppState(raw: string): Result<AppState> {
 
   const formatVersion = parsed['formatVersion'];
   if (typeof formatVersion !== 'number') {
-    log.add('formatVersion', 'is missing — this may not be a Pile-On file');
+    log.add('formatVersion', 'is missing — this may not be a Pile On file');
   } else if (formatVersion > STATE_FORMAT_VERSION) {
     log.add(
       'formatVersion',
-      `is ${formatVersion}, but this build only reads up to ${STATE_FORMAT_VERSION}. Update Pile-On.`,
+      `is ${formatVersion}, but this build only reads up to ${STATE_FORMAT_VERSION}. Update Pile On.`,
     );
   }
 

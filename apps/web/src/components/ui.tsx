@@ -5,7 +5,7 @@ import type {Issue, Result} from '@pile-on/core';
 
 const BUTTON_STYLES: Record<string, string> = {
   default: 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
-  primary: 'border-sky-700 bg-sky-700 text-white hover:bg-sky-800',
+  primary: 'border-brand bg-brand text-white hover:bg-brand-deep',
   danger: 'border-red-300 bg-white text-red-700 hover:bg-red-50',
   quiet: 'border-transparent bg-transparent text-slate-600 hover:bg-slate-100',
 };
@@ -63,7 +63,7 @@ export function Field({
         value={value}
         placeholder={placeholder ?? ''}
         onChange={event => onChange(event.target.value)}
-        className="rounded border border-slate-300 px-2 py-1.5 text-slate-900 focus:border-sky-600 focus:outline-none"
+        className="rounded border border-slate-300 px-2 py-1.5 text-slate-900 focus:border-brand focus:outline-none"
       />
     </label>
   );
@@ -86,7 +86,7 @@ export function SelectField<T extends string>({
       <select
         value={value}
         onChange={event => onChange(event.target.value as T)}
-        className="rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900 focus:border-sky-600 focus:outline-none"
+        className="rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-900 focus:border-brand focus:outline-none"
       >
         {options.map(option => (
           <option key={option.value} value={option.value}>
@@ -201,7 +201,7 @@ export function EntityForm({
 }) {
   return (
     <form
-      className="space-y-4 rounded border border-sky-300 bg-sky-50/50 p-4"
+      className="space-y-4 rounded border border-brand/25 bg-brand/5 p-4"
       onSubmit={event => {
         event.preventDefault();
         onSubmit();

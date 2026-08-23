@@ -60,7 +60,7 @@ export function CsvImportPanel<T>({
               checked={!replace}
               onChange={() => setReplace(false)}
             />
-            Merge — update matching ids, keep the rest
+            Merge: update rows with matching ids, keep the rest
           </label>
           <label className="flex items-center gap-1.5">
             <input
@@ -86,7 +86,7 @@ export function CsvImportPanel<T>({
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-slate-700">
-            …or paste rows (a block copied from Excel works — tabs are detected)
+            Or paste rows (a block copied from Excel works too)
           </span>
           <textarea
             value={text}

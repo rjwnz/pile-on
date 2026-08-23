@@ -129,10 +129,10 @@ export function PileTypeForm({
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-slate-700">
-          Helices — {helixCount === 1 ? 'single helix' : `${helixCount} plates`}
+          Helices: {helixCount === 1 ? 'one helix.' : `${helixCount} plates.`}
           {helixCount === 1
-            ? ' (plates may interleave with another single-helix pile)'
-            : ' (no interleaving allowed against any neighbour)'}
+            ? ' Its plate can interleave with another single-helix pile.'
+            : ' No interleaving allowed against any neighbour.'}
         </legend>
 
         {draft.helices.map((helix, index) => (

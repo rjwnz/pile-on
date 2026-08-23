@@ -176,7 +176,7 @@ export function VehicleForm({
           onChange={v => set('balanceTarget', v)}
         />
         <Field
-          label="Towable by — truck ids, semicolon-separated"
+          label="Towable by (truck ids, separated by semicolons)"
           value={draft.towableBy}
           placeholder="self-propelled"
           onChange={v => set('towableBy', v)}
@@ -184,19 +184,18 @@ export function VehicleForm({
       </div>
 
       <p className="text-sm text-slate-600">
-        Overhang allowances are what this unit will actually carry, not a rule —
-        VDAM states rear overhang against axle spacing, and axles are not
-        modelled. Leave the balance point blank unless the yard has a figure for
-        it: a semi wants its mass forward toward the kingpin and a rigid does
-        not, and mid-deck is a guess standing in for the answer.
+        Enter the overhang this vehicle will actually carry, not a legal limit.
+        This model does not check axle spacing. Leave the balance point blank
+        unless you have a figure for it. A semi-trailer wants its mass forward,
+        a rigid truck does not. If you leave it blank, the load balances to
+        mid-deck, which is only a guess.
       </p>
 
       {Number.isFinite(payload) && payload > 0 ? (
         <p className="text-sm text-slate-600">
-          Payload capacity <strong>{payload.toLocaleString('en-NZ')} kg</strong>{' '}
-          before dunnage and restraint. This is the mass constraint on the load
-          — axle limits are not modelled, because payload is always reached
-          first.
+          Payload capacity <strong>{payload.toLocaleString('en-NZ')} kg</strong>
+          , before dunnage and lashings. This is the weight limit on the load.
+          Axle limits are not modelled, because you reach payload first.
         </p>
       ) : null}
     </EntityForm>

@@ -45,7 +45,7 @@ export function QuantityCell({
         className={`w-24 rounded border px-2 py-1 text-right tabular-nums focus:outline-none ${
           invalid
             ? 'border-red-500 bg-red-50 text-red-900'
-            : 'border-slate-300 focus:border-sky-600'
+            : 'border-slate-300 focus:border-brand'
         }`}
       />
       {invalid ? (

@@ -55,7 +55,7 @@ describe('VehicleSection', () => {
     renderWith([{...SEMI, maxGross: 50000}]);
 
     expect(
-      screen.getByText(/HPMV permit — over 44,000 kg gross/),
+      screen.getByText(/Needs an HPMV permit \(over 44,000 kg gross\)/),
     ).toBeInTheDocument();
   });
 

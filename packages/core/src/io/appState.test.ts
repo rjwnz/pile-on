@@ -102,7 +102,7 @@ describe('parseAppState', () => {
 
   it('warns when the file has no format version', () => {
     expect(messages(parseAppState('{}'))).toContain(
-      'formatVersion: is missing — this may not be a Pile-On file',
+      'formatVersion: is missing — this may not be a Pile On file',
     );
   });
 
@@ -110,7 +110,7 @@ describe('parseAppState', () => {
     const future = JSON.stringify({...POPULATED, formatVersion: 99});
 
     expect(messages(parseAppState(future))).toContain(
-      `formatVersion: is 99, but this build only reads up to ${STATE_FORMAT_VERSION}. Update Pile-On.`,
+      `formatVersion: is 99, but this build only reads up to ${STATE_FORMAT_VERSION}. Update Pile On.`,
     );
   });
 

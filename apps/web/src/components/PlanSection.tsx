@@ -83,7 +83,7 @@ export function PlanSection() {
           {combinations.length === 0
             ? catalogue.vehicles.length === 0
               ? 'Add a vehicle on the Vehicles tab first.'
-              : 'No self-propelled truck in the catalogue — every vehicle is a trailer. Add a truck on the Vehicles tab.'
+              : 'There is no truck in the catalogue, only trailers. Add a truck on the Vehicles tab.'
             : 'Set some quantities on the Piling schedule tab first.'}
         </EmptyState>
       </Panel>
@@ -96,7 +96,7 @@ export function PlanSection() {
     <Panel
       title={
         movements > 0
-          ? `Loading plan — ${movements} ${movements === 1 ? 'movement' : 'movements'}`
+          ? `Loading plan (${movements} ${movements === 1 ? 'movement' : 'movements'})`
           : 'Loading plan'
       }
       actions={
@@ -116,12 +116,13 @@ export function PlanSection() {
         </Button>
         <Button onClick={() => build(true)}>Baseline instead</Button>
         <p className="text-sm text-slate-600">
-          Packing draws on the whole fleet: {trucks}{' '}
+          Packing uses your whole fleet: {trucks}{' '}
           {trucks === 1 ? 'truck' : 'trucks'}
           {trailers > 0
             ? `, ${trailers} ${trailers === 1 ? 'trailer' : 'trailers'}`
-            : ''}{' '}
-          — {combinations.length}{' '}
+            : ''}
+          {', '}
+          {combinations.length}{' '}
           {combinations.length === 1 ? 'combination' : 'combinations'}.
         </p>
       </div>
@@ -133,11 +134,11 @@ export function PlanSection() {
 
       {baselineMovements === null ? (
         <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <strong>This is the naive baseline, not the packer.</strong> Every
-          pile is treated as a cylinder of its widest diameter for its whole
-          length, each tier is given over to one pile type, nothing is staggered
-          or flipped, and every movement uses the biggest combination in the
-          fleet. It is the control — the number the packer has to beat.
+          <strong>This is the baseline, not the packer.</strong> It treats every
+          pile as a solid cylinder at its widest diameter, puts one pile type
+          per tier, and never staggers or flips anything. Every movement uses
+          the biggest combination in your fleet. This is the number the packer
+          has to beat.
         </p>
       ) : (
         <p
@@ -154,15 +155,16 @@ export function PlanSection() {
                 {baselineMovements - movements === 1 ? 'movement' : 'movements'}{' '}
                 saved.
               </strong>{' '}
-              The naive control needs {baselineMovements}. Staggering plates so
-              they miss each other, mixing types, and choosing the right
-              combination for each load fits this job on {movements}.
+              The baseline needs {baselineMovements}. By staggering plates so
+              they clear each other, mixing pile types, and picking the best
+              combination for each load, the packer fits this job on {movements}
+              .
             </>
           ) : (
             <>
               <strong>No saving on this job.</strong> The baseline also needs{' '}
-              {baselineMovements}. The packer wins back deck width and picks the
-              fleet mix, so it shows up when those are what run out.
+              {baselineMovements}. The packer saves deck width and picks the
+              fleet mix, so it only helps when those are what run out.
             </>
           )}
         </p>
@@ -181,7 +183,7 @@ export function PlanSection() {
           {unplaced.map(entry => (
             <li key={entry.pileTypeId}>
               <span className="font-mono text-xs">{entry.pileTypeId}</span> ×{' '}
-              {entry.quantity} — {entry.reason}
+              {entry.quantity}: {entry.reason}
             </li>
           ))}
         </ul>

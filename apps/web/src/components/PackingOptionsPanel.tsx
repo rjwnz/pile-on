@@ -84,10 +84,9 @@ export function PackingOptionsPanel({
           <section className="space-y-2">
             <h4 className="text-sm font-semibold text-slate-900">Clearances</h4>
             <p className="text-xs text-slate-500">
-              Minimum steel to steel, by which two surfaces are meeting. The
-              helix-to-shaft figure is the one longitudinal staggering is meant
-              to exploit, so it is the one that decides how much a helix-aware
-              packer can win.
+              The smallest gap allowed between two steel surfaces. Staggering
+              piles along the deck mainly opens up the helix-to-shaft gap, so
+              that figure decides how much the packer can save.
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
               <NumberField
@@ -114,10 +113,10 @@ export function PackingOptionsPanel({
           <section className="space-y-2">
             <h4 className="text-sm font-semibold text-slate-900">Balance</h4>
             <p className="text-xs text-slate-500">
-              How far the load centre of mass may sit from where the deck wants
-              it. Not a legal limit — it stands in for axle share and roll
-              stability, neither of which this model computes — so these are
-              placeholders, deliberately tight, until the yard gives real ones.
+              How far the load&rsquo;s centre of mass may sit from where the
+              deck wants it. This is not a legal limit. It stands in for axle
+              share and roll stability, which this model does not calculate, so
+              the defaults are deliberately tight until you set real ones.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <NumberField
@@ -149,10 +148,10 @@ export function PackingOptionsPanel({
                   Allow head-to-toe flipping
                 </span>
                 <span className="block text-xs text-slate-500">
-                  Loading a pile tip-first moves its plates to the other end,
-                  which is a second way to get them off a neighbour&rsquo;s
-                  stations. Turn it off if the site needs every pile the same
-                  way round for unloading.
+                  Loading a pile tip-first moves its plates to the other end.
+                  This is another way to keep them clear of a neighbour&rsquo;s
+                  plates. Turn it off if the site needs every pile facing the
+                  same way for unloading.
                 </span>
               </span>
             </label>
@@ -197,7 +196,7 @@ export function PackingOptionsPanel({
                 label="Bearers and lashings"
                 suffix="kg per tier"
                 value={options.ancillaryMassPerTier}
-                hint="Counted against the payload, because it is."
+                hint="This weight counts against the payload."
                 onChange={ancillaryMassPerTier => patch({ancillaryMassPerTier})}
               />
             </div>

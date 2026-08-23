@@ -96,7 +96,7 @@ describe('arranging', () => {
     renderPlan();
 
     expect(
-      screen.getByText(/This is the naive baseline, not the packer/),
+      screen.getByText(/This is the baseline, not the packer/),
     ).toBeInTheDocument();
   });
 
@@ -107,7 +107,7 @@ describe('arranging', () => {
     await user.click(screen.getByRole('button', {name: /Pack 25 piles/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan — 1 movement/}),
+      screen.getByRole('heading', {name: /Loading plan \(1 movement\)/}),
     ).toBeInTheDocument();
     expect(screen.getByText(/Movement 1 of 1/)).toBeInTheDocument();
   });
@@ -121,7 +121,7 @@ describe('arranging', () => {
     await user.click(screen.getByRole('button', {name: /Pack 95 piles/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan — 2 movements/}),
+      screen.getByRole('heading', {name: /Loading plan \(2 movements\)/}),
     ).toBeInTheDocument();
   });
 
@@ -354,10 +354,10 @@ describe('the packer against the control', () => {
     await user.click(screen.getByRole('button', {name: /Baseline instead/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan — 3 movements/}),
+      screen.getByRole('heading', {name: /Loading plan \(3 movements\)/}),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/This is the naive baseline, not the packer/),
+      screen.getByText(/This is the baseline, not the packer/),
     ).toBeInTheDocument();
   });
 
@@ -438,7 +438,7 @@ describe('the fleet', () => {
 
     expect(screen.queryByLabelText(/Load onto/)).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Packing draws on the whole fleet: 2 trucks/),
+      screen.getByText(/Packing uses your whole fleet: 2 trucks/),
     ).toBeInTheDocument();
   });
 
@@ -446,7 +446,7 @@ describe('the fleet', () => {
     renderPlan({vehicles: [RIGID, TRAILER]});
 
     expect(
-      screen.getByText(/1 truck, 1 trailer — 2 combinations/),
+      screen.getByText(/1 truck, 1 trailer, 2 combinations/),
     ).toBeInTheDocument();
   });
 
@@ -454,7 +454,7 @@ describe('the fleet', () => {
     renderPlan({vehicles: [TRAILER]});
 
     expect(
-      screen.getByText(/No self-propelled truck in the catalogue/),
+      screen.getByText(/There is no truck in the catalogue/),
     ).toBeInTheDocument();
   });
 
@@ -471,8 +471,8 @@ describe('the fleet', () => {
     expect(
       within(movement).getByText(/8-wheeler rigid \+ 4-axle full trailer/),
     ).toBeInTheDocument();
-    expect(within(movement).getByText(/Truck deck —/)).toBeInTheDocument();
-    expect(within(movement).getByText(/Trailer deck —/)).toBeInTheDocument();
+    expect(within(movement).getByText(/Truck deck:/)).toBeInTheDocument();
+    expect(within(movement).getByText(/Trailer deck:/)).toBeInTheDocument();
     expect(within(movement).getByText('Combination gross')).toBeInTheDocument();
     expect(
       within(movement).getByText(/of 44 t route limit/),

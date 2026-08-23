@@ -30,7 +30,7 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  * 5 — `helix.thickness` became `helix.length`, which is what it always meant.
  *     Version 4 files read cleanly: the old field is still accepted.
  * 6 — added `options` (how the yard loads, and what makes a load legal), and
- *     vehicles gained overhang allowances and a balance target. Version 5 files
+ *     vehicles gained a balance target. Version 5 files
  *     read cleanly: every one of those defaults to the conservative reading, so
  *     an old file means exactly what it meant.
  * 7 — vehicles gained `towableBy`, consignments `trailerId`, placements
@@ -206,10 +206,6 @@ function parseVehicle(value: unknown, log: IssueLog): Vehicle | null {
     deckHeight,
     tare,
     maxGross,
-    // Absent before version 6. Zero overhang and an unstated balance target are
-    // the readings that leave an old file meaning what it meant.
-    maxFrontOverhang: numberOr(value['maxFrontOverhang'], 0),
-    maxRearOverhang: numberOr(value['maxRearOverhang'], 0),
     balanceTarget:
       typeof value['balanceTarget'] === 'number' &&
       Number.isFinite(value['balanceTarget'])

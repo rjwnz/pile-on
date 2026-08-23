@@ -31,8 +31,6 @@ const VEHICLE: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  maxFrontOverhang: 0,
-  maxRearOverhang: 0,
   balanceTarget: null,
   towableBy: [],
 };
@@ -306,8 +304,6 @@ describe('parseAppState — malformed entries', () => {
           deckHeight: 1200,
           tare: 10600,
           maxGross: 30000,
-          maxFrontOverhang: 0,
-          maxRearOverhang: 0,
           balanceTarget: null,
         },
       ],
@@ -342,8 +338,6 @@ describe('reading a version 1 file', () => {
           deckHeight: 1350,
           tare: 15800,
           maxGross: 44000,
-          maxFrontOverhang: 0,
-          maxRearOverhang: 0,
           balanceTarget: null,
           axles: [
             {xFromFront: 0, tyreClass: 'SL', setId: 'steer', steering: true},
@@ -371,8 +365,6 @@ describe('reading a version 1 file', () => {
       deckHeight: 1350,
       tare: 15800,
       maxGross: 44000,
-      maxFrontOverhang: 0,
-      maxRearOverhang: 0,
       balanceTarget: null,
       towableBy: [],
     });
@@ -644,8 +636,6 @@ describe('reading a version 5 vehicle', () => {
     const result = parseAppState(v5);
 
     expect(result.ok && result.value.catalogue.vehicles[0]).toMatchObject({
-      maxFrontOverhang: 0,
-      maxRearOverhang: 0,
       balanceTarget: null,
     });
   });

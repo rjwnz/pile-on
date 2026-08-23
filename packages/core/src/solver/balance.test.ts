@@ -24,8 +24,6 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  maxFrontOverhang: 0,
-  maxRearOverhang: 0,
   balanceTarget: null,
   towableBy: [],
 };
@@ -57,19 +55,6 @@ describe('balancingShift', () => {
     const full = [place({id: 'a', x: 100}), place({id: 'b', x: 6200})];
 
     expect(balancingShift(full, CATALOGUE, SEMI)).toBe(100);
-  });
-
-  it('spends a rear overhang allowance when it has one', () => {
-    const tolerant: Vehicle = {...SEMI, maxRearOverhang: 1000};
-    const load = [place({x: 100}), place({id: 'b', x: 6200})];
-
-    // Wanted is only 100, so the extra room changes nothing here.
-    expect(balancingShift(load, CATALOGUE, tolerant)).toBe(100);
-    // Pull the target hard aft and the allowance is the whole of what is left:
-    // the load ends at 12200, and 13500 is as far back as it may go.
-    expect(
-      balancingShift(load, CATALOGUE, {...tolerant, balanceTarget: 12000}),
-    ).toBe(1300);
   });
 
   it('will move a load forward as readily as aft', () => {

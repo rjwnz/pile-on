@@ -316,8 +316,7 @@ function packMovement(
   const combinedTare = combo.truck.tare + (combo.trailer?.tare ?? 0);
   const headroom = ruleset.maxGrossMass - combinedTare;
 
-  const reach = (vehicle: Vehicle) =>
-    vehicle.deckLength + vehicle.maxRearOverhang;
+  const reach = (vehicle: Vehicle) => vehicle.deckLength;
   const decks: {role: DeckRole; vehicle: Vehicle}[] = combo.trailer
     ? [
         {role: 'truck' as const, vehicle: combo.truck},
@@ -370,7 +369,7 @@ function packFleetOnce(
 ): PackResult {
   const combos = combinationsOf(catalogue);
   const usableOf = (vehicle: Vehicle) => ({
-    length: vehicle.deckLength + vehicle.maxRearOverhang - options.headboardGap,
+    length: vehicle.deckLength - options.headboardGap,
     width: vehicle.deckWidth - options.sideMargin * 2,
   });
 
@@ -506,8 +505,8 @@ function shiftRange(
 
     ranges = intersect(ranges, [
       [
-        -vehicle.maxFrontOverhang - start,
-        vehicle.deckLength + vehicle.maxRearOverhang - end,
+        -start,
+        vehicle.deckLength - end,
       ],
     ]);
 
@@ -707,13 +706,8 @@ function laneTravel(
     if (!type) {
       continue;
     }
-    low = Math.max(low, -vehicle.maxFrontOverhang - placement.x);
-    high = Math.min(
-      high,
-      vehicle.deckLength +
-        vehicle.maxRearOverhang -
-        (placement.x + type.length),
-    );
+    low = Math.max(low, -placement.x);
+    high = Math.min(high, vehicle.deckLength - (placement.x + type.length));
   }
   return [low, high];
 }

@@ -40,8 +40,6 @@ const SEMI: Vehicle = {
   deckHeight: 1350,
   tare: 15800,
   maxGross: 44000,
-  maxFrontOverhang: 0,
-  maxRearOverhang: 0,
   balanceTarget: null,
   towableBy: [],
 };
@@ -249,31 +247,6 @@ describe('what will not fit', () => {
     );
 
     expect(unplaced[0]!.reason).toContain('too wide for the deck');
-  });
-
-  it('spends a rear overhang allowance the yard has given it', () => {
-    // 6.4 m piles do not fit two to a 12.4 m lane, but they do once the yard
-    // will accept 700 mm hanging out the back.
-    const sixFour: PileType = {...SP168, id: 'SP168-D64', length: 6400};
-    const tolerant: Vehicle = {...SEMI, maxRearOverhang: 700};
-
-    const tight = pack(
-      job(['SP168-D64', 12]),
-      {pileTypes: [sixFour], vehicles: [SEMI]},
-      OPTIONS,
-    );
-    const roomy = pack(
-      job(['SP168-D64', 12]),
-      {pileTypes: [sixFour], vehicles: [tolerant]},
-      OPTIONS,
-    );
-
-    expect(
-      roomy.plan.placements.filter(p => p.tier === 0).length,
-    ).toBeGreaterThan(tight.plan.placements.filter(p => p.tier === 0).length);
-    expect(
-      errors(roomy.plan, {pileTypes: [sixFour], vehicles: [tolerant]}),
-    ).toEqual([]);
   });
 
   it('stops rather than opening trucks forever when nothing more fits', () => {

@@ -1,11 +1,14 @@
 /**
  * CSV shape for the pile type catalogue.
  *
- * Helices are flat, numbered columns (`helix1_radius`, `helix2_radius`, …)
+ * Helices are flat, numbered columns (`helix1_diameter`, `helix2_diameter`, …)
  * rather than a packed string or a second file, because the people maintaining
  * this catalogue maintain it in Excel. The parser scans upward from 1 until it
  * finds no columns for the next index, so any number of helices works without
  * the format committing to a maximum.
+ *
+ * Shaft and plate sizes are entered as diameters — the figure stamped on the
+ * pile — and halved to the radii the geometry works in.
  *
  * `helixN_length` was once called `helixN_thickness`. Both are accepted, so a
  * sheet written against the old header still imports.
@@ -24,13 +27,13 @@ import {
 /** Superseded by `helixN_length`; still read so old sheets keep importing. */
 const LEGACY_LENGTH_SUFFIX = 'thickness';
 
-export const PILE_TYPE_CSV_EXAMPLE = `id,name,length,shaft_radius,mass,helix1_offset,helix1_radius,helix1_length,helix2_offset,helix2_radius,helix2_length
-SP168-D6,SP168 6.0 m twin helix,6000,84,178,400,225,110,1100,175,110
-SP139-S4,SP139 4.5 m single helix,4500,70,96,350,175,90,,,
+export const PILE_TYPE_CSV_EXAMPLE = `id,name,length,shaft_diameter,mass,helix1_offset,helix1_diameter,helix1_length,helix2_offset,helix2_diameter,helix2_length
+SP168-D6,SP168 6.0 m twin helix,6000,168,178,400,450,110,1100,350,110
+SP139-S4,SP139 4.5 m single helix,4500,140,96,350,350,90,,,
 `;
 
 function helixColumnsPresent(row: CsvRow, index: number): boolean {
-  return ['offset', 'radius', 'length', LEGACY_LENGTH_SUFFIX].some(part => {
+  return ['offset', 'diameter', 'length', LEGACY_LENGTH_SUFFIX].some(part => {
     const value = row[`helix${index}_${part}`];
     return value !== undefined && value.trim() !== '';
   });
@@ -71,9 +74,9 @@ function readHelices(row: CsvRow, pileLength: number, log: IssueLog): Helix[] {
       min: 0,
       ...(pileLength > 0 ? {max: pileLength} : {}),
     });
-    const radius = readNumber(row, `${prefix}_radius`, log, {min: 0.0001});
+    const diameter = readNumber(row, `${prefix}_diameter`, log, {min: 0.0001});
     const length = readHelixLength(row, index, log);
-    helices.push({offsetFromButt, radius, length});
+    helices.push({offsetFromButt, radius: diameter / 2, length});
   }
 
   return helices.sort((a, b) => a.offsetFromButt - b.offsetFromButt);
@@ -84,15 +87,16 @@ function parsePileTypeRow(row: CsvRow, log: IssueLog): PileType {
   const id = readString(row, 'id', log);
   const name = readString(row, 'name', log, {required: false}) || id;
   const length = readNumber(row, 'length', log, {min: 1});
-  const shaftRadius = readNumber(row, 'shaft_radius', log, {min: 1});
+  const shaftDiameter = readNumber(row, 'shaft_diameter', log, {min: 1});
+  const shaftRadius = shaftDiameter / 2;
   const mass = readNumber(row, 'mass', log, {min: 0.0001});
   const helices = readHelices(row, length, log);
 
   for (const [index, helix] of helices.entries()) {
     if (helix.radius > 0 && helix.radius < shaftRadius) {
       log.add(
-        `helix${index + 1}_radius`,
-        `is smaller than the shaft radius (${shaftRadius}) — check the units`,
+        `helix${index + 1}_diameter`,
+        `is smaller than the shaft diameter (${shaftDiameter}) — check the units`,
       );
     }
   }

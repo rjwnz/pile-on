@@ -6,13 +6,13 @@ const GOOD: CsvRow = {
   id: 'SP168-D6',
   name: 'SP168 6.0 m twin helix',
   length: '6000',
-  shaft_radius: '84',
+  shaft_diameter: '168',
   mass: '178',
   helix1_offset: '400',
-  helix1_radius: '225',
+  helix1_diameter: '450',
   helix1_length: '110',
   helix2_offset: '1100',
-  helix2_radius: '175',
+  helix2_diameter: '350',
   helix2_length: '110',
 };
 
@@ -54,7 +54,7 @@ describe('parsePileTypeRows', () => {
         ...GOOD,
         id: 'SP139-S4',
         helix2_offset: '',
-        helix2_radius: '',
+        helix2_diameter: '',
         helix2_length: '',
       },
     ]);
@@ -67,7 +67,7 @@ describe('parsePileTypeRows', () => {
       {
         ...GOOD,
         helix3_offset: '2000',
-        helix3_radius: '150',
+        helix3_diameter: '300',
         helix3_length: '110',
       },
     ]);
@@ -110,11 +110,11 @@ describe('parsePileTypeRows', () => {
   it('tags issues with the row they came from', () => {
     const result = parsePileTypeRows([
       GOOD,
-      {...GOOD, id: 'B', shaft_radius: ''},
+      {...GOOD, id: 'B', shaft_diameter: ''},
       {...GOOD, id: 'C', mass: 'heavy'},
     ]);
 
-    expect(paths(result)).toEqual(['row 2 / shaft_radius', 'row 3 / mass']);
+    expect(paths(result)).toEqual(['row 2 / shaft_diameter', 'row 3 / mass']);
   });
 
   it('rejects a helix sitting off the end of the pile', () => {
@@ -125,11 +125,11 @@ describe('parsePileTypeRows', () => {
     );
   });
 
-  it('catches a helix radius below the shaft radius as a likely unit error', () => {
-    const result = parsePileTypeRows([{...GOOD, helix1_radius: '45'}]);
+  it('catches a helix diameter below the shaft diameter as a likely unit error', () => {
+    const result = parsePileTypeRows([{...GOOD, helix1_diameter: '90'}]);
 
     expect(messages(result)).toContain(
-      'row 1 / helix1_radius: is smaller than the shaft radius (84) — check the units',
+      'row 1 / helix1_diameter: is smaller than the shaft diameter (168) — check the units',
     );
   });
 

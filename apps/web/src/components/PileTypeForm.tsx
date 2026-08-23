@@ -9,7 +9,7 @@ import {Button, EntityForm, Field, useValidatedSubmit} from './ui';
 
 interface HelixDraft {
   readonly offset: string;
-  readonly radius: string;
+  readonly diameter: string;
   readonly length: string;
 }
 
@@ -17,7 +17,7 @@ interface Draft {
   readonly id: string;
   readonly name: string;
   readonly length: string;
-  readonly shaftRadius: string;
+  readonly shaftDiameter: string;
   readonly mass: string;
   readonly helices: readonly HelixDraft[];
 }
@@ -26,21 +26,22 @@ const BLANK: Draft = {
   id: '',
   name: '',
   length: '',
-  shaftRadius: '',
+  shaftDiameter: '',
   mass: '',
-  helices: [{offset: '', radius: '', length: ''}],
+  helices: [{offset: '', diameter: '', length: ''}],
 };
 
+/** The geometry stores radii; the form takes and shows diameters. */
 function toDraft(type: PileType): Draft {
   return {
     id: type.id,
     name: type.name,
     length: String(type.length),
-    shaftRadius: String(type.shaftRadius),
+    shaftDiameter: String(type.shaftRadius * 2),
     mass: String(type.mass),
     helices: type.helices.map(helix => ({
       offset: String(helix.offsetFromButt),
-      radius: String(helix.radius),
+      diameter: String(helix.radius * 2),
       length: String(helix.length),
     })),
   };
@@ -52,12 +53,12 @@ export function draftToRow(draft: Draft): CsvRow {
     id: draft.id,
     name: draft.name,
     length: draft.length,
-    shaft_radius: draft.shaftRadius,
+    shaft_diameter: draft.shaftDiameter,
     mass: draft.mass,
   };
   draft.helices.forEach((helix, index) => {
     row[`helix${index + 1}_offset`] = helix.offset;
-    row[`helix${index + 1}_radius`] = helix.radius;
+    row[`helix${index + 1}_diameter`] = helix.diameter;
     row[`helix${index + 1}_length`] = helix.length;
   });
   return row;
@@ -91,7 +92,7 @@ export function PileTypeForm({
     }));
   }
 
-  const helixCount = draft.helices.filter(h => h.radius.trim() !== '').length;
+  const helixCount = draft.helices.filter(h => h.diameter.trim() !== '').length;
 
   return (
     <EntityForm
@@ -112,11 +113,11 @@ export function PileTypeForm({
           onChange={v => set('length', v)}
         />
         <Field
-          label="Shaft radius"
+          label="Shaft diameter"
           suffix="mm"
           type="number"
-          value={draft.shaftRadius}
-          onChange={v => set('shaftRadius', v)}
+          value={draft.shaftDiameter}
+          onChange={v => set('shaftDiameter', v)}
         />
         <Field
           label="Mass"
@@ -148,11 +149,11 @@ export function PileTypeForm({
               onChange={v => setHelix(index, {offset: v})}
             />
             <Field
-              label={`Plate ${index + 1} radius`}
+              label={`Plate ${index + 1} diameter`}
               suffix="mm"
               type="number"
-              value={helix.radius}
-              onChange={v => setHelix(index, {radius: v})}
+              value={helix.diameter}
+              onChange={v => setHelix(index, {diameter: v})}
             />
             <Field
               label={`Plate ${index + 1} length`}
@@ -181,7 +182,7 @@ export function PileTypeForm({
           onClick={() =>
             set('helices', [
               ...draft.helices,
-              {offset: '', radius: '', length: ''},
+              {offset: '', diameter: '', length: ''},
             ])
           }
         >

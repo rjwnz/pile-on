@@ -3,8 +3,11 @@ import {maxRadius} from '../domain/pile';
 import {balanceTargetOf} from '../domain/vehicle';
 import type {Placement, PlacedPile} from '../domain/placement';
 import {GEOMETRIC_EPSILON, type Kilograms, type Millimetres} from '../units';
+import type {PackingOptions} from './options';
 import {
   buildPackCandidates,
+  invertedPack,
+  packFlips,
   type BuiltPack,
   type PackBuildInput,
 } from './packBuilder';
@@ -16,7 +19,9 @@ import {
  * side margins with the packs kept apart (banded bundles never interleave
  * their steel), weighs alike within `minPackMassRatio`, and above the bottom
  * tier every pack stands wholly on the footprint the tier below offers over
- * the pack's own run of deck.
+ * the pack's own run of deck. The head-to-tail run inside a pack carries on
+ * across the join between them: the second pack of a row is turned end for
+ * end when that is what puts the two facing piles the opposite way round.
  */
 
 export interface LayerResult {
@@ -75,7 +80,37 @@ function intersect(
   return out;
 }
 
-function rowOf(packs: readonly BuiltPack[], input: TierInput): Row {
+/**
+ * Carry the head-to-tail run across the join between packs: a pack whose
+ * left-hand pile faces the same way as its neighbour's right-hand pile is
+ * turned end for end, provided the turned band still bands and comes out no
+ * wider. Orientation is free in the yard, so this never costs deck.
+ */
+function seatHeadToTail(
+  packs: readonly BuiltPack[],
+  options: PackingOptions,
+): readonly BuiltPack[] {
+  if (!options.allowFlips || packs.length < 2) {
+    return packs;
+  }
+  const seated: BuiltPack[] = [];
+  for (const pack of packs) {
+    const facing = seated.at(-1);
+    const trailing = facing ? packFlips(facing).at(-1) : undefined;
+    if (trailing !== undefined && packFlips(pack)[0] === trailing) {
+      const turned = invertedPack(pack, options);
+      if (turned && turned.width <= pack.width + GEOMETRIC_EPSILON) {
+        seated.push(turned);
+        continue;
+      }
+    }
+    seated.push(pack);
+  }
+  return seated;
+}
+
+function rowOf(unseated: readonly BuiltPack[], input: TierInput): Row {
+  const packs = seatHeadToTail(unseated, input.options);
   // Packs are banded bundles lifted one at a time, so their steel never
   // interleaves the way flipped piles inside a pack do: the next pack
   // starts a clearance past the previous pack's edge, full stop.

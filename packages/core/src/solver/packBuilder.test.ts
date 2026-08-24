@@ -3,8 +3,14 @@ import type {Catalogue} from '../domain/catalogue';
 import {PACK_MAX_WIDTH} from '../domain/packs';
 import type {PileType} from '../domain/pile';
 import type {Vehicle} from '../domain/vehicle';
-import {DEFAULT_PACKING_OPTIONS} from './options';
-import {buildPackCandidates, flipPatterns, type BuiltPack} from './packBuilder';
+import {DEFAULT_PACKING_OPTIONS, withoutFlips} from './options';
+import {
+  buildPackCandidates,
+  flipPatterns,
+  invertedPack,
+  packFlips,
+  type BuiltPack,
+} from './packBuilder';
 
 const STARTER: PileType = {
   id: 'SS200-starter',
@@ -124,6 +130,40 @@ describe('buildPackCandidates', () => {
     const [a, b] = pair.piles;
     expect(a!.placement.flipped).not.toBe(b!.placement.flipped);
     expect(Math.abs(a!.placement.y - b!.placement.y)).toBeCloseTo(334);
+  });
+
+  it('bands piles head to tail by default', () => {
+    // Bare extensions: no plates to miss, so every flip pattern bands to the
+    // same width. Head to tail is what the yard wants, so that is what wins.
+    const packs = candidates([['SS200-ext-6000', 5]]);
+
+    for (const pack of packs) {
+      expect(packFlips(pack)).toEqual(
+        pack.piles.map((_, index) => index % 2 === 1),
+      );
+    }
+  });
+
+  it('loads every pile the same way round when flips are off', () => {
+    const packs = candidates([['SS200-ext-6000', 5]], {
+      options: withoutFlips(OPTIONS),
+    });
+
+    expect(packs.length).toBeGreaterThan(1);
+    for (const pack of packs) {
+      expect(packFlips(pack).some(Boolean)).toBe(false);
+    }
+  });
+
+  it('turns a band end for end without changing what it holds', () => {
+    const pack = candidates([['SS200-starter', 3]]).find(
+      candidate => candidate.piles.length === 3,
+    )!;
+    const turned = invertedPack(pack, OPTIONS)!;
+
+    expect(packFlips(turned)).toEqual(packFlips(pack).map(flip => !flip));
+    expect(turned.width).toBeCloseTo(pack.width);
+    expect(turned.demand).toEqual(pack.demand);
   });
 
   it('offers mixed-length extension bundles for remainders, longest first', () => {

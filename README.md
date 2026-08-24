@@ -49,7 +49,10 @@ shows what moved.
 The packer also does things the control never does: it flips piles within a
 pack so their plates miss, mixes extension lengths in a pack when banding them
 apart would strand one, and keeps every load balanced by sliding rows and
-tiers along the deck and turning alternate tiers round.
+tiers along the deck and turning alternate tiers round. Head to tail is its
+default: where two flip patterns band to the same width it takes the
+alternating one, and the run carries on across the join between packs riding
+abreast — the second pack is turned end for end unless that would widen it.
 
 **Stage 1** is what it rests on — the validator telling the whole truth, and the
 numbers it judges against being settable and saved with the job:

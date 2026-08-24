@@ -26,7 +26,8 @@ import type {PackingOptions} from './options';
  *
  * Within a pack, flipping is the one stagger lever left: alternate piles
  * loaded tip-first put their plates at the other end, and the pack closes
- * from plate pitch to shaft pitch.
+ * from plate pitch to shaft pitch. Head to tail is therefore the default
+ * band — bands that come out the same width are settled in its favour.
  */
 
 /** A candidate pack, laid out in pack-local coordinates. */
@@ -170,16 +171,68 @@ function buildFlushPack(
   };
 }
 
-/** The narrowest flush pack of exactly these piles, over the flip patterns. */
+/** How many neighbouring piles in a band lie head to tail. */
+function headToTailJoins(flips: readonly boolean[]): number {
+  let joins = 0;
+  for (let index = 1; index < flips.length; index++) {
+    if (flips[index] !== flips[index - 1]) {
+      joins++;
+    }
+  }
+  return joins;
+}
+
+/** Which way each pile of a built pack faces, left steel edge to right. */
+export function packFlips(pack: BuiltPack): boolean[] {
+  return pack.piles.map(pile => pile.placement.flipped);
+}
+
+/**
+ * The same band turned end for end — every pile loaded the other way round,
+ * so it lies head to tail against whatever it is parked beside. Null when
+ * the turned band will not close inside the width limit.
+ */
+export function invertedPack(
+  pack: BuiltPack,
+  options: PackingOptions,
+): BuiltPack | null {
+  return buildFlushPack(
+    pack.piles.map(pile => pile.type),
+    packFlips(pack).map(flipped => !flipped),
+    options,
+  );
+}
+
+/**
+ * The narrowest flush pack of exactly these piles, over the flip patterns.
+ * Bands of equal width tie-break to the most head-to-tail joins — that is how
+ * the yard bands by default, and where plates do collide it is the pattern
+ * that closes the band anyway — and then to the band whose first pile loads
+ * butt-first, so an alternating band reads the same way every time.
+ */
 function bestPackOf(
   types: readonly PileType[],
   options: PackingOptions,
 ): BuiltPack | null {
   let best: BuiltPack | null = null;
+  let bestJoins = -1;
   for (const flips of flipPatterns(types.length, options.allowFlips)) {
     const pack = buildFlushPack(types, flips, options);
-    if (pack && (!best || pack.width < best.width)) {
+    if (!pack) {
+      continue;
+    }
+    const joins = headToTailJoins(flips);
+    const better =
+      !best ||
+      pack.width < best.width - GEOMETRIC_EPSILON ||
+      (pack.width < best.width + GEOMETRIC_EPSILON &&
+        (joins > bestJoins ||
+          (joins === bestJoins &&
+            best.piles[0]!.placement.flipped &&
+            !flips[0]!)));
+    if (better) {
       best = pack;
+      bestJoins = joins;
     }
   }
   return best;

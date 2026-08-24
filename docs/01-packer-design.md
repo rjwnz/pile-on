@@ -957,6 +957,17 @@ construction in the packer:
    a band: alternate piles loaded tip-first put their plates at the other
    end, and a pack of twin-helix starters closes from plate pitch to shaft
    pitch.
+
+   **Head to tail is the default, and it runs across the join.** Where flip
+   patterns band to the same width — bare extensions, say, with no plates to
+   miss — the packer takes the alternating one, starting butt-first, rather
+   than loading everything the same way round. The run then carries on
+   between packs riding abreast: the second pack of a row is turned end for
+   end when that is what puts the two facing piles the opposite way round,
+   which it does whenever the turned band still closes no wider. Orientation
+   is free in the yard, so this never costs deck; with `allowFlips` off
+   nothing turns and every pile loads butt-first.
+
 2. **A tier is rows of packs marching down the deck**, `endGap` apart — at
    most two packs abreast at any station (`too-many-packs`, checked as
    mutual x-overlap, exact by Helly's theorem on intervals), as many rows as

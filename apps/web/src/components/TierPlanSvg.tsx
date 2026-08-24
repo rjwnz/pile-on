@@ -11,9 +11,18 @@ import {
   type Vehicle,
 } from '@pile-on/core';
 import {colourForPileType} from '../render/palette';
-import {packContentsLine} from './PackManifestTable';
+import {bearerLine, packContentsLine} from './PackManifestTable';
 
 const LABEL_BAND = 420;
+
+/** Sawn timber, so the bearers read as timber and not as more steel. */
+const BEARER_FILL = '#c9a227';
+const BEARER_STROKE = '#8a6d1f';
+
+/** How far a timber sticks out past the steel it carries, in the drawing.
+ * Real bearers run a little proud of the pack; drawn flush they vanish under
+ * the shafts. */
+const BEARER_OVERHANG = 60;
 
 /**
  * One tier of one truck, seen from above, drawn in deck millimetres — the
@@ -109,7 +118,7 @@ export function TierPlanSvg({
               <g key={`pack-${pack}`}>
                 {summary ? (
                   <title>
-                    {`${summary.id} — ${packContentsLine(summary)} · ${toMetres(summary.length).toFixed(2)} m × ${toMetres(summary.width).toFixed(2)} m · ${Math.round(summary.mass)} kg · on ${summary.dunnage} mm bearers`}
+                    {`${summary.id} — ${packContentsLine(summary)} · ${toMetres(summary.length).toFixed(2)} m × ${toMetres(summary.width).toFixed(2)} m · ${Math.round(summary.mass)} kg · on ${bearerLine(summary)}`}
                   </title>
                 ) : null}
                 <rect
@@ -135,6 +144,33 @@ export function TierPlanSvg({
             );
           },
         )}
+
+        {/*
+          Every timber under this tier, from the same derivation the packer
+          and the validator use — a pack must land on two of them, and this
+          is where you can see that it does.
+        */}
+        {packs
+          .filter(summary => summary.tier === tier)
+          .flatMap(summary =>
+            summary.bearers.map((bearer, index) => (
+              <rect
+                key={`bearer-${summary.id}-${index}`}
+                x={bearer.x}
+                y={toSvgY(bearer.span[0]) - BEARER_OVERHANG}
+                width={bearer.width}
+                height={bearer.span[1] - bearer.span[0] + BEARER_OVERHANG * 2}
+                fill={BEARER_FILL}
+                stroke={BEARER_STROKE}
+                strokeWidth={8}
+                data-testid="bearer"
+              >
+                <title>
+                  {`${summary.id} bearer ${index + 1} of ${summary.bearers.length} — ${bearer.thickness} mm timber, ${Math.round(bearer.x)} mm along the deck`}
+                </title>
+              </rect>
+            )),
+          )}
 
         {placements.map(placement => {
           const type = findPileType(catalogue, placement.pileTypeId);

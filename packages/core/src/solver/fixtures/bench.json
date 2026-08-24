@@ -6,10 +6,10 @@
     "packedTrucks": 3,
     "noFlipTrucks": 4,
     "deckUsed": 27,
-    "massUsed": 21,
+    "massUsed": 23,
     "worstBalance": 0,
     "errors": 0,
-    "millis": 39
+    "millis": 40
   },
   {
     "fixture": "02-two-types-semi",
@@ -18,10 +18,10 @@
     "packedTrucks": 3,
     "noFlipTrucks": 3,
     "deckUsed": 23,
-    "massUsed": 17,
-    "worstBalance": 53,
+    "massUsed": 18,
+    "worstBalance": 59,
     "errors": 0,
-    "millis": 29
+    "millis": 30
   },
   {
     "fixture": "03-four-types-semi",
@@ -29,11 +29,11 @@
     "baselineTrucks": 9,
     "packedTrucks": 6,
     "noFlipTrucks": 7,
-    "deckUsed": 26,
-    "massUsed": 19,
+    "deckUsed": 25,
+    "massUsed": 20,
     "worstBalance": 0,
     "errors": 0,
-    "millis": 59
+    "millis": 62
   },
   {
     "fixture": "04-short-deck-rigid",
@@ -53,22 +53,22 @@
     "baselineTrucks": 3,
     "packedTrucks": 2,
     "noFlipTrucks": 3,
-    "deckUsed": 26,
-    "massUsed": 17,
+    "deckUsed": 20,
+    "massUsed": 16,
     "worstBalance": 0,
     "errors": 0,
-    "millis": 2
+    "millis": 3
   },
   {
     "fixture": "06-rigid-and-trailer",
     "piles": 80,
-    "baselineTrucks": 4,
-    "packedTrucks": 3,
-    "noFlipTrucks": 4,
-    "deckUsed": 28,
-    "massUsed": 27,
+    "baselineTrucks": 3,
+    "packedTrucks": 2,
+    "noFlipTrucks": 3,
+    "deckUsed": 34,
+    "massUsed": 30,
     "worstBalance": 0,
     "errors": 0,
-    "millis": 17
+    "millis": 16
   }
 ]

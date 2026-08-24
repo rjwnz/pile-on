@@ -21,8 +21,8 @@ isometric view of each deck, with the load checked against the NZ limits.
 works, and it packs onto a mixed fleet: every truck in the catalogue, each
 towing up to one trailer (`towableBy` on the trailer row says which trucks
 may). A truck and its trailer count as one movement, budgeted together under
-the 44 t route cap, and on the benchmark fixtures the packer takes **20
-movements where the bounding-box control takes 28**. Still to come from
+the 44 t route cap, and on the benchmark fixtures the packer takes **19
+movements where the bounding-box control takes 27**. Still to come from
 stages 4-6: the solo-towing-unit cap, a cost model, LNS repair, and phases.
 
 That is the whole business case, and it comes from one observation: a pile is

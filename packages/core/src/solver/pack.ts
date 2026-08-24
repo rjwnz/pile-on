@@ -11,6 +11,7 @@ import {
 import type {Job} from '../domain/job';
 import {MAX_LOAD_HEIGHT, loadHeight} from '../domain/loading';
 import {
+  everyPackIsBorne,
   footprintOver,
   layerHeights,
   layersOf,
@@ -211,10 +212,11 @@ function packOneDeck(
   }
 
   // Mirroring changes cross-tier lateral distances, and settling changes
-  // longitudinal overlaps — both can thicken the derived bearers. Each is an
+  // longitudinal overlaps — both can thicken the derived bearers, and sliding
+  // a row can walk a pack off the ground its timbers need. Each is an
   // optimisation and is checked like one: verified, and thrown away for the
-  // already-legal layout when it broke support or pushed the stack over
-  // height.
+  // already-legal layout when it broke support, left a pack unbearable, or
+  // pushed the stack over height.
   const mirrored = mirrorTiers(onDeck, catalogue, options);
   const upright =
     loadHeight(mirrored, catalogue, options) <= MAX_LOAD_HEIGHT
@@ -225,6 +227,7 @@ function packOneDeck(
   const kept =
     allTiersSupported(settled, catalogue, options) &&
     allTiersContained(settled, catalogue, options) &&
+    everyPackIsBorne(settled, catalogue, options) &&
     loadHeight(settled, catalogue, options) <= MAX_LOAD_HEIGHT
       ? settled
       : upright;

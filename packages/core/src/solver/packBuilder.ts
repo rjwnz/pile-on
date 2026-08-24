@@ -1,7 +1,9 @@
 import type {Catalogue} from '../domain/catalogue';
 import {findPileType} from '../domain/catalogue';
 import {
+  MIN_BEARERS_PER_PACK,
   PACK_MAX_WIDTH,
+  bearerStations,
   dunnageForProtrusion,
   shaftProtrusion,
 } from '../domain/packs';
@@ -142,6 +144,15 @@ function buildFlushPack(
     piles.push(pileAt(type, y, flips[index]!, index));
   }
   if (piles.length === 0) {
+    return null;
+  }
+  /*
+   * A band the yard cannot get two timbers under is not a band. The deck is
+   * continuous ground, so this is the pack's own geometry talking: its plates
+   * against its shortest pile. Flipping moves the plates, so a pattern that
+   * blocks the timbers is simply not the pattern chosen.
+   */
+  if (bearerStations(piles, null).length < MIN_BEARERS_PER_PACK) {
     return null;
   }
 

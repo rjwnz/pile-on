@@ -473,11 +473,11 @@ longitudinal  = deckLength / 2 − headboardGap − pileLength / 2
 Against the catalogue examples in `VEHICLE_CSV_EXAMPLE` / `PILE_TYPE_CSV_EXAMPLE`
 and `DEFAULT_LOADING_OPTIONS`:
 
-| Combination        | Lateral ceiling | Longitudinal ceiling |
-| ------------------ | --------------- | -------------------- |
-| SEMI-45 + SP168-D6 | 950 mm          | 3 150 mm             |
-| SEMI-45 + SP139-S4 | 1 000 mm        | 3 900 mm             |
-| RIGID-8 + SP168-D6 | 950 mm          | **500 mm**           |
+| Combination             | Lateral ceiling | Longitudinal ceiling |
+| ----------------------- | --------------- | -------------------- |
+| SEMI-45 + SP168-starter | 950 mm          | 3 150 mm             |
+| SEMI-45 + SP114-starter | 1 025 mm        | 4 650 mm             |
+| RIGID-8 + SP168-starter | 950 mm          | **500 mm**           |
 
 The RIGID-8 row is the instructive one: a 6 m pile on a 7.2 m deck has almost no
 longitudinal freedom, so any tolerance above 500 mm is vacuous _there_ while
@@ -493,7 +493,7 @@ unambiguously unsafe.
 
 **And one floor.** The centroid cannot be tuned finer than one pile's worth of
 mass on its available lever, `Δ = m_pile × lever / M_payload`. For a SEMI-45 full
-of SP168-D6 (178 kg each, 28 200 kg payload): ~40 mm longitudinally, ~12 mm
+of SP168-starter (196 kg each, 28 200 kg payload): ~44 mm longitudinally, ~13 mm
 laterally. Below that the tolerance is unreachable by swapping and depends
 entirely on the continuous whole-load shift (§6.5) — whose range is whatever
 slack the lane happens to have, and that collapses to ±150 mm for 6 m piles on a
@@ -503,11 +503,11 @@ slack the lane happens to have, and that collapses to ±150 mm for 6 m piles on 
 
 **Longitudinal 200 mm, lateral 50 mm.** Both per-deck overridable.
 
-Longitudinal 200 mm is ~5× the 40 mm granularity floor, so it is reliably
+Longitudinal 200 mm is ~4.5× the 44 mm granularity floor, so it is reliably
 hittable, and it is inside every vacuous ceiling in the table above — including
 the awkward RIGID-8 row, where it is still doing work at 40% of the ceiling.
 
-Lateral 50 mm is ~4× the 12 mm granularity and an order of magnitude inside the
+Lateral 50 mm is ~4× the 13 mm granularity and an order of magnitude inside the
 ~525 mm stability ceiling. It costs essentially nothing to hit: `lanesFor`
 already generates lanes symmetric about the centreline, so a load is
 near-balanced laterally by construction, and 50 mm is roughly the asymmetry one
@@ -553,7 +553,7 @@ assumption it is today.
 it. Two things make it not yet true in the yard:
 
 **Dunnage and restraint mass is excluded.** `consignmentMass` says so in a
-comment. Bearers at 100 × 100 hardwood across a 2.45 m deck, four per tier, plus
+comment. Bearers at 100 × 100 hardwood across a 2.45 m deck, two under every pack, plus
 chains and chocks, is tens of kilograms per tier — small against 28 t, but it is
 the difference between "under the limit" and "under the limit on paper". Add
 `ancillaryMassPerTier` to the options; the packer reserves it and `validatePlan`
@@ -992,11 +992,21 @@ construction in the packer:
    where level packs (equal shaft-top planes) merge into one bearing surface
    (`unsupported-laterally`, via `footprintOver`).
 
-What is deliberately not modelled: where along the deck each timber lands. A
-station clear of plates is assumed to exist — true for real catalogues,
-where plates are short bands on long shafts. The escalation hook, if it is
-ever needed, is a per-tier clear-station check over the complement of the
-lower tiers' helix intervals.
+6. **Every pack rides on at least two timbers** (`MIN_BEARERS_PER_PACK`,
+   `too-few-bearers`). A bundle seated on one bearer see-saws about it, so
+   where along the deck each timber lands is derived as well as how thick it
+   is — per _pack_, not per tier, which is what the head-to-tail rows of §1
+   made unavoidable: two timbers sized to a tier put one under each row, not
+   two under each pack. A station has to be inside every pile of the pack,
+   clear of the pack's own plates, and standing on something — the deck, or
+   the shaft the tier below presents, plates cut out and row gaps _not_
+   bridged, because a 100 mm timber dropped into the gap between two rows
+   holds nothing. The yard's inset is 300 mm from each end, walked off any
+   plate in the way by the shorter route, inward on a tie. `deckBearers`
+   derives them once: the packer refuses bands and row positions it cannot
+   bear, the validator reports what is left, and both drawings show the
+   timbers that were checked. A pack with nothing under it at all is left to
+   the longitudinal support rule, which says it better.
 
 Module map as revised: `lane.ts` and `stagger.ts` (end-to-end fills and
 stagger offsets) are gone, and with them the `beamWidth` and
@@ -1012,7 +1022,7 @@ manifest ids ("P1" onward) the table and the drawings share — is computed on
 demand from `domain/packs.ts`, so the packer and the validator cannot drift.
 
 The capacity cost is real and priced openly: on the bench fixtures the
-packer stands at 20 trucks against the baseline's 28 (from 14 and 23 before
+packer stands at 19 trucks against the baseline's 27 (from 14 and 23 before
 the pack rules, in two steps — pack banding first, then rows and shaft
 seating). Balance took three extra levers to hold under the row rules: a
 stretch's rows are re-ordered and slid so their weight lands on the balance

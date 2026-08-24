@@ -1,4 +1,9 @@
-import {footprintOver} from '../domain/packs';
+import {
+  MIN_BEARERS_PER_PACK,
+  bearerStations,
+  bearingGround,
+  footprintOver,
+} from '../domain/packs';
 import {maxRadius} from '../domain/pile';
 import {balanceTargetOf} from '../domain/vehicle';
 import type {Placement, PlacedPile} from '../domain/placement';
@@ -384,7 +389,11 @@ function mirrorRows(chain: readonly PlacedPile[]): PlacedPile[] {
   return out;
 }
 
-/** Whether every pack of a shifted chain still stands on its footprint. */
+/**
+ * Whether every pack of a shifted chain still stands on its footprint, and
+ * can be borne there — a pack needs two timbers under it, and above the
+ * bottom tier they have to land on the shaft the tier below presents.
+ */
 function chainContained(
   chain: readonly PlacedPile[],
   input: TierInput,
@@ -392,6 +401,7 @@ function chainContained(
   if (!input.below) {
     return true;
   }
+  const ground = bearingGround(input.below, input.catalogue);
   const byPack = new Map<number, PlacedPile[]>();
   for (const pile of chain) {
     const held = byPack.get(pile.placement.pack) ?? [];
@@ -399,6 +409,11 @@ function chainContained(
     byPack.set(pile.placement.pack, held);
   }
   for (const piles of byPack.values()) {
+    // A pack has to be bearable where it lands, not merely over something:
+    // two timbers, each on shaft the tier below actually presents.
+    if (bearerStations(piles, ground).length < MIN_BEARERS_PER_PACK) {
+      return false;
+    }
     const x0 = Math.min(...piles.map(pile => pile.placement.x));
     const x1 = Math.max(
       ...piles.map(pile => pile.placement.x + pile.type.length),

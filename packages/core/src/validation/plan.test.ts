@@ -62,9 +62,20 @@ const SEMI: Vehicle = {
   towableBy: [],
 };
 
+/** A stub barely longer than a bearer, with a plate over the middle of it —
+ * there is nowhere to land a second timber. */
+const STUB: PileType = {
+  id: 'STUB-S0',
+  name: 'Stub',
+  length: 250,
+  shaftRadius: 84,
+  mass: 20,
+  helices: [{offsetFromButt: 125, radius: 225, length: 100}],
+};
+
 const CATALOGUE: Catalogue = {pileTypes: [SP168], vehicles: [SEMI]};
 const FULL_CATALOGUE: Catalogue = {
-  pileTypes: [SP168, SP139, STARTER, EXTENSION],
+  pileTypes: [SP168, SP139, STARTER, EXTENSION, STUB],
   vehicles: [SEMI],
 };
 
@@ -417,6 +428,49 @@ describe('multiple consignments', () => {
     expect(
       validatePlan({consignments: [], placements: []}, CATALOGUE, OPTIONS),
     ).toEqual([]);
+  });
+});
+
+describe('bearers', () => {
+  it('accepts a pack the yard can get two timbers under', () => {
+    const plan = planWith([place({id: 'a', x: 100})]);
+
+    expect(rules(plan)).toEqual([]);
+  });
+
+  it('flags a pack with nowhere to put a second timber', () => {
+    const plan = planWith([place({id: 'a', pileTypeId: 'STUB-S0', x: 100})]);
+
+    expect(rules(plan, FULL_CATALOGUE)).toEqual(['too-few-bearers']);
+  });
+
+  it('says which pack and why', () => {
+    const plan = planWith([place({id: 'a', pileTypeId: 'STUB-S0', x: 100})]);
+    const violation = validatePlan(plan, FULL_CATALOGUE, OPTIONS)[0];
+
+    expect(violation!.message).toContain('pack 1 of tier 1');
+    expect(violation!.message).toContain('2 timbers at least');
+  });
+
+  it('bears each row of a tier in its own right', () => {
+    // Two rows head to tail. Timbers sized to the tier would leave one under
+    // each row; both packs have to hold two of their own.
+    const plan = planWith([
+      place({id: 'a', x: 100, pack: 0}),
+      place({id: 'b', x: 6300, pack: 1}),
+    ]);
+
+    expect(rules(plan)).toEqual([]);
+  });
+
+  it('leaves a floating pack to the support rule rather than piling on', () => {
+    // Nothing under tier 2 at all: one clear finding beats two.
+    const plan = planWith([
+      place({id: 'a', tier: 0, x: 100}),
+      place({id: 'b', tier: 1, x: 6200}),
+    ]);
+
+    expect(rules(plan)).toEqual(['unsupported']);
   });
 });
 

@@ -13,8 +13,11 @@ import {
   type LoadingOptions,
 } from '../domain/loading';
 import {
+  MIN_BEARERS_PER_PACK,
   PACK_MAX_WIDTH,
+  bearingGround,
   coveredSpans,
+  deckBearers,
   footprintOver,
   layerHeights,
   layersOf,
@@ -318,6 +321,9 @@ function deckViolations(
   violations.push(
     ...checkLateralSupport(consignmentId, placements, catalogue, options),
   );
+  violations.push(
+    ...checkBearers(consignmentId, placements, catalogue, options),
+  );
 
   return violations;
 }
@@ -516,6 +522,68 @@ function checkLateralSupport(
           ),
         );
       }
+    }
+  }
+
+  return violations;
+}
+
+/**
+ * Every pack rides on at least two timbers.
+ *
+ * A bundle seated on one bearer see-saws about it: the first hard brake pitches
+ * it, and the lashings are holding a lever rather than a load. Two is the
+ * floor, and the stations are not free — a timber has to land on shaft, clear
+ * of the pack's own plates, and on something that will hold it, which above
+ * the bottom tier means the shaft the tier below presents rather than the gap
+ * between two rows. `deckBearers` derives exactly the timbers the drawings
+ * show, so a pack flagged here is a pack whose drawing is visibly short of
+ * bearers.
+ */
+function checkBearers(
+  consignmentId: string,
+  placements: readonly Placement[],
+  catalogue: Catalogue,
+  options: LoadingOptions,
+): Violation[] {
+  const counts = new Map<string, number>();
+  for (const bearer of deckBearers(placements, catalogue, options)) {
+    const key = `${bearer.tier}:${bearer.pack}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const violations: Violation[] = [];
+  const tiers = [...layersOf(placements)];
+  for (const [index, [tier, packs]] of tiers.entries()) {
+    const ground =
+      index === 0
+        ? null
+        : bearingGround([...tiers[index - 1]![1].values()].flat(), catalogue);
+
+    for (const [pack, inPack] of packs) {
+      const found = counts.get(`${tier}:${pack}`) ?? 0;
+      if (found >= MIN_BEARERS_PER_PACK) {
+        continue;
+      }
+      const span = packLongitudinalSpan(inPack, catalogue);
+      if (!span) {
+        continue;
+      }
+      if (
+        ground &&
+        !ground.some(([from, to]) => from < span[1] && to > span[0])
+      ) {
+        // Nothing under the pack at all: the longitudinal support rule owns
+        // that finding, and it reads better than "nowhere to put a timber".
+        continue;
+      }
+      violations.push(
+        error(
+          consignmentId,
+          'too-few-bearers',
+          `pack ${pack + 1} of tier ${tier + 1} lands on ${found === 0 ? 'no bearer' : `${found} bearer`} — a pack rides on ${MIN_BEARERS_PER_PACK} timbers at least, one near each end, and there is nowhere clear of its plates${tier > 0 ? ' and over the tier below' : ''} to put a second`,
+        ),
+      );
     }
   }
 

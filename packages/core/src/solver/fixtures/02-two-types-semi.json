@@ -25,18 +25,18 @@
         "id": "SP168-D6",
         "name": "SP168 6.0 m twin helix",
         "length": 6000,
-        "shaftRadius": 84,
-        "mass": 178,
+        "shaftRadius": 84.15,
+        "mass": 196,
         "helices": [
           {
             "offsetFromButt": 400,
-            "radius": 225,
-            "length": 110
+            "radius": 225.0,
+            "length": 126
           },
           {
             "offsetFromButt": 1100,
-            "radius": 175,
-            "length": 110
+            "radius": 175.0,
+            "length": 106
           }
         ]
       },
@@ -44,13 +44,13 @@
         "id": "SP139-S4",
         "name": "SP139 4.5 m single helix",
         "length": 4500,
-        "shaftRadius": 70,
-        "mass": 96,
+        "shaftRadius": 69.85,
+        "mass": 99,
         "helices": [
           {
             "offsetFromButt": 350,
-            "radius": 175,
-            "length": 90
+            "radius": 175.0,
+            "length": 106
           }
         ]
       }
@@ -72,7 +72,7 @@
     ]
   },
   "job": {
-    "name": "Papakura subdivision — two types",
+    "name": "Papakura subdivision \u2014 two types",
     "lines": [
       {
         "pileTypeId": "SP168-D6",

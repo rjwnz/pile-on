@@ -1,7 +1,7 @@
 /**
  * CSV shape for the pile type catalogue.
  *
- * A row is one shippable piece: a `pile_type` code (SP1, SP3) and a `part`,
+ * A row is one shippable piece: a `pile_type` code (SP114, SP168) and a `part`,
  * either `starter` or `extension`. The starter carries the helices; extensions
  * are plain shaft, so their helix columns are ignored. The catalogue id is
  * built from the two — one pile type can list several extension lengths.
@@ -40,10 +40,21 @@ import {
 /** Superseded by `helixN_length`; still read so old sheets keep importing. */
 const LEGACY_LENGTH_SUFFIX = 'thickness';
 
+/**
+ * The example rows are real AS/NZS 1163 CHS sizes, so the masses are the ones
+ * the yard would weigh rather than round numbers: shaft mass is the tube's
+ * annulus at 7850 kg/m³ (SP114 114.3 × 5.4 = 14.5 kg/m, SP168 168.3 × 7.1 =
+ * 28.2 kg/m, SP219 219.1 × 8.2 = 42.6 kg/m), plus each helix as a plate
+ * annulus of its own thickness. Lengths sit in the 3–7 m band the sections
+ * ship in — anything longer is made up on site out of extensions.
+ */
 export const PILE_TYPE_CSV_EXAMPLE = `pile_type,part,name,length,shaft_diameter,mass,helix1_offset,helix1_diameter,helix1_length,helix2_offset,helix2_diameter,helix2_length
-SP1,starter,,6000,168,178,400,450,110,1100,350,110
-SP1,extension,,3000,168,90,,,,,,
-SP3,starter,,4500,140,96,350,350,90,,,
+SP114,starter,,3000,114.3,49,300,300,87,,,
+SP114,extension,,3000,114.3,44,,,,,,
+SP168,starter,,6000,168.3,196,400,450,131,1100,350,106
+SP168,extension,,3000,168.3,85,,,,,,
+SP219,starter,,7000,219.1,356,500,600,170,1400,450,135
+SP219,extension,,6000,219.1,256,,,,,,
 `;
 
 function helixColumnsPresent(row: CsvRow, index: number): boolean {

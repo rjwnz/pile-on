@@ -22,21 +22,21 @@
   "catalogue": {
     "pileTypes": [
       {
-        "id": "SP219-D9",
-        "name": "SP219 9.0 m twin helix",
-        "length": 9000,
-        "shaftRadius": 110,
-        "mass": 396,
+        "id": "SP219-D7",
+        "name": "SP219 7.0 m twin helix",
+        "length": 7000,
+        "shaftRadius": 109.55,
+        "mass": 362,
         "helices": [
           {
             "offsetFromButt": 500,
-            "radius": 300,
-            "length": 140
+            "radius": 300.0,
+            "length": 170
           },
           {
             "offsetFromButt": 1400,
-            "radius": 250,
-            "length": 140
+            "radius": 250.0,
+            "length": 145
           }
         ]
       },
@@ -44,18 +44,18 @@
         "id": "SP168-D6",
         "name": "SP168 6.0 m twin helix",
         "length": 6000,
-        "shaftRadius": 84,
-        "mass": 178,
+        "shaftRadius": 84.15,
+        "mass": 196,
         "helices": [
           {
             "offsetFromButt": 400,
-            "radius": 225,
-            "length": 110
+            "radius": 225.0,
+            "length": 126
           },
           {
             "offsetFromButt": 1100,
-            "radius": 175,
-            "length": 110
+            "radius": 175.0,
+            "length": 106
           }
         ]
       },
@@ -63,13 +63,13 @@
         "id": "SP139-S4",
         "name": "SP139 4.5 m single helix",
         "length": 4500,
-        "shaftRadius": 70,
-        "mass": 96,
+        "shaftRadius": 69.85,
+        "mass": 99,
         "helices": [
           {
             "offsetFromButt": 350,
-            "radius": 175,
-            "length": 90
+            "radius": 175.0,
+            "length": 106
           }
         ]
       },
@@ -77,13 +77,13 @@
         "id": "SP114-S3",
         "name": "SP114 3.0 m single helix",
         "length": 3000,
-        "shaftRadius": 57,
-        "mass": 52,
+        "shaftRadius": 57.15,
+        "mass": 49,
         "helices": [
           {
             "offsetFromButt": 300,
-            "radius": 150,
-            "length": 80
+            "radius": 150.0,
+            "length": 87
           }
         ]
       }
@@ -105,10 +105,10 @@
     ]
   },
   "job": {
-    "name": "Hobsonville stage 3 — mixed schedule",
+    "name": "Hobsonville stage 3 \u2014 mixed schedule",
     "lines": [
       {
-        "pileTypeId": "SP219-D9",
+        "pileTypeId": "SP219-D7",
         "quantity": 18
       },
       {

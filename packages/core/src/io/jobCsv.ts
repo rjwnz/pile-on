@@ -11,8 +11,9 @@ import {readNumber, readString, type CsvRow} from './fields';
  * someone has quoted from it.
  */
 export const JOB_CSV_EXAMPLE = `pile_type_id,quantity
-SP168-D6,120
-SP139-S4,64
+SP168-starter,120
+SP168-ext-3000,84
+SP114-starter,64
 `;
 
 function parseJobRow(

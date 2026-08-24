@@ -55,8 +55,9 @@ describe('PackManifestTable', () => {
     expect(screen.getByText('P2')).toBeInTheDocument();
     expect(screen.getByText('2 × SS200 starter (6.00 m)')).toBeInTheDocument();
     expect(screen.getByText('356 kg')).toBeInTheDocument();
-    // Both packs ride tier 1 on the 200 mm bearers its plates demand.
-    expect(screen.getAllByText('200 mm')).toHaveLength(2);
+    // Both packs ride tier 1 on the 200 mm bearers its plates demand, and
+    // both are held in two places — a bundle on one timber see-saws.
+    expect(screen.getAllByText('2 × 200 mm')).toHaveLength(2);
   });
 
   it('renders nothing at all for an empty deck', () => {

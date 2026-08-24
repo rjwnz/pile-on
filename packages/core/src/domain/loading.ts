@@ -55,7 +55,8 @@ export interface LoadingOptions {
    * lateral balance tolerance instead.
    */
   readonly minPackMassRatio: number;
-  /** Gap between piles laid end to end in the same lane. */
+  /** Gap between rows of packs queued end to end along the deck. Piles never
+   * lie end to end inside a pack, so this is a between-packs figure. */
   readonly endGap: Millimetres;
   /** Clear space kept between the load and each side of the deck. */
   readonly sideMargin: Millimetres;

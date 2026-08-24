@@ -7,16 +7,8 @@ import type {Catalogue} from '../domain/catalogue';
 import type {Job} from '../domain/job';
 import type {Helix, PileType} from '../domain/pile';
 import type {Vehicle} from '../domain/vehicle';
+import {SEMI} from '../testFixtures';
 
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 's',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
-};
 const OPTIONS = DEFAULT_PACKING_OPTIONS;
 const HARD = [
   'piles-clash',

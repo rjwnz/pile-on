@@ -1,11 +1,5 @@
 import {describe, expect, it} from '@jest/globals';
-import {
-  VEHICLE_KINDS,
-  deckArea,
-  isTrailer,
-  payloadCapacity,
-  type Vehicle,
-} from './vehicle';
+import {VEHICLE_KINDS, deckArea, isTrailer, type Vehicle} from './vehicle';
 
 const SEMI: Vehicle = {
   id: 'V',
@@ -16,12 +10,6 @@ const SEMI: Vehicle = {
   payloadCapacity: 28200,
   towableBy: [],
 };
-
-describe('payloadCapacity', () => {
-  it('reports the stated load capacity', () => {
-    expect(payloadCapacity(SEMI)).toBe(28200);
-  });
-});
 
 describe('deckArea', () => {
   it('multiplies deck length by width', () => {

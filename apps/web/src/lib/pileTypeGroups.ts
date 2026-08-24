@@ -1,4 +1,4 @@
-import {pilePartOf, pileTypeCode, type PileType} from '@pile-on/core';
+import {groupBy, pilePartOf, pileTypeCode, type PileType} from '@pile-on/core';
 
 /** A pile-type code and every shippable piece that belongs to it. */
 export interface PileTypeGroup {
@@ -14,16 +14,7 @@ export interface PileTypeGroup {
 export function groupPileTypes(
   types: readonly PileType[],
 ): readonly PileTypeGroup[] {
-  const groups = new Map<string, PileType[]>();
-  for (const type of types) {
-    const code = pileTypeCode(type);
-    const members = groups.get(code);
-    if (members) {
-      members.push(type);
-    } else {
-      groups.set(code, [type]);
-    }
-  }
+  const groups = groupBy(types, pileTypeCode);
   return [...groups].map(([code, members]) => ({
     code,
     members: [...members].sort(byPart),

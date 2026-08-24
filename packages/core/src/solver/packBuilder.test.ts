@@ -2,7 +2,6 @@ import {describe, expect, it} from '@jest/globals';
 import type {Catalogue} from '../domain/catalogue';
 import {PACK_MAX_WIDTH} from '../domain/packs';
 import type {PileType} from '../domain/pile';
-import type {Vehicle} from '../domain/vehicle';
 import {DEFAULT_PACKING_OPTIONS, withoutFlips} from './options';
 import {
   buildPackCandidates,
@@ -11,15 +10,8 @@ import {
   packFlips,
   type BuiltPack,
 } from './packBuilder';
-
-const STARTER: PileType = {
-  id: 'SS200-starter',
-  name: 'SS200 starter',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 178,
-  helices: [{offsetFromButt: 400, radius: 225, length: 110}],
-};
+import {SEMI} from '../testFixtures';
+import {SS200_STARTER as STARTER} from '../testFixtures';
 
 const EXT_LONG: PileType = {
   id: 'SS200-ext-6000',
@@ -37,16 +29,6 @@ const EXT_SHORT: PileType = {
   shaftRadius: 84,
   mass: 66,
   helices: [],
-};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
 };
 
 const CATALOGUE: Catalogue = {

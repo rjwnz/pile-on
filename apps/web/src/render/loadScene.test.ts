@@ -4,32 +4,10 @@ import {
   DEFAULT_LOADING_OPTIONS,
   type Catalogue,
   type Placement,
-  type Vehicle,
 } from '@pile-on/core';
 import {buildLoadScene, frameIsometric} from './loadScene';
 import {colourForPileType} from './palette';
-
-const SP168 = {
-  id: 'SP168-D6',
-  name: 'SP168',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 178,
-  helices: [
-    {offsetFromButt: 400, radius: 225, length: 110},
-    {offsetFromButt: 1100, radius: 175, length: 110},
-  ],
-};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
-};
+import {SEMI, SP168} from '@pile-on/core/testFixtures';
 
 const CATALOGUE: Catalogue = {pileTypes: [SP168], vehicles: [SEMI]};
 const OPTIONS = DEFAULT_LOADING_OPTIONS;

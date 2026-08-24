@@ -10,37 +10,7 @@ import {
 } from '@pile-on/core';
 import {AppStateProvider} from '../state/AppStateProvider';
 import {JobSection} from './JobSection';
-
-const SP168: PileType = {
-  id: 'SP168-D6',
-  name: 'SP168 6.0 m twin helix',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 178,
-  helices: [
-    {offsetFromButt: 400, radius: 225, length: 110},
-    {offsetFromButt: 1100, radius: 175, length: 110},
-  ],
-};
-
-const SP139: PileType = {
-  id: 'SP139-S4',
-  name: 'SP139 4.5 m single helix',
-  length: 4500,
-  shaftRadius: 70,
-  mass: 96,
-  helices: [{offsetFromButt: 350, radius: 175, length: 90}],
-};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
-};
+import {SEMI, SP139, SP168} from '@pile-on/core/testFixtures';
 
 function renderJob({
   pileTypes = [SP168, SP139],

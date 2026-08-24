@@ -1,5 +1,6 @@
 import type {Kilograms, Millimetres} from '../units';
 import {GEOMETRIC_EPSILON} from '../units';
+import {groupBy} from '../collections';
 import {radiusProfile} from '../geometry/profile';
 import {requiredAxisDistance} from '../geometry/separation';
 import {findPileType, type Catalogue} from './catalogue';
@@ -57,21 +58,32 @@ export type TierPacks = Map<number, Placement[]>;
 export function layersOf(
   placements: readonly Placement[],
 ): Map<number, TierPacks> {
-  const tiers = new Map<number, TierPacks>();
-  for (const placement of placements) {
-    let packs = tiers.get(placement.tier);
-    if (!packs) {
-      packs = new Map();
-      tiers.set(placement.tier, packs);
-    }
-    const pack = packs.get(placement.pack);
-    if (pack) {
-      pack.push(placement);
-    } else {
-      packs.set(placement.pack, [placement]);
-    }
-  }
-  return new Map([...tiers].sort((a, b) => a[0] - b[0]));
+  return new Map(
+    [...groupBy(placements, placement => placement.tier)]
+      .sort((a, b) => a[0] - b[0])
+      .map(([tier, inTier]) => [
+        tier,
+        groupBy(inTier, placement => placement.pack),
+      ]),
+  );
+}
+
+/** Everything in a tier, pack structure dropped. */
+export function flattenPacks(packs: TierPacks): Placement[] {
+  return [...packs.values()].flat();
+}
+
+/** One tier of a deck: its index and every placement on it. */
+export interface TierLayer {
+  readonly tier: number;
+  readonly placements: readonly Placement[];
+}
+
+/** Placements grouped into tiers, bottom tier first. */
+export function tierLayers(placements: readonly Placement[]): TierLayer[] {
+  return [...groupBy(placements, placement => placement.tier)]
+    .sort((a, b) => a[0] - b[0])
+    .map(([tier, inTier]) => ({tier, placements: inTier}));
 }
 
 /**
@@ -331,11 +343,11 @@ function mergeLevel(
 }
 
 /** Pairwise intersection of two lists of closed intervals, empties dropped. */
-function intersectSpans(
-  a: readonly (readonly [Millimetres, Millimetres])[],
-  b: readonly (readonly [Millimetres, Millimetres])[],
-): [Millimetres, Millimetres][] {
-  const out: [Millimetres, Millimetres][] = [];
+export function intersectSpans(
+  a: readonly (readonly [number, number])[],
+  b: readonly (readonly [number, number])[],
+): [number, number][] {
+  const out: [number, number][] = [];
   for (const [aLow, aHigh] of a) {
     for (const [bLow, bHigh] of b) {
       const low = Math.max(aLow, bLow);
@@ -462,7 +474,7 @@ export function layerHeights(
   const heights = new Map<number, LayerHeight>();
   const below: SeatedLayer[] = [];
   for (const packs of layersOf(placements).values()) {
-    const layer = [...packs.values()].flat();
+    const layer = flattenPacks(packs);
     const tier = layer[0]!.tier;
     const last = below[below.length - 1];
     const shaftTopBelow = last ? shaftTopOf(last, catalogue) : 0;
@@ -575,7 +587,7 @@ export function bearingGround(
  *   3. on ground that will hold it: the deck (`ground` null, which is
  *      continuous), or the shaft the tier below presents.
  */
-export function bearerWindows(
+function bearerWindows(
   piles: readonly PlacedPile[],
   ground: readonly (readonly [Millimetres, Millimetres])[] | null,
 ): [Millimetres, Millimetres][] {
@@ -719,7 +731,7 @@ export function deckBearers(
         });
       }
     }
-    below = [...packs.values()].flat();
+    below = flattenPacks(packs);
   }
 
   return bearers;
@@ -727,17 +739,7 @@ export function deckBearers(
 
 /** A deck's bearers keyed `tier:pack`, in the order they were derived. */
 function groupBearers(bearers: readonly Bearer[]): Map<string, Bearer[]> {
-  const grouped = new Map<string, Bearer[]>();
-  for (const bearer of bearers) {
-    const key = `${bearer.tier}:${bearer.pack}`;
-    const held = grouped.get(key);
-    if (held) {
-      held.push(bearer);
-    } else {
-      grouped.set(key, [bearer]);
-    }
-  }
-  return grouped;
+  return groupBy(bearers, bearer => `${bearer.tier}:${bearer.pack}`);
 }
 
 /**

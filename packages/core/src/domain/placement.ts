@@ -2,8 +2,7 @@ import type {Millimetres} from '../units';
 import type {PileType} from './pile';
 
 /** Which deck of a movement a pile rides on. */
-export const DECK_ROLES = ['truck', 'trailer'] as const;
-export type DeckRole = (typeof DECK_ROLES)[number];
+export type DeckRole = 'truck' | 'trailer';
 
 /**
  * Deck coordinate system, used everywhere:

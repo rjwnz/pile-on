@@ -25,7 +25,6 @@ import {
   consignmentPayload,
   deckArea,
   parseAppState,
-  payloadCapacity,
   pack,
   validatePlan,
   withoutFlips,
@@ -105,7 +104,7 @@ function utilisation(
       deck += footprint / (deckArea(vehicle) * tiers);
       mass +=
         consignmentPayload(on, state.catalogue, options) /
-        payloadCapacity(vehicle);
+        vehicle.payloadCapacity;
       const offset = balanceOffset(on, state.catalogue, vehicle);
       balance = Math.max(
         balance,
@@ -121,8 +120,7 @@ function utilisation(
 }
 
 function run(state: AppState, fixture: string): Row {
-  const vehicle = state.catalogue.vehicles[0];
-  if (!vehicle) {
+  if (state.catalogue.vehicles.length === 0) {
     throw new Error(`${fixture} has no vehicle to load onto`);
   }
   const options: PackingOptions = {

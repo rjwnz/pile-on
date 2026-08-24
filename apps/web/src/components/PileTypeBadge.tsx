@@ -1,3 +1,5 @@
+import {isSingleHelix, type PileType} from '@pile-on/core';
+
 /**
  * A pile-type code shown as a colour-coded lozenge. The colour is a pure
  * function of the code, so the same pile type wears the same colour in every
@@ -38,4 +40,22 @@ export function PileTypeBadge({code}: {readonly code: string}) {
       {code}
     </span>
   );
+}
+
+/** How a pile type's plates read in a table: how many, and whether they may
+ * interleave with a neighbour's. Both catalogue tables say it the same way. */
+export function describeHelices(type: PileType): string {
+  if (type.helices.length === 0) {
+    return 'plain shaft';
+  }
+  const count =
+    type.helices.length === 1 ? '1 helix' : `${type.helices.length} helices`;
+  return `${count} · ${isSingleHelix(type) ? 'interleaves' : 'no interleave'}`;
+}
+
+/** Why that matters, for the title attribute. */
+export function explainHelices(type: PileType): string {
+  return isSingleHelix(type)
+    ? 'One helix. Its plate can interleave with another single-helix pile, saving deck length.'
+    : 'More than one helix. It needs full clearance from every neighbour, so it cannot interleave.';
 }

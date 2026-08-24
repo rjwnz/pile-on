@@ -20,10 +20,11 @@ isometric view of each deck, with the load checked against the NZ limits.
 **Packer stages 1, 2 and the 4+5 core of 6 are in.** The helix-aware packer
 works, and it packs onto a mixed fleet: every truck in the catalogue, each
 towing up to one trailer (`towableBy` on the trailer row says which trucks
-may). A truck and its trailer count as one movement, budgeted together under
-the 44 t route cap, and on the benchmark fixtures the packer takes **19
-movements where the bounding-box control takes 27**. Still to come from
-stages 4-6: the solo-towing-unit cap, a cost model, LNS repair, and phases.
+may). A truck and its trailer count as one movement, and each deck fills to
+its own stated payload — there is no combined gross cap to share out. On the
+benchmark fixtures the packer takes **19 movements where the bounding-box
+control takes 27**. Still to come from stages 4-6: the solo-towing-unit cap, a
+cost model, LNS repair, and phases.
 
 That is the whole business case, and it comes from one observation: a pile is
 not a cylinder of its widest diameter. A plate is a short fat band on a thin
@@ -63,8 +64,8 @@ numbers it judges against being settable and saved with the job:
 - **Separation in three dimensions.** Piles rest on their widest point, so two
   diameters in one tier already sit at different heights. That vertical offset
   is clearance the lateral rule can spend.
-- **The envelope.** Overhang against what each vehicle will actually carry, and
-  the side margins, are enforced rather than assumed — see below.
+- **The envelope.** The load fits between headboard and tailgate, inside the
+  side margins, with no overhang — enforced rather than assumed.
 - **Balance.** The load centre of mass against where the deck wants it, within a
   settable tolerance — see the caveat below.
 - **Honest mass.** Bearers, chocks and lashings count against the payload.
@@ -80,29 +81,18 @@ Still to come: vertical interleaving (stage 3), the solo-tractor rule and a
 cost model (4/5 leftovers), LNS repair (5), phases and early delivery (6).
 Single phase only until then; the schedule is a quantity per pile type.
 
-### Overhang
+### The envelope
 
-**Default zero: the load must fit on the deck.** Past the allowance is an
-`over-rear-overhang` error, not a note, and the packer will not build one. Inside
-it the plan says so — a warning, and past a metre a reminder that it needs flags
-by day and lamps at night.
+**The load must fit on the deck.** A pile projecting past the tailgate is an
+`over-rear-overhang` error, one ahead of the headboard is `ahead-of-headboard`,
+and the packer will not build either. There is no per-vehicle overhang
+allowance: VDAM states rear overhang against axle spacing, and axle positions
+were deliberately scoped out, so there is no honest figure to hold a load
+against. Zero is the reading that cannot be wrong in the unsafe direction.
 
-The allowance is set **per vehicle**, on the Vehicles tab, not in the loading
-rules. VDAM states rear overhang as the lesser of a fixed distance and a fraction
-of the axle spacing, so how far a load may hang out is a fact about a particular
-unit rather than about a job — and it cannot be derived here, because axle
-positions were deliberately scoped out. It is what the yard says this trailer
-will carry.
-
-A deck carrying an overhang gets a metric reading what it uses against what it
-is allowed. A deck with no overhang and no allowance shows nothing — a column
-reading "0 of 0 mm" on every deck is the noise that stops the one that matters
-being noticed.
-
-One interaction to know about: the allowance applies to the row whether it runs
-solo or in a combination, so a truck with a rear allowance may legally carry
-overhang while towing — into the drawbar space. Set `maxRearOverhang: 0` on
-trucks that tow; `docs/01-packer-design.md` §4.4 records the limitation.
+Across the deck the side margin is a loading rule rather than a vehicle fact —
+clear space kept between the steel and each edge — and a pile reaching into it
+is `outside-side-margin`.
 
 ### What the packer does not promise
 
@@ -136,22 +126,30 @@ fixes it; too loose accepts an illegal one silently and it reaches the road.
 `docs/01-packer-design.md` §4.6 shows the ceilings that _are_ derivable and what
 the real numbers should be measured against.
 
-Where a deck wants its load is the same kind of question. A semi wants mass
-forward toward the kingpin and a rigid does not, so `balanceTarget` is left null
-— "nobody has said" — and mid-deck is assumed until the yard gives a figure.
+Where a deck wants its load is the same kind of question, and it got the same
+answer: every load balances to **mid-deck**. A semi arguably wants mass forward
+toward the kingpin and a rigid does not, but which and by how much needs the
+axle geometry that is not modelled, so there is no per-vehicle target to set.
 
 ### CSV formats
 
 Headers are case-insensitive and a block pasted from Excel works (tabs are
 detected). Every importer offers merge or replace.
 
-**Pile types.** Helices are flat numbered columns, because this catalogue is
-maintained in a spreadsheet. Any number of helices works; the parser scans
-`helix1_*`, `helix2_*`, … until they run out.
+**Pile types.** A row is one shippable piece: a `pile_type` code and a `part`,
+either `starter` or `extension`. The starter carries the helices; an extension
+is plain shaft, so its helix columns are ignored. The catalogue id is built
+from the two, so one pile type can list several extension lengths. Shaft and
+plate sizes are entered as **diameters** — the figure stamped on the pile.
+
+Helices are flat numbered columns, because this catalogue is maintained in a
+spreadsheet. Any number of helices works; the parser scans `helix1_*`,
+`helix2_*`, … until they run out.
 
 ```
-id,name,length,shaft_radius,mass,helix1_offset,helix1_radius,helix1_length
-SP139-S4,SP139 4.5 m single helix,4500,70,96,350,175,90
+pile_type,part,name,length,shaft_diameter,mass,helix1_offset,helix1_diameter,helix1_length
+SP168,starter,,6000,168.3,196,400,450,131
+SP168,extension,,3000,168.3,85,,,
 ```
 
 `helixN_length` is the axial length of the helix — plate thickness plus the rise
@@ -164,21 +162,17 @@ trailer is a row whose `towable_by` names the trucks allowed to tow it,
 semicolon-separated.
 
 ```
-id,name,kind,deck_length,deck_width,deck_height,tare,max_gross,max_front_overhang,max_rear_overhang,balance_target,towable_by
-SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,1350,15800,44000,0,0,,
-RIGID-8,8-wheeler rigid,rigid,7200,2450,1200,10600,30000,0,0,,
-TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,1150,6800,22000,0,0,,RIGID-8
+id,name,kind,deck_length,deck_width,payload_capacity,towable_by
+SEMI-45,Tractor + 4-axle semi,semi_trailer,12500,2450,28200,
+RIGID-8,8-wheeler rigid,rigid,7200,2450,19400,
+TRAILER-4A,4-axle full trailer,full_trailer,8100,2450,15200,RIGID-8
 ```
 
 `kind` is one of `rigid`, `semi_trailer`, `full_trailer`, `simple_trailer`,
-`b_train`.
-
-The loading columns are optional and default to the conservative reading — no
-overhang either end, no opinion about where the load should sit, towed by
-nobody — so a sheet written before they existed still imports and still means
-what it meant. None of them can be derived: VDAM states rear overhang against
-axle spacing, and where a deck wants its load depends on where its axles are. A
-blank `balance_target` means unstated, which is not the same as mid-deck.
+`b_train`, and is a label — `towable_by` is the field that decides what may
+move with what. `payload_capacity` is the mass this deck may carry, piles,
+bearers and lashings together: the operator states it directly, because it is
+the only mass figure the packer and the rules ever consult.
 
 **Piling schedule.** A quantity per pile type. Pile types must already exist in
 the catalogue — a schedule naming an unknown type is rejected with the id, since
@@ -188,8 +182,8 @@ building or grid line.
 
 ```
 pile_type_id,quantity
-SP168-D6,120
-SP139-S4,64
+SP168-starter,120
+SP168-ext-3000,84
 ```
 
 ### Why there are no axle limits
@@ -198,8 +192,8 @@ Axle positions, tyre classes and the VDAM bridge formula were modelled and then
 removed. In this operation the total payload limit is always reached before any
 individual axle or axle-set limit, so the axle model cost real complexity —
 including a deck-origin-to-axle coordinate mapping needed for the statics — to
-enforce a constraint that never binds. **`maxGross − tare` is the mass
-constraint.**
+enforce a constraint that never binds. **The deck's stated payload capacity is
+the mass constraint.**
 
 Even distribution is still required. It is a load-balance question — centroid
 against the deck centre and the centreline — and does not need axle geometry.

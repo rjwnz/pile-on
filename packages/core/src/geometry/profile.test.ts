@@ -1,10 +1,5 @@
 import {describe, expect, it} from '@jest/globals';
-import {
-  breakpoints,
-  coversStation,
-  helixRadiusAt,
-  radiusProfile,
-} from './profile';
+import {breakpoints, helixRadiusAt, radiusProfile} from './profile';
 import {
   HELIX_RADIUS,
   PILE_LENGTH,
@@ -15,7 +10,7 @@ import {
   helixAt,
   pileType,
   place,
-} from './testFixtures';
+} from '../testFixtures';
 
 describe('radiusProfile', () => {
   it('gives a plain shaft one segment spanning the whole pile', () => {
@@ -103,20 +98,6 @@ describe('helixRadiusAt', () => {
     ]);
 
     expect(helixRadiusAt(radiusProfile(place(stacked)), 500)).toBe(350);
-  });
-});
-
-describe('coversStation', () => {
-  const profile = radiusProfile(place(PLAIN, {x: 1000}));
-
-  it('is true within the pile extent', () => {
-    expect(coversStation(profile, 1000)).toBe(true);
-    expect(coversStation(profile, 4000)).toBe(true);
-  });
-
-  it('is false outside it', () => {
-    expect(coversStation(profile, 999)).toBe(false);
-    expect(coversStation(profile, 1000 + PILE_LENGTH)).toBe(false);
   });
 });
 

@@ -8,7 +8,6 @@ import {
   loadHeight,
   loadWidth,
   packManifest,
-  payloadCapacity,
   tiersOf,
   toMetres,
   toTonnes,
@@ -102,7 +101,7 @@ function DeckView({
   // Bearers and lashings included: this is the number the payload limit
   // applies to, and showing the piles alone would flatter the load.
   const mass = consignmentPayload(placements, catalogue, options);
-  const payload = payloadCapacity(vehicle);
+  const payload = vehicle.payloadCapacity;
   const height = loadHeight(placements, catalogue, options);
   const width = loadWidth(placements, catalogue);
   const offset = balanceOffset(placements, catalogue, vehicle);
@@ -256,7 +255,7 @@ function Movement({
       consignmentPayload(trailerPlacements, catalogue, options)
     : null;
   const combinedCapacity = trailer
-    ? payloadCapacity(vehicle) + payloadCapacity(trailer)
+    ? vehicle.payloadCapacity + trailer.payloadCapacity
     : null;
 
   return (

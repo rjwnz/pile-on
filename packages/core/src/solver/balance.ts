@@ -2,7 +2,7 @@ import {loadCentroid} from '../domain/balance';
 import type {Catalogue} from '../domain/catalogue';
 import {findPileType} from '../domain/catalogue';
 import type {Placement} from '../domain/placement';
-import {balanceTargetOf, loadableSpan, type Vehicle} from '../domain/vehicle';
+import {balanceTargetOf, type Vehicle} from '../domain/vehicle';
 import type {Millimetres} from '../units';
 
 /**
@@ -13,7 +13,7 @@ import type {Millimetres} from '../units';
  * The centroid moves one-for-one with the shift, so the correction is a single
  * subtraction rather than a search, and because every pile moves by the same
  * amount nothing else about the layout changes — separations, tier support and
- * lane structure are all preserved exactly.
+ * pack structure are all preserved exactly.
  *
  * The shift is clamped to keep the load inside what the vehicle may carry, so a
  * load that is long enough to pin both ends simply does not move. That is not a
@@ -57,9 +57,9 @@ export function balancingShift(
     end = Math.max(end, placement.x + type.length);
   }
 
-  const [minX, maxX] = loadableSpan(vehicle);
-  const lowest = minX - start;
-  const highest = maxX - end;
+  // Headboard to tailgate, no overhang.
+  const lowest = -start;
+  const highest = vehicle.deckLength - end;
   if (lowest > highest) {
     // The load does not fit the span at all. Moving it cannot make that better,
     // and the envelope check is what should be reporting it.

@@ -18,6 +18,7 @@ import {
   bearingGround,
   coveredSpans,
   deckBearers,
+  flattenPacks,
   footprintOver,
   layerHeights,
   layersOf,
@@ -26,18 +27,9 @@ import {
   packMass,
   packWidth,
 } from '../domain/packs';
-
-// Re-exported from its old home so existing importers keep working; the
-// packer and this file must share one idea of when bearers bridge a gap.
-export {coveredSpans} from '../domain/packs';
 import {maxRadius, pilePartOf, pileTypeCode} from '../domain/pile';
 import type {DeckRole, PlacedPile, Placement} from '../domain/placement';
-import {
-  balanceTargetOf,
-  isTrailer,
-  payloadCapacity,
-  type Vehicle,
-} from '../domain/vehicle';
+import {balanceTargetOf, isTrailer, type Vehicle} from '../domain/vehicle';
 import {requiredLateralSeparation} from '../geometry/separation';
 import {NZ_VDAM_2016, type VdamRuleset} from '../rules/nzVdam';
 import {GEOMETRIC_EPSILON, toMetres} from '../units';
@@ -263,7 +255,7 @@ function deckViolations(
   const violations: Violation[] = [];
 
   const mass = consignmentPayload(placements, catalogue, options);
-  const payload = payloadCapacity(vehicle);
+  const payload = vehicle.payloadCapacity;
   if (mass > payload) {
     violations.push(
       error(
@@ -482,13 +474,15 @@ function checkLateralSupport(
   options: LoadingOptions,
 ): Violation[] {
   const violations: Violation[] = [];
-  const tiers = [...layersOf(placements)];
+  let below: Placement[] | null = null;
 
-  for (const [index, [tier, packs]] of tiers.entries()) {
-    if (index === 0) {
+  for (const [tier, packs] of layersOf(placements)) {
+    const beneath = below;
+    below = flattenPacks(packs);
+    if (beneath === null) {
+      // The bottom tier stands on the deck, which is continuous.
       continue;
     }
-    const below = [...tiers[index - 1]![1].values()].flat();
 
     for (const [packIndex, pack] of packs) {
       const span = packLateralSpan(pack, catalogue);
@@ -497,7 +491,7 @@ function checkLateralSupport(
         continue;
       }
       const footprint = footprintOver(
-        below,
+        beneath,
         catalogue,
         options,
         xSpan[0],
@@ -553,12 +547,10 @@ function checkBearers(
   }
 
   const violations: Violation[] = [];
-  const tiers = [...layersOf(placements)];
-  for (const [index, [tier, packs]] of tiers.entries()) {
-    const ground =
-      index === 0
-        ? null
-        : bearingGround([...tiers[index - 1]![1].values()].flat(), catalogue);
+  let below: Placement[] | null = null;
+  for (const [tier, packs] of layersOf(placements)) {
+    const ground = below ? bearingGround(below, catalogue) : null;
+    below = flattenPacks(packs);
 
     for (const [pack, inPack] of packs) {
       const found = counts.get(`${tier}:${pack}`) ?? 0;
@@ -593,10 +585,10 @@ function checkBearers(
 /**
  * Every pile above the bottom tier has to be resting on something.
  *
- * Support is judged along the deck only. Dunnage bearers run across the full
- * width, so a tier is carried wherever the tier below has material under the
- * bearers; the gaps that matter are longitudinal ones, where a partly filled
- * tier leaves the tier above it hanging over thin air.
+ * This is the longitudinal half of support: a pile has to lie over a stretch
+ * of deck the tier below covers, or it hangs over thin air. Across the deck is
+ * `checkLateralSupport`'s job, because a bearer runs only the width of the
+ * pack it carries rather than the width of the deck.
  */
 function checkSupport(
   consignmentId: string,
@@ -769,12 +761,7 @@ function checkSeparations(
   });
 
   const heights = layerHeights(placements, catalogue, options);
-  const byTier = new Map<number, PlacedPile[]>();
-  for (const placed of resolved) {
-    const tier = byTier.get(placed.placement.tier) ?? [];
-    tier.push(placed);
-    byTier.set(placed.placement.tier, tier);
-  }
+  const byTier = groupBy(resolved, placed => placed.placement.tier);
 
   for (const tier of byTier.values()) {
     for (let i = 0; i < tier.length; i++) {

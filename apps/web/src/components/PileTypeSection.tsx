@@ -10,7 +10,7 @@ import {useEditor} from '../lib/useEditor';
 import {groupPileTypes} from '../lib/pileTypeGroups';
 import {useAppState} from '../state/AppStateProvider';
 import {CsvImportPanel} from './CsvImportPanel';
-import {PileTypeBadge} from './PileTypeBadge';
+import {PileTypeBadge, describeHelices, explainHelices} from './PileTypeBadge';
 import {PileTypeForm, describeWidth} from './PileTypeForm';
 import {Button, EmptyState, Panel} from './ui';
 
@@ -96,19 +96,9 @@ export function PileTypeSection() {
                               ? 'rounded bg-green-100 px-1.5 py-0.5 text-xs text-green-900'
                               : 'rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900'
                           }
-                          title={
-                            isSingleHelix(type)
-                              ? 'One helix. Its plate can interleave with another single-helix pile, saving deck length.'
-                              : 'More than one helix. It needs full clearance from every neighbour, so it cannot interleave.'
-                          }
+                          title={explainHelices(type)}
                         >
-                          {type.helices.length === 1
-                            ? '1 helix'
-                            : `${type.helices.length} helices`}{' '}
-                          ·{' '}
-                          {isSingleHelix(type)
-                            ? 'interleaves'
-                            : 'no interleave'}
+                          {describeHelices(type)}
                         </span>
                       )}
                     </td>

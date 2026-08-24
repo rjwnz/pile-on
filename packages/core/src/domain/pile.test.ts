@@ -6,7 +6,7 @@ import {
   PLAIN,
   SHAFT_RADIUS,
   SINGLE,
-} from '../geometry/testFixtures';
+} from '../testFixtures';
 
 describe('isSingleHelix', () => {
   it('is true for exactly one plate', () => {

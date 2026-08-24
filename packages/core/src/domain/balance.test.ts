@@ -4,7 +4,7 @@ import type {Catalogue} from './catalogue';
 import {DEFAULT_LOADING_OPTIONS} from './loading';
 import type {PileType} from './pile';
 import type {Placement} from './placement';
-import type {Vehicle} from './vehicle';
+import {SEMI} from '../testFixtures';
 
 const LIGHT: PileType = {
   id: 'LIGHT',
@@ -16,16 +16,6 @@ const LIGHT: PileType = {
 };
 
 const HEAVY: PileType = {...LIGHT, id: 'HEAVY', name: 'Heavy', mass: 300};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
-};
 
 const CATALOGUE: Catalogue = {pileTypes: [LIGHT, HEAVY], vehicles: [SEMI]};
 

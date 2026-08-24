@@ -9,6 +9,9 @@ module.exports = {
   moduleNameMapper: {
     // Mirror the Vite alias so tests import the same source the app bundles.
     '^@pile-on/core$': '<rootDir>/../../packages/core/src/index.ts',
+    // Subpath imports, which in practice means the shared test fixtures: the
+    // web suite loads the same steel and the same deck as core's.
+    '^@pile-on/core/(.*)$': '<rootDir>/../../packages/core/src/$1.ts',
     '\\.css$': '<rootDir>/src/testing/styleMock.cjs',
   },
   transform: {

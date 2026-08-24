@@ -6,11 +6,18 @@ import {
 } from '../domain/loading';
 import {PACK_MAX_WIDTH} from '../domain/packs';
 import {maxRadius, type PileType} from '../domain/pile';
-import {deckArea, payloadCapacity, type Vehicle} from '../domain/vehicle';
+import {deckArea, type Vehicle} from '../domain/vehicle';
 import type {Millimetres} from '../units';
 
+/** Demand no deck could take, and why. Both solvers report it this way. */
+export interface UnplacedDemand {
+  readonly pileTypeId: string;
+  readonly quantity: number;
+  readonly reason: string;
+}
+
 /** Why a pile type can never go on this vehicle, or null if it can. */
-export function unplaceableReason(
+function unplaceableReason(
   type: PileType,
   vehicle: Vehicle,
   options: LoadingOptions,
@@ -29,7 +36,7 @@ export function unplaceableReason(
   if (tierHeight > MAX_LOAD_HEIGHT) {
     return `a single tier is ${tierHeight} mm, over the ${MAX_LOAD_HEIGHT} mm a deck can carry`;
   }
-  const payload = payloadCapacity(vehicle);
+  const payload = vehicle.payloadCapacity;
   if (type.mass + options.ancillaryMassPerTier > payload) {
     return `one pile plus its bearers is ${type.mass + options.ancillaryMassPerTier} kg, over the ${payload} kg payload`;
   }
@@ -63,19 +70,21 @@ export function unplaceableOnFleet(
     return 'no self-propelled truck in the catalogue';
   }
 
-  let nearest: {vehicle: Vehicle; reason: string} | null = null;
+  let nearest: {vehicle: Vehicle; reason: string; length: Millimetres} | null =
+    null;
   for (const deck of decks.values()) {
-    const reason = unplaceableReason(type, deck, options, usableOf(deck));
+    const usable = usableOf(deck);
+    const reason = unplaceableReason(type, deck, options, usable);
     if (!reason) {
       return null;
     }
-    if (
+    const roomier =
       !nearest ||
-      usableOf(deck).length > usableOf(nearest.vehicle).length ||
-      (usableOf(deck).length === usableOf(nearest.vehicle).length &&
-        deckArea(deck) > deckArea(nearest.vehicle))
-    ) {
-      nearest = {vehicle: deck, reason};
+      usable.length > nearest.length ||
+      (usable.length === nearest.length &&
+        deckArea(deck) > deckArea(nearest.vehicle));
+    if (roomier) {
+      nearest = {vehicle: deck, reason, length: usable.length};
     }
   }
   return `fits no vehicle in the fleet — best case (${nearest!.vehicle.name}): ${nearest!.reason}`;

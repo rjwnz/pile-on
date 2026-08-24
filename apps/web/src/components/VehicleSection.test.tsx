@@ -4,16 +4,7 @@ import userEvent from '@testing-library/user-event';
 import {emptyAppState, type AppState, type Vehicle} from '@pile-on/core';
 import {AppStateProvider} from '../state/AppStateProvider';
 import {VehicleSection} from './VehicleSection';
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Tractor + 4-axle semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
-};
+import {SEMI} from '@pile-on/core/testFixtures';
 
 function renderWith(vehicles: Vehicle[] = []) {
   const state: AppState = {

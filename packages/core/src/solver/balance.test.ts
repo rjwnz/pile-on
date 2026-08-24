@@ -4,7 +4,7 @@ import {loadCentroid} from '../domain/balance';
 import type {Catalogue} from '../domain/catalogue';
 import type {PileType} from '../domain/pile';
 import type {Placement} from '../domain/placement';
-import type {Vehicle} from '../domain/vehicle';
+import {SEMI} from '../testFixtures';
 
 const PILE: PileType = {
   id: 'P6',
@@ -13,16 +13,6 @@ const PILE: PileType = {
   shaftRadius: 84,
   mass: 178,
   helices: [],
-};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [PILE], vehicles: [SEMI]};

@@ -12,55 +12,11 @@ import type {Job} from '../domain/job';
 import type {PileType} from '../domain/pile';
 import type {Placement} from '../domain/placement';
 import type {Vehicle} from '../domain/vehicle';
-
-const SP168: PileType = {
-  id: 'SP168-D6',
-  name: 'SP168',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 178,
-  helices: [
-    {offsetFromButt: 400, radius: 225, length: 110},
-    {offsetFromButt: 1100, radius: 175, length: 110},
-  ],
-};
-
-const SP139: PileType = {
-  id: 'SP139-S4',
-  name: 'SP139',
-  length: 4500,
-  shaftRadius: 70,
-  mass: 96,
-  helices: [{offsetFromButt: 350, radius: 175, length: 90}],
-};
-
-const STARTER: PileType = {
-  id: 'SS200-starter',
-  name: 'SS200 starter',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 178,
-  helices: [{offsetFromButt: 400, radius: 225, length: 110}],
-};
-
-const EXTENSION: PileType = {
-  id: 'SS200-ext-6000',
-  name: 'SS200 extension',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 132,
-  helices: [],
-};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
-};
+import {SEMI, SP139, SP168} from '../testFixtures';
+import {
+  SS200_STARTER as STARTER,
+  SS200_EXTENSION as EXTENSION,
+} from '../testFixtures';
 
 /** A stub barely longer than a bearer, with a plate over the middle of it —
  * there is nowhere to land a second timber. */

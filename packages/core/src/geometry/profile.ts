@@ -87,16 +87,6 @@ export function helixRadiusAt(
   return widest;
 }
 
-/** Whether the pile occupies `station` at all. */
-export function coversStation(
-  profile: readonly RadiusSegment[],
-  station: Millimetres,
-): boolean {
-  return profile.some(
-    segment => station >= segment.start && station < segment.end,
-  );
-}
-
 /**
  * Sorted, de-duplicated breakpoints of two profiles — every x at which either
  * profile's radius can change. Between consecutive breakpoints both profiles

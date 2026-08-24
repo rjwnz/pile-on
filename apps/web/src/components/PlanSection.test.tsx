@@ -116,7 +116,7 @@ describe('arranging', () => {
     await user.click(screen.getByRole('button', {name: /Pack 95 piles/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan \(2 movements\)/}),
+      screen.getByRole('heading', {name: /Loading plan \(3 movements\)/}),
     ).toBeInTheDocument();
   });
 
@@ -277,11 +277,11 @@ describe('the loading rules drive what the plan is judged against', () => {
     expect(screen.queryByText(/aft of the/)).not.toBeInTheDocument();
   });
 
-  it('flags the lateral drift a part-filled baseline tier leaves behind', async () => {
-    // The control fills lanes from the middle out and then stops, so an odd
-    // number of piles on the top tier leaves a real residue. The packer does
-    // not have this problem — it turns alternate tiers round to cancel it —
-    // which is why this is measured on the baseline.
+  it('keeps even a part-filled baseline load centred, judged at 5 mm', async () => {
+    // The row rules ended the old drift: a leftover pile rides as a lone
+    // centred pack on its own row, so 25 piles leave no lateral residue at
+    // all — and the re-judging is live, because the tolerance typed here is
+    // what the plan is checked against.
     const user = userEvent.setup();
     renderPlan();
 
@@ -290,8 +290,7 @@ describe('the loading rules drive what the plan is judged against', () => {
     await user.clear(screen.getByLabelText(/Across the deck/));
     await user.type(screen.getByLabelText(/Across the deck/), '5');
 
-    expect(screen.getAllByText(/centre of mass is/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/19 mm to the/)).toBeInTheDocument();
+    expect(screen.queryByText(/centre of mass is/)).not.toBeInTheDocument();
   });
 
   it('leaves the packer balanced where the baseline is not', async () => {
@@ -328,7 +327,7 @@ describe('the packer against the control', () => {
     await user.click(screen.getByRole('button', {name: /Pack 95 piles/}));
 
     expect(screen.getByText(/1 movement saved/)).toBeInTheDocument();
-    expect(screen.getByText(/fits this job on 2/)).toBeInTheDocument();
+    expect(screen.getByText(/fits this job on 3/)).toBeInTheDocument();
   });
 
   it('says so plainly when staggering wins nothing', async () => {
@@ -351,7 +350,7 @@ describe('the packer against the control', () => {
     await user.click(screen.getByRole('button', {name: /Baseline instead/}));
 
     expect(
-      screen.getByRole('heading', {name: /Loading plan \(3 movements\)/}),
+      screen.getByRole('heading', {name: /Loading plan \(4 movements\)/}),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/This is the baseline, not the packer/),

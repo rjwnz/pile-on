@@ -78,52 +78,67 @@ describe('what the packer is for', () => {
     const packed = pack(scheduled, CATALOGUE, OPTIONS);
     const naive = arrangeNaively(scheduled, CATALOGUE, OPTIONS);
 
-    expect(naive.plan.consignments).toHaveLength(3);
-    expect(packed.plan.consignments).toHaveLength(2);
+    expect(packed.plan.consignments.length).toBeLessThan(
+      naive.plan.consignments.length,
+    );
   });
 
-  it('mixes pile types within a tier, which the baseline never does', () => {
+  it('bands every pack from a single pile type, which mixed tiers never did', () => {
     const {plan} = pack(
       job(['SP168-D6', 50], ['SP139-S4', 50]),
       CATALOGUE,
       OPTIONS,
     );
 
-    const mixedTiers = new Set(
-      plan.placements.map(
-        placement => `${placement.consignmentId}:${placement.tier}`,
-      ),
-    );
-    const types = [...mixedTiers].map(
-      key =>
-        new Set(
-          plan.placements
-            .filter(p => `${p.consignmentId}:${p.tier}` === key)
-            .map(p => p.pileTypeId),
-        ).size,
-    );
+    const packs = new Map<string, Set<string>>();
+    for (const placement of plan.placements) {
+      const key = `${placement.consignmentId}:${placement.deck}:${placement.tier}:${placement.pack}`;
+      packs.set(key, (packs.get(key) ?? new Set()).add(placement.pileTypeId));
+    }
 
-    expect(Math.max(...types)).toBeGreaterThan(1);
+    expect(packs.size).toBeGreaterThan(0);
+    for (const types of packs.values()) {
+      expect(types.size).toBe(1);
+    }
   });
 
-  it('mixes lengths down a single lane', () => {
-    // A 6 m behind a 4.5 m uses 10.6 m of a 12.4 m lane. Two 4.5 m piles would
-    // leave 3.3 m of deck doing nothing at all.
-    const {plan} = pack(
-      job(['SP168-D6', 6], ['SP139-S4', 6]),
-      CATALOGUE,
+  it('mixes extension lengths in one pack when banding them apart would strand one', () => {
+    /*
+     * Two lone extensions of one code, too unalike in weight to ride as a
+     * side-by-side pair of packs (66 kg is half of 132 kg, under the 70%
+     * floor). Banded into one mixed-length pack they lie side by side,
+     * flush at the leading end, the short one tucked beside the long.
+     */
+    const short: PileType = {
+      id: 'SS200-ext-3000',
+      name: 'SS200 extension',
+      length: 3000,
+      shaftRadius: 70,
+      mass: 66,
+      helices: [],
+    };
+    const long: PileType = {
+      id: 'SS200-ext-6000',
+      name: 'SS200 extension',
+      length: 6000,
+      shaftRadius: 70,
+      mass: 132,
+      helices: [],
+    };
+    const catalogue: Catalogue = {pileTypes: [short, long], vehicles: [SEMI]};
+    const {plan, unplaced} = pack(
+      job(['SS200-ext-3000', 1], ['SS200-ext-6000', 1]),
+      catalogue,
       OPTIONS,
     );
 
-    const lanes = new Map<number, Set<string>>();
-    for (const placement of plan.placements.filter(p => p.tier === 0)) {
-      lanes.set(
-        placement.y,
-        (lanes.get(placement.y) ?? new Set()).add(placement.pileTypeId),
-      );
-    }
-
-    expect([...lanes.values()].some(types => types.size > 1)).toBe(true);
+    expect(unplaced).toEqual([]);
+    expect(plan.placements).toHaveLength(2);
+    const [a, b] = plan.placements;
+    expect(a!.tier).toBe(b!.tier);
+    expect(a!.pack).toBe(b!.pack);
+    expect(a!.x).toBe(b!.x);
+    expect(a!.y).not.toBe(b!.y);
   });
 });
 
@@ -244,6 +259,22 @@ describe('what will not fit', () => {
     );
 
     expect(unplaced[0]!.reason).toContain('too wide for the deck');
+  });
+
+  it('reports a pile too wide to band into a pack, even where the deck would take it', () => {
+    // A 1.4 m plate fits a 2.45 m deck but no 1.2 m pack.
+    const wide: PileType = {
+      ...SP168,
+      id: 'WIDE-PACK',
+      helices: [{offsetFromButt: 400, radius: 700, length: 110}],
+    };
+    const {unplaced} = pack(
+      job(['WIDE-PACK', 5]),
+      {...CATALOGUE, pileTypes: [wide]},
+      OPTIONS,
+    );
+
+    expect(unplaced[0]!.reason).toContain('too wide to band into a pack');
   });
 
   it('stops rather than opening trucks forever when nothing more fits', () => {
@@ -374,6 +405,12 @@ describe('properties, over generated jobs', () => {
     'over-rear-overhang',
     'ahead-of-headboard',
     'outside-side-margin',
+    'pack-too-wide',
+    'pack-mixed-type',
+    'pack-not-flush',
+    'too-many-packs',
+    'packs-unbalanced',
+    'unsupported-laterally',
   ];
 
   it('never clashes, overhangs, overloads or leaves a pile unsupported', () => {

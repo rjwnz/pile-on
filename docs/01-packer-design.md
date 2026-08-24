@@ -936,3 +936,78 @@ Three of these are already in analysis §8 and are now on the critical path.
 design question**: it is an option (§4.7), defaulting on. It stays worth asking
 the yard, but it no longer blocks anything, and §9's two-way benchmark means the
 answer arrives with a number attached rather than as a preference.
+
+---
+
+## 12. Revision: packs, rows and shaft-seated bearers
+
+The free-form tier model above was later replaced by yard practice, in two
+passes. First: piles travel in **packs** — banded, single-type, single-layer
+bundles. Then the yard corrected the physics: a bearer is a single length of
+timber touching only shafts, and a pack never lays piles end to end. The
+rules as they stand, all enforced by `validatePlan` and honoured by
+construction in the packer:
+
+1. **A pack is piles side by side, flush at the leading end**
+   (`pack-not-flush`), at most 1200 mm across (`PACK_MAX_WIDTH`,
+   `pack-too-wide`), holding one pile type code only. Starters never share a
+   pack with extensions; extensions of one code may mix lengths, longest
+   first, but the packer prefers identical bundles and only mixes to mop up
+   remainders (`pack-mixed-type`). Flipping is the one stagger lever inside
+   a band: alternate piles loaded tip-first put their plates at the other
+   end, and a pack of twin-helix starters closes from plate pitch to shaft
+   pitch.
+2. **A tier is rows of packs marching down the deck**, `endGap` apart — at
+   most two packs abreast at any station (`too-many-packs`, checked as
+   mutual x-overlap, exact by Helly's theorem on intervals), as many rows as
+   the deck takes.
+3. **Packs riding abreast weigh alike**: the lighter at least
+   `minPackMassRatio` (default 70%) of the heavier, judged per x-overlapping
+   pair; a pack with nothing beside it is exempt (`packs-unbalanced`).
+4. **A pile seats its shaft on the bearers** — its axis sits one shaft
+   radius above the tier's base, its plates hang below and stand proud
+   above. Bearers are **derived, never stored**: the thickness under a layer
+   is the smallest 50 mm multiple (`DUNNAGE_INCREMENT`) that clears the
+   layer's own hanging plates above the surface beneath, and keeps every
+   cross-tier pile pair clear in three dimensions — the same separation
+   engine as within a tier, solved for height, in closed form. Judged
+   against **every** lower tier, not just the one beneath, because a tall
+   plate two tiers down can reach straight past a low middle tier. Stagger
+   already spent shows up as lateral or longitudinal distance and buys the
+   bearers down; what stagger cannot buy, thickness must, and `over-height`
+   prices it. A cross-tier clash is therefore impossible to store at all.
+5. **Layers narrow going up, at every station**: a pack must stand wholly on
+   the footprint the tier below offers over the pack's own run of deck,
+   where level packs (equal shaft-top planes) merge into one bearing surface
+   (`unsupported-laterally`, via `footprintOver`).
+
+What is deliberately not modelled: where along the deck each timber lands. A
+station clear of plates is assumed to exist — true for real catalogues,
+where plates are short bands on long shafts. The escalation hook, if it is
+ever needed, is a per-tier clear-station check over the complement of the
+lower tiers' helix intervals.
+
+Module map as revised: `lane.ts` and `stagger.ts` (end-to-end fills and
+stagger offsets) are gone, and with them the `beamWidth` and
+`maxLanePatterns` search options (format version 12). `packBuilder.ts`
+builds flush candidate packs per `(code, part)` group; `layer.ts` sweeps
+rows of packs along each supported stretch, then slides each finished chain
+toward the balance point; `pack.ts` keeps the fleet loop and the balance
+pipeline (mirror -> settle -> shift, every move verified against footprint,
+support and height, and rolled back when it breaks any of them). Pack
+membership is the one stored fact (`Placement.pack`, the pack index within
+its tier); everything else — widths, masses, bearers, footprints, the
+manifest ids ("P1" onward) the table and the drawings share — is computed on
+demand from `domain/packs.ts`, so the packer and the validator cannot drift.
+
+The capacity cost is real and priced openly: on the bench fixtures the
+packer stands at 20 trucks against the baseline's 28 (from 14 and 23 before
+the pack rules, in two steps — pack banding first, then rows and shaft
+seating). Balance took three extra levers to hold under the row rules: a
+stretch's rows are re-ordered and slid so their weight lands on the balance
+point (the runt row rides mid-chain, not at the rear), rows mirror across
+the centreline to cancel each other, and the finished deck slides sideways
+onto the centreline as one rigid body — the one lateral move that cannot
+disturb a footprint, and the only one that reaches a pack pinned off-centre
+by the tier below it. All six fixtures come out inside the placeholder
+tolerances; anything a real job leaves over is reported, not hidden.

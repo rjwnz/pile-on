@@ -65,6 +65,7 @@ export function place(
       deck: 'truck',
       pileTypeId: type.id,
       tier: 0,
+      pack: 0,
       x: 0,
       y: 0,
       flipped: false,

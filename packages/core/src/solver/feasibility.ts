@@ -4,6 +4,7 @@ import {
   tierHeightFor,
   type LoadingOptions,
 } from '../domain/loading';
+import {PACK_MAX_WIDTH} from '../domain/packs';
 import {maxRadius, type PileType} from '../domain/pile';
 import {deckArea, payloadCapacity, type Vehicle} from '../domain/vehicle';
 import type {Millimetres} from '../units';
@@ -17,6 +18,9 @@ export function unplaceableReason(
 ): string | null {
   if (usable.width < maxRadius(type) * 2) {
     return `too wide for the deck — needs ${maxRadius(type) * 2} mm plus margins, deck is ${vehicle.deckWidth} mm`;
+  }
+  if (maxRadius(type) * 2 > PACK_MAX_WIDTH) {
+    return `too wide to band into a pack — ${maxRadius(type) * 2} mm across, packs are limited to ${PACK_MAX_WIDTH} mm`;
   }
   if (usable.length < type.length) {
     return `too long for the deck — ${type.length} mm on a ${vehicle.deckLength} mm deck`;

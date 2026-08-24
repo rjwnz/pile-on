@@ -52,8 +52,20 @@ import {IssueLog, type Issue, type Result} from '../validation/result';
  *     stated off-centre target, and reading it as mid-deck would re-judge that
  *     plan's balance — the one thing tolerance must not do. A file with no
  *     target, or one already at mid-deck, means exactly what it meant.
+ * 11 — placements gained `pack` and the pack rules arrived: single-type packs
+ *     at most 1.2 m wide, at most two to a tier, bearers sized to clear the
+ *     plates below. Bumped although `pack` defaults to 0, because a version 10
+ *     plan was built free-form and will be re-judged by rules that did not
+ *     exist when it was saved — the file still opens, and the violations say
+ *     what changed.
+ * 12 — dropped the `beamWidth` and `maxLanePatterns` search options with the
+ *     lane sweep they tuned: piles no longer lie end to end inside a pack,
+ *     whole packs queue along the deck instead, and piles seat their shafts
+ *     on single bearer timbers. Old files read cleanly — the two options are
+ *     ignored — but their plans are re-judged under the row and seating
+ *     rules, and the violations say what changed.
  */
-export const STATE_FORMAT_VERSION = 10;
+export const STATE_FORMAT_VERSION = 12;
 
 export interface AppState {
   readonly formatVersion: number;
@@ -280,6 +292,11 @@ function parseLoadingOptions(value: unknown): PackingOptions {
       source['dunnageThickness'],
       defaults.dunnageThickness,
     ),
+    // Added with the pack rules at version 11.
+    minPackMassRatio: numberOr(
+      source['minPackMassRatio'],
+      defaults.minPackMassRatio,
+    ),
     endGap: numberOr(source['endGap'], defaults.endGap),
     sideMargin: numberOr(source['sideMargin'], defaults.sideMargin),
     headboardGap: numberOr(source['headboardGap'], defaults.headboardGap),
@@ -289,15 +306,12 @@ function parseLoadingOptions(value: unknown): PackingOptions {
       defaults.ancillaryMassPerTier,
     ),
     // Added with the packer, so a version 6 file written before it has none.
+    // `beamWidth` and `maxLanePatterns` (versions 10–11) are read and
+    // discarded: the lane sweep they tuned is gone.
     allowFlips:
       typeof source['allowFlips'] === 'boolean'
         ? source['allowFlips']
         : defaults.allowFlips,
-    beamWidth: numberOr(source['beamWidth'], defaults.beamWidth),
-    maxLanePatterns: numberOr(
-      source['maxLanePatterns'],
-      defaults.maxLanePatterns,
-    ),
   };
 }
 
@@ -384,6 +398,8 @@ function parsePlacement(value: unknown, log: IssueLog): Placement | null {
     deck: deck === 'trailer' ? 'trailer' : 'truck',
     pileTypeId,
     tier,
+    // Absent before version 11, when tiers were not split into packs.
+    pack: numberOr(value['pack'], 0),
     x,
     y,
     flipped: flipped === true,

@@ -1,5 +1,5 @@
 import {describe, expect, it} from '@jest/globals';
-import {arrangeNaively, cellsFor, lanesFor, pilesPerLane} from './baseline';
+import {arrangeNaively, cellsFor, lanesFor, rowsFor} from './baseline';
 import {validatePlan} from '../validation/plan';
 import {balanceOffset} from '../domain/balance';
 import {DEFAULT_LOADING_OPTIONS} from '../domain/loading';
@@ -50,13 +50,15 @@ function job(...lines: [string, number][]): Job {
 }
 
 describe('lanesFor', () => {
-  it('spaces lanes at the bounding-box pitch, not the staggered pitch', () => {
+  it('spaces lanes at the bounding-box pitch, in two packs', () => {
     // 450 mm plate OD + 25 mm clearance = 475 mm pitch. The helix-aware packer
     // gets 334 mm here; that gap is the whole point of keeping this baseline.
+    // Two lanes fill a 1.2 m pack at that pitch, and two packs ride abreast.
     const lanes = lanesFor(SEMI, SP168, OPTIONS);
 
-    expect(lanes).toHaveLength(5);
-    expect(lanes.map(lane => lane.y)).toEqual([-950, -475, 0, 475, 950]);
+    expect(lanes).toHaveLength(4);
+    expect(lanes.map(lane => lane.y)).toEqual([-712.5, -237.5, 237.5, 712.5]);
+    expect(lanes.map(lane => lane.pack)).toEqual([0, 0, 1, 1]);
   });
 
   it('centres the lanes on the deck', () => {
@@ -85,19 +87,19 @@ describe('lanesFor', () => {
   });
 });
 
-describe('pilesPerLane', () => {
+describe('rowsFor', () => {
   it('fits two 6 m piles end to end on a 12.5 m deck', () => {
     // 12500 − 100 headboard = 12400 usable; 2 × 6000 + 100 gap = 12100.
-    expect(pilesPerLane(SEMI, SP168, OPTIONS)).toBe(2);
+    expect(rowsFor(SEMI, SP168, OPTIONS)).toBe(2);
   });
 
   it('fits two 4.5 m piles, not three, once gaps are counted', () => {
     // 3 × 4500 + 2 × 100 = 13700 > 12400.
-    expect(pilesPerLane(SEMI, SP139, OPTIONS)).toBe(2);
+    expect(rowsFor(SEMI, SP139, OPTIONS)).toBe(2);
   });
 
   it('is zero for a pile longer than the deck', () => {
-    expect(pilesPerLane(SEMI, {...SP168, length: 14000}, OPTIONS)).toBe(0);
+    expect(rowsFor(SEMI, {...SP168, length: 14000}, OPTIONS)).toBe(0);
   });
 });
 
@@ -111,18 +113,18 @@ describe('arrangeNaively', () => {
   });
 
   it('fills one tier before opening the next', () => {
-    // 5 lanes × 2 piles = 10 per tier.
-    const {plan} = arrangeNaively(job(['SP168-D6', 10]), CATALOGUE, OPTIONS);
+    // 2 packs × 2 lanes × 2 piles = 8 per tier.
+    const {plan} = arrangeNaively(job(['SP168-D6', 8]), CATALOGUE, OPTIONS);
 
-    expect(plan.placements).toHaveLength(10);
+    expect(plan.placements).toHaveLength(8);
     expect(new Set(plan.placements.map(p => p.tier))).toEqual(new Set([0]));
     expect(plan.consignments).toHaveLength(1);
   });
 
   it('opens a second tier once the first is full', () => {
-    const {plan} = arrangeNaively(job(['SP168-D6', 11]), CATALOGUE, OPTIONS);
+    const {plan} = arrangeNaively(job(['SP168-D6', 9]), CATALOGUE, OPTIONS);
 
-    expect(plan.placements.filter(p => p.tier === 0)).toHaveLength(10);
+    expect(plan.placements.filter(p => p.tier === 0)).toHaveLength(8);
     expect(plan.placements.filter(p => p.tier === 1)).toHaveLength(1);
   });
 
@@ -135,6 +137,52 @@ describe('arrangeNaively', () => {
 
     expect(unplaced).toEqual([]);
     expect(plan.placements).toHaveLength(58);
+  });
+
+  it('drops to centred lone packs when a pair would weigh too unalike', () => {
+    // 11 piles: a full tier of 8, then 3. Split 2-and-1 across a pair the
+    // lighter pack is half the heavier, under the 70% floor — so the
+    // leftovers ride as centred lone packs in separate rows, which the rule
+    // exempts.
+    const {plan} = arrangeNaively(job(['SP168-D6', 11]), CATALOGUE, OPTIONS);
+    const top = plan.placements.filter(p => p.tier === 1);
+
+    expect(top).toHaveLength(3);
+    // Each row holds one pack, centred: the pair of leftovers on one row,
+    // the last pile on its own row at the centreline.
+    const byPack = new Map<number, number[]>();
+    for (const p of top) {
+      byPack.set(p.pack, [...(byPack.get(p.pack) ?? []), p.y]);
+    }
+    for (const ys of byPack.values()) {
+      const centre = ys.reduce((a, b) => a + b, 0) / ys.length;
+      expect(Math.abs(centre)).toBeLessThanOrEqual(1e-6);
+    }
+    expect(
+      validatePlan(plan, CATALOGUE, OPTIONS).filter(
+        v => v.severity === 'error',
+      ),
+    ).toEqual([]);
+  });
+
+  it('opens a new movement rather than stacking one type on another', () => {
+    // A different type lays out different packs, and those would overhang
+    // the footprint of the tier below — so the deck closes instead.
+    const {plan} = arrangeNaively(
+      job(['SP168-D6', 8], ['SP139-S4', 8]),
+      CATALOGUE,
+      OPTIONS,
+    );
+
+    expect(plan.consignments).toHaveLength(2);
+    for (const consignment of plan.consignments) {
+      const types = new Set(
+        plan.placements
+          .filter(p => p.consignmentId === consignment.id)
+          .map(p => p.pileTypeId),
+      );
+      expect(types.size).toBe(1);
+    }
   });
 
   it('gives each tier over to a single pile type', () => {
@@ -159,12 +207,12 @@ describe('arrangeNaively', () => {
   });
 
   it('opens a second truck when the tier limit is reached', () => {
-    // 4 tiers × 10 = 40 per truck.
-    const {plan} = arrangeNaively(job(['SP168-D6', 41]), CATALOGUE, OPTIONS);
+    // 4 tiers × 8 = 32 per truck.
+    const {plan} = arrangeNaively(job(['SP168-D6', 33]), CATALOGUE, OPTIONS);
 
     expect(plan.consignments).toHaveLength(2);
     expect(plan.placements.filter(p => p.consignmentId === 'C1')).toHaveLength(
-      40,
+      32,
     );
     expect(plan.placements.filter(p => p.consignmentId === 'C2')).toHaveLength(
       1,
@@ -185,12 +233,18 @@ describe('arrangeNaively', () => {
   });
 
   it('stops adding tiers at the height limit', () => {
-    // Each tier of this fat pile stands 100 + 1400 = 1500 mm, so two reach the
-    // 3 m a deck can carry and a third never boards, however many are waiting.
+    // Twin 500 mm plates on an 84 mm shaft, stacked dead in line the way the
+    // baseline always stacks: each tier wants 1025 mm of axis distance from
+    // the one below, all of it vertical. Two tiers top out at 2102 mm; a
+    // third would reach 3170 mm, over the 3 m a deck can carry, and never
+    // boards, however many are waiting.
     const fat: PileType = {
       ...SP168,
       id: 'FAT',
-      helices: [{offsetFromButt: 400, radius: 700, length: 110}],
+      helices: [
+        {offsetFromButt: 400, radius: 500, length: 110},
+        {offsetFromButt: 1100, radius: 500, length: 110},
+      ],
     };
     const {plan} = arrangeNaively(
       job(['FAT', 40]),
@@ -312,9 +366,7 @@ describe('arrangeNaively', () => {
     const cells = cellsFor(SEMI, SP168, OPTIONS);
     const lanes = lanesFor(SEMI, SP168, OPTIONS);
 
-    expect(cells).toHaveLength(
-      lanes.length * pilesPerLane(SEMI, SP168, OPTIONS),
-    );
+    expect(cells).toHaveLength(lanes.length * rowsFor(SEMI, SP168, OPTIONS));
     expect(new Set(cells.map(c => `${c.x}:${c.y}`)).size).toBe(cells.length);
   });
 });

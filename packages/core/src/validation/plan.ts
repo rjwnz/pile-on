@@ -10,10 +10,24 @@ import {
   ancillaryMass,
   axisHeightOf,
   loadHeight,
-  tierHeights,
   type LoadingOptions,
 } from '../domain/loading';
-import {maxRadius} from '../domain/pile';
+import {
+  PACK_MAX_WIDTH,
+  coveredSpans,
+  footprintOver,
+  layerHeights,
+  layersOf,
+  packLateralSpan,
+  packLongitudinalSpan,
+  packMass,
+  packWidth,
+} from '../domain/packs';
+
+// Re-exported from its old home so existing importers keep working; the
+// packer and this file must share one idea of when bearers bridge a gap.
+export {coveredSpans} from '../domain/packs';
+import {maxRadius, pilePartOf, pileTypeCode} from '../domain/pile';
 import type {DeckRole, PlacedPile, Placement} from '../domain/placement';
 import {
   balanceTargetOf,
@@ -300,31 +314,212 @@ function deckViolations(
   violations.push(
     ...checkSupport(consignmentId, placements, catalogue, options),
   );
+  violations.push(...checkPacks(consignmentId, placements, catalogue, options));
+  violations.push(
+    ...checkLateralSupport(consignmentId, placements, catalogue, options),
+  );
+
+  return violations;
+}
+
+/** Whether two longitudinal spans genuinely share a stretch of deck. */
+function spansOverlap(
+  a: readonly [number, number],
+  b: readonly [number, number],
+): boolean {
+  return a[0] < b[1] - GEOMETRIC_EPSILON && b[0] < a[1] - GEOMETRIC_EPSILON;
+}
+
+/**
+ * Packs are how piles actually travel: banded single-type bundles, at most
+ * `PACK_MAX_WIDTH` across, laid in rows along the deck with at most two
+ * abreast at any station, and side-by-side neighbours weighing alike.
+ * Everything here reads the same `domain/packs` helpers the packer builds
+ * with, so the two cannot drift.
+ */
+function checkPacks(
+  consignmentId: string,
+  placements: readonly Placement[],
+  catalogue: Catalogue,
+  options: LoadingOptions,
+): Violation[] {
+  const violations: Violation[] = [];
+
+  for (const [tier, packs] of layersOf(placements)) {
+    /*
+     * At most two packs abreast: no station along the deck may have three
+     * packs across it. Intervals on a line obey Helly's theorem — three
+     * intervals that pairwise overlap share a common point — so checking
+     * triples for mutual overlap is exact, not an approximation.
+     */
+    const extents = [...packs.entries()].flatMap(([index, pack]) => {
+      const xSpan = packLongitudinalSpan(pack, catalogue);
+      return xSpan ? [{index, pack, xSpan}] : [];
+    });
+    let crowded = false;
+    for (let i = 0; i < extents.length && !crowded; i++) {
+      for (let j = i + 1; j < extents.length && !crowded; j++) {
+        if (!spansOverlap(extents[i]!.xSpan, extents[j]!.xSpan)) {
+          continue;
+        }
+        for (let k = j + 1; k < extents.length && !crowded; k++) {
+          if (
+            spansOverlap(extents[i]!.xSpan, extents[k]!.xSpan) &&
+            spansOverlap(extents[j]!.xSpan, extents[k]!.xSpan)
+          ) {
+            crowded = true;
+          }
+        }
+      }
+    }
+    if (crowded) {
+      violations.push(
+        error(
+          consignmentId,
+          'too-many-packs',
+          `three packs of tier ${tier + 1} ride abreast at one station — at most two packs sit side by side`,
+        ),
+      );
+    }
+
+    if (options.minPackMassRatio > 0) {
+      for (let i = 0; i < extents.length; i++) {
+        for (let j = i + 1; j < extents.length; j++) {
+          if (!spansOverlap(extents[i]!.xSpan, extents[j]!.xSpan)) {
+            continue;
+          }
+          const massA = packMass(extents[i]!.pack, catalogue);
+          const massB = packMass(extents[j]!.pack, catalogue);
+          const lighter = Math.min(massA, massB);
+          const heavier = Math.max(massA, massB);
+          if (
+            heavier > 0 &&
+            lighter + GEOMETRIC_EPSILON < options.minPackMassRatio * heavier
+          ) {
+            violations.push(
+              error(
+                consignmentId,
+                'packs-unbalanced',
+                `packs riding abreast in tier ${tier + 1} weigh ${Math.round(lighter)} kg and ${Math.round(heavier)} kg — the lighter must be at least ${Math.round(options.minPackMassRatio * 100)}% of the heavier`,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    for (const [index, pack] of packs) {
+      const width = packWidth(pack, catalogue);
+      if (width > PACK_MAX_WIDTH + GEOMETRIC_EPSILON) {
+        violations.push(
+          error(
+            consignmentId,
+            'pack-too-wide',
+            `pack ${index + 1} of tier ${tier + 1} is ${Math.round(width)} mm across, over the ${PACK_MAX_WIDTH} mm a pack may be banded`,
+          ),
+        );
+      }
+
+      const codes = new Set<string>();
+      const parts = new Set<string>();
+      for (const placement of pack) {
+        const type = findPileType(catalogue, placement.pileTypeId);
+        if (type) {
+          codes.add(pileTypeCode(type));
+          parts.add(pilePartOf(type));
+        }
+      }
+      if (codes.size > 1 || parts.size > 1) {
+        violations.push(
+          error(
+            consignmentId,
+            'pack-mixed-type',
+            codes.size > 1
+              ? `pack ${index + 1} of tier ${tier + 1} mixes pile types ${[...codes].join(' and ')} — a pack is banded from one type`
+              : `pack ${index + 1} of tier ${tier + 1} mixes starters with extensions — they never share a pack`,
+          ),
+        );
+      }
+
+      const leads = pack
+        .filter(placement => findPileType(catalogue, placement.pileTypeId))
+        .map(placement => placement.x);
+      if (
+        leads.length > 1 &&
+        Math.max(...leads) - Math.min(...leads) > GEOMETRIC_EPSILON
+      ) {
+        violations.push(
+          error(
+            consignmentId,
+            'pack-not-flush',
+            `pack ${index + 1} of tier ${tier + 1} is not banded flush — piles in a pack line up side by side, sharing their leading end`,
+          ),
+        );
+      }
+    }
+  }
 
   return violations;
 }
 
 /**
- * Merge overlapping or nearly-touching intervals into a covered span list.
- *
- * Exported because the packer builds tiers against it. If it had its own idea
- * of when bearers bridge a gap it would produce loads this rule then rejects.
+ * Across the deck, a pack has to stand wholly on the packs below it — at
+ * every station its steel covers, not just on the whole-tier average. The
+ * bearers under a tier rest on the shafts of the tier beneath, so a pack may
+ * bridge two packs only where their tops are level; `footprintOver` merges
+ * exactly those, per stretch of deck. Layers narrow going up, never overhang.
  */
-export function coveredSpans(
-  intervals: readonly (readonly [number, number])[],
-  bridge: number,
-): [number, number][] {
-  const sorted = [...intervals].sort((a, b) => a[0] - b[0]);
-  const merged: [number, number][] = [];
-  for (const [start, end] of sorted) {
-    const last = merged[merged.length - 1];
-    if (last && start <= last[1] + bridge) {
-      last[1] = Math.max(last[1], end);
-    } else {
-      merged.push([start, end]);
+function checkLateralSupport(
+  consignmentId: string,
+  placements: readonly Placement[],
+  catalogue: Catalogue,
+  options: LoadingOptions,
+): Violation[] {
+  const violations: Violation[] = [];
+  const tiers = [...layersOf(placements)];
+
+  for (const [index, [tier, packs]] of tiers.entries()) {
+    if (index === 0) {
+      continue;
+    }
+    const below = [...tiers[index - 1]![1].values()].flat();
+
+    for (const [packIndex, pack] of packs) {
+      const span = packLateralSpan(pack, catalogue);
+      const xSpan = packLongitudinalSpan(pack, catalogue);
+      if (!span || !xSpan) {
+        continue;
+      }
+      const footprint = footprintOver(
+        below,
+        catalogue,
+        options,
+        xSpan[0],
+        xSpan[1],
+      );
+      if (footprint === null) {
+        // Nothing beneath anywhere along the pack: the longitudinal support
+        // rule owns that finding.
+        continue;
+      }
+      const held = footprint.some(
+        ([from, to]) =>
+          span[0] >= from - GEOMETRIC_EPSILON &&
+          span[1] <= to + GEOMETRIC_EPSILON,
+      );
+      if (!held) {
+        violations.push(
+          error(
+            consignmentId,
+            'unsupported-laterally',
+            `pack ${packIndex + 1} of tier ${tier + 1} overhangs the packs below it — a pack must stand wholly on the tier beneath, all the way along`,
+          ),
+        );
+      }
     }
   }
-  return merged;
+
+  return violations;
 }
 
 /**
@@ -505,7 +700,7 @@ function checkSeparations(
     return type ? [{type, placement}] : [];
   });
 
-  const heights = tierHeights(placements, catalogue, options);
+  const heights = layerHeights(placements, catalogue, options);
   const byTier = new Map<number, PlacedPile[]>();
   for (const placed of resolved) {
     const tier = byTier.get(placed.placement.tier) ?? [];
@@ -521,8 +716,7 @@ function checkSeparations(
         // Piles of different diameter rest on their own widest point, so their
         // axes sit at different heights even in the same tier. That offset is
         // clearance already spent, and ignoring it over-separates the load.
-        const deltaZ =
-          axisHeightOf(a, heights, options) - axisHeightOf(b, heights, options);
+        const deltaZ = axisHeightOf(a, heights) - axisHeightOf(b, heights);
         const required = requiredLateralSeparation(a, b, options, deltaZ);
         const actual = Math.abs(a.placement.y - b.placement.y);
         if (required > 0 && actual + GEOMETRIC_EPSILON < required) {

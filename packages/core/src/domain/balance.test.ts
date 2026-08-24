@@ -36,6 +36,7 @@ function place(overrides: Partial<Placement> = {}): Placement {
     deck: 'truck',
     pileTypeId: 'LIGHT',
     tier: 0,
+    pack: 0,
     x: 0,
     y: 0,
     flipped: false,

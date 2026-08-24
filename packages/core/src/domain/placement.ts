@@ -27,6 +27,12 @@ export interface Placement {
   readonly deck: DeckRole;
   readonly pileTypeId: string;
   readonly tier: number;
+  /**
+   * Which pack of its tier this pile is banded into: 0 for the first, 1 for
+   * the second. A pack is a single-type, single-layer bundle at most
+   * `PACK_MAX_WIDTH` wide; a tier holds at most two, side by side.
+   */
+  readonly pack: number;
   /** Position of the pile's leading (headboard-most) end. */
   readonly x: Millimetres;
   /** Lateral position of the shaft axis. */

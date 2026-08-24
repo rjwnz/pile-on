@@ -5,7 +5,6 @@ import {
   setJobQuantity,
   totalPileCount,
   totalPileMass,
-  usedPileTypeIds,
   type Job,
 } from './job';
 import type {Catalogue} from './catalogue';
@@ -107,11 +106,5 @@ describe('totalPileMass', () => {
 
   it('is zero for an empty job', () => {
     expect(totalPileMass(EMPTY_JOB, CATALOGUE)).toBe(0);
-  });
-});
-
-describe('usedPileTypeIds', () => {
-  it('lists the types the job draws on', () => {
-    expect(usedPileTypeIds(JOB)).toEqual(['A', 'B']);
   });
 });

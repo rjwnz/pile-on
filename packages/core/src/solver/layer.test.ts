@@ -2,9 +2,9 @@ import {describe, expect, it} from '@jest/globals';
 import type {Catalogue} from '../domain/catalogue';
 import type {PileType} from '../domain/pile';
 import type {PlacedPile} from '../domain/placement';
-import type {Vehicle} from '../domain/vehicle';
 import {packTier} from './layer';
 import {DEFAULT_PACKING_OPTIONS, withoutFlips} from './options';
+import {SEMI} from '../testFixtures';
 
 const EXT: PileType = {
   id: 'SS200-ext-6000',
@@ -13,16 +13,6 @@ const EXT: PileType = {
   shaftRadius: 84,
   mass: 132,
   helices: [],
-};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [EXT], vehicles: [SEMI]};

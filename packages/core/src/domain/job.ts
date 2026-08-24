@@ -59,10 +59,3 @@ export function totalPileMass(job: Job, catalogue: Catalogue): Kilograms {
     return type ? total + type.mass * line.quantity : total;
   }, 0);
 }
-
-/** Pile types the job actually uses, in catalogue order. */
-export function usedPileTypeIds(job: Job): string[] {
-  return job.lines
-    .filter(line => line.quantity > 0)
-    .map(line => line.pileTypeId);
-}

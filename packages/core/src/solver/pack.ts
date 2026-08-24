@@ -11,27 +11,23 @@ import {
 import type {Job} from '../domain/job';
 import {MAX_LOAD_HEIGHT, loadHeight} from '../domain/loading';
 import {
+  coveredSpans,
   everyPackIsBorne,
   footprintOver,
+  intersectSpans,
   layerHeights,
   layersOf,
   packLateralSpan,
   packLongitudinalSpan,
+  tierLayers,
 } from '../domain/packs';
 import {loadCentroid} from '../domain/balance';
 import {maxRadius} from '../domain/pile';
 import type {DeckRole, Placement} from '../domain/placement';
-import {
-  balanceTargetOf,
-  deckArea,
-  payloadCapacity,
-  type Vehicle,
-} from '../domain/vehicle';
-import {coveredSpans} from '../validation/plan';
+import {balanceTargetOf, deckArea, type Vehicle} from '../domain/vehicle';
 import {GEOMETRIC_EPSILON, type Kilograms, type Millimetres} from '../units';
-import {groupBy} from '../collections';
 import {shiftToBalance} from './balance';
-import {unplaceableOnFleet} from './feasibility';
+import {unplaceableOnFleet, type UnplacedDemand} from './feasibility';
 import {packTier} from './layer';
 import {withoutFlips, type PackingOptions} from './options';
 
@@ -39,21 +35,15 @@ import {withoutFlips, type PackingOptions} from './options';
  * The helix-aware packer. Unlike `arrangeNaively` it knows a pile is not a
  * cylinder of its widest diameter: stagger neighbouring piles so their plates
  * miss and a pack closes from plate pitch to shaft pitch — an extra lane in a
- * pack that fits two. The pieces live in `stagger.ts` (exact offsets),
- * `lane.ts` (fill patterns), `packBuilder.ts` (the within-pack sweep) and
- * `layer.ts` (pairing packs into tiers).
+ * pack that fits two. The pieces live in `packBuilder.ts` (banding piles into
+ * candidate packs) and `layer.ts` (laying packs out as rows of a tier); this
+ * file runs the deck, movement and fleet loops over them.
  */
-
-export interface PackedType {
-  readonly pileTypeId: string;
-  readonly quantity: number;
-  readonly reason: string;
-}
 
 export interface PackResult {
   readonly plan: LoadPlan;
   /** Demand that could not be placed anywhere, with why. */
-  readonly unplaced: readonly PackedType[];
+  readonly unplaced: readonly UnplacedDemand[];
 }
 
 /**
@@ -141,7 +131,7 @@ function packOneDeck(
   vehicle: Vehicle,
   options: PackingOptions,
 ): DeckLoad {
-  const payload = payloadCapacity(vehicle);
+  const payload = vehicle.payloadCapacity;
 
   const available = new Map(remaining);
   const consumed = new Map<string, number>();
@@ -292,15 +282,17 @@ function allTiersContained(
   catalogue: Catalogue,
   options: PackingOptions,
 ): boolean {
-  const tiers = [...layersOf(onTruck).values()];
-  for (let index = 1; index < tiers.length; index++) {
-    const inTier = [...tiers[index]!.values()].flat();
-    const below = [...tiers[index - 1]!.values()].flat();
-    if (!tierContained(inTier, below, catalogue, options)) {
-      return false;
-    }
-  }
-  return true;
+  const tiers = tierLayers(onTruck);
+  return tiers.every(
+    (layer, index) =>
+      index === 0 ||
+      tierContained(
+        layer.placements,
+        tiers[index - 1]!.placements,
+        catalogue,
+        options,
+      ),
+  );
 }
 
 /**
@@ -416,7 +408,7 @@ function packFleetOnce(
   });
 
   const remaining = new Map<string, number>();
-  const unplaced: PackedType[] = [];
+  const unplaced: UnplacedDemand[] = [];
 
   for (const line of job.lines) {
     if (line.quantity <= 0) {
@@ -499,24 +491,6 @@ function packFleetOnce(
   return {plan: {consignments, placements}, unplaced};
 }
 
-/** Pairwise intersection of two lists of closed intervals, empties dropped. */
-function intersect(
-  a: readonly (readonly [number, number])[],
-  b: readonly (readonly [number, number])[],
-): [number, number][] {
-  const out: [number, number][] = [];
-  for (const [aLow, aHigh] of a) {
-    for (const [bLow, bHigh] of b) {
-      const low = Math.max(aLow, bLow);
-      const high = Math.min(aHigh, bHigh);
-      if (low <= high) {
-        out.push([low, high]);
-      }
-    }
-  }
-  return out;
-}
-
 /**
  * How far a whole tier may slide along the deck: every pile must stay on the
  * vehicle and, above the bottom tier, inside a stretch the tier below covers.
@@ -539,10 +513,10 @@ function shiftRange(
     const start = placement.x;
     const end = start + type.length;
 
-    ranges = intersect(ranges, [[-start, vehicle.deckLength - end]]);
+    ranges = intersectSpans(ranges, [[-start, vehicle.deckLength - end]]);
 
     if (support) {
-      ranges = intersect(
+      ranges = intersectSpans(
         ranges,
         support
           .filter(([from, to]) => to - from >= type.length)
@@ -570,8 +544,6 @@ function settleTiers(
   vehicle: Vehicle,
   options: PackingOptions,
 ): Placement[] {
-  const byTier = groupBy(onTruck, placement => placement.tier);
-
   const target = balanceTargetOf(vehicle);
   const settled: Placement[] = [];
   let support: readonly (readonly [Millimetres, Millimetres])[] | null = null;
@@ -579,7 +551,7 @@ function settleTiers(
   let carriedMass = 0;
   let carriedMoment = 0;
 
-  for (const [, inTier] of [...byTier].sort((a, b) => a[0] - b[0])) {
+  for (const {placements: inTier} of tierLayers(onTruck)) {
     let moment = 0;
     let mass = 0;
     for (const placement of inTier) {
@@ -646,12 +618,10 @@ function mirrorTiers(
   catalogue: Catalogue,
   options: PackingOptions,
 ): Placement[] {
-  const byTier = groupBy(onTruck, placement => placement.tier);
-
   const out: Placement[] = [];
   let moment = 0;
   let below: readonly Placement[] | null = null;
-  for (const [, inTier] of [...byTier].sort((a, b) => a[0] - b[0])) {
+  for (const {placements: inTier} of tierLayers(onTruck)) {
     let tierMoment = 0;
     for (const placement of inTier) {
       const type = findPileType(catalogue, placement.pileTypeId);
@@ -692,22 +662,21 @@ function allTiersSupported(
   catalogue: Catalogue,
   options: PackingOptions,
 ): boolean {
-  const byTier = groupBy(onTruck, placement => placement.tier);
-
-  const tiers = [...byTier].sort((a, b) => a[0] - b[0]);
-  for (const [index, [, inTier]] of tiers.entries()) {
+  const tiers = tierLayers(onTruck);
+  for (const [index, layer] of tiers.entries()) {
     if (index === 0) {
       continue;
     }
-    const support = spansOf(tiers[index - 1]![1], catalogue, options);
-    const fits = inTier.every(placement => {
+    const support = spansOf(tiers[index - 1]!.placements, catalogue, options);
+    const fits = layer.placements.every(placement => {
       const type = findPileType(catalogue, placement.pileTypeId);
       if (!type) {
         return true;
       }
       return support.some(
         ([from, to]) =>
-          placement.x >= from - 1e-6 && placement.x + type.length <= to + 1e-6,
+          placement.x >= from - GEOMETRIC_EPSILON &&
+          placement.x + type.length <= to + GEOMETRIC_EPSILON,
       );
     });
     if (!fits) {

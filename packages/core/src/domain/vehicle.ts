@@ -46,11 +46,6 @@ export function isTrailer(vehicle: Vehicle): boolean {
   return vehicle.towableBy.length > 0;
 }
 
-/** Mass available for piles, dunnage and restraint. */
-export function payloadCapacity(vehicle: Vehicle): Kilograms {
-  return vehicle.payloadCapacity;
-}
-
 /** Usable deck area, in square millimetres. */
 export function deckArea(vehicle: Vehicle): number {
   return vehicle.deckLength * vehicle.deckWidth;
@@ -59,11 +54,4 @@ export function deckArea(vehicle: Vehicle): number {
 /** Where the load centroid should sit along the deck: always mid-length. */
 export function balanceTargetOf(vehicle: Vehicle): Millimetres {
   return vehicle.deckLength / 2;
-}
-
-/** Longitudinal span a load may occupy — headboard to tailgate, no overhang. */
-export function loadableSpan(
-  vehicle: Vehicle,
-): readonly [Millimetres, Millimetres] {
-  return [0, vehicle.deckLength];
 }

@@ -6,7 +6,7 @@ import {
   helixAt,
   place,
   pileType,
-} from '../geometry/testFixtures';
+} from '../testFixtures';
 import type {Catalogue} from './catalogue';
 import {DEFAULT_LOADING_OPTIONS, axisHeightOf} from './loading';
 import {

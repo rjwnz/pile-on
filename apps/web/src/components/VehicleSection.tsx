@@ -3,7 +3,6 @@ import {
   VEHICLE_KIND_LABELS,
   isTrailer,
   parseVehicleRows,
-  payloadCapacity,
   toMetres,
   trailersFor,
 } from '@pile-on/core';
@@ -106,7 +105,7 @@ export function VehicleSection() {
                       {toMetres(vehicle.deckWidth).toFixed(2)} m
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums">
-                      {payloadCapacity(vehicle).toLocaleString('en-NZ')} kg
+                      {vehicle.payloadCapacity.toLocaleString('en-NZ')} kg
                     </td>
                     <td className="py-2 text-right whitespace-nowrap">
                       <Button

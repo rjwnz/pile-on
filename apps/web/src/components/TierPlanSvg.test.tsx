@@ -5,34 +5,12 @@ import {
   packManifest,
   type Catalogue,
   type Placement,
-  type Vehicle,
 } from '@pile-on/core';
 import {TierPlanSvg} from './TierPlanSvg';
 import {colourForPileType} from '../render/palette';
+import {SEMI, SP168} from '@pile-on/core/testFixtures';
 
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
-};
-
-const CATALOGUE: Catalogue = {
-  pileTypes: [
-    {
-      id: 'SP168-D6',
-      name: 'SP168',
-      length: 6000,
-      shaftRadius: 84,
-      mass: 178,
-      helices: [{offsetFromButt: 400, radius: 225, length: 110}],
-    },
-  ],
-  vehicles: [SEMI],
-};
+const CATALOGUE: Catalogue = {pileTypes: [SP168], vehicles: [SEMI]};
 
 function place(overrides: Partial<Placement> = {}): Placement {
   return {
@@ -80,11 +58,12 @@ describe('TierPlanSvg', () => {
     );
   });
 
-  it('draws a shaft segment and a helix segment per pile', () => {
+  it('draws one rect per segment of a pile — shaft, then every plate', () => {
     renderTier();
 
+    // SP168 is twin helix, so one shaft band and two plate bands.
     expect(screen.getAllByTestId('segment-shaft')).toHaveLength(1);
-    expect(screen.getAllByTestId('segment-helix')).toHaveLength(1);
+    expect(screen.getAllByTestId('segment-helix')).toHaveLength(2);
   });
 
   it('places a centreline pile in the middle of the deck', () => {

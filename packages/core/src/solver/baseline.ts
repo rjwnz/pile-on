@@ -3,6 +3,7 @@ import {
   combinationsOf,
   findPileType,
   type Catalogue,
+  type Consignment,
   type LoadPlan,
   type VehicleCombination,
 } from '../domain/catalogue';
@@ -15,14 +16,10 @@ import {PACK_MAX_WIDTH} from '../domain/packs';
 import type {Job, JobLine} from '../domain/job';
 import {maxRadius, type PileType} from '../domain/pile';
 import type {DeckRole, Placement} from '../domain/placement';
-import {
-  balanceTargetOf,
-  payloadCapacity,
-  type Vehicle,
-} from '../domain/vehicle';
+import {balanceTargetOf, type Vehicle} from '../domain/vehicle';
 import {GEOMETRIC_EPSILON, type Kilograms, type Millimetres} from '../units';
 import {shiftToBalance} from './balance';
-import {unplaceableOnFleet} from './feasibility';
+import {unplaceableOnFleet, type UnplacedDemand} from './feasibility';
 
 /**
  * The naive bounding-box arranger — the *control* the packer has to beat.
@@ -40,11 +37,34 @@ export interface Lane {
 export interface ArrangeResult {
   readonly plan: LoadPlan;
   /** Demand the arranger could not fit anywhere, with why. */
-  readonly unplaced: readonly {
-    readonly pileTypeId: string;
-    readonly quantity: number;
-    readonly reason: string;
-  }[];
+  readonly unplaced: readonly UnplacedDemand[];
+}
+
+/**
+ * What a single pack of lanes of this pile type measures, or null when the
+ * type cannot be laned on this deck at all. Every pile is its widest all the
+ * way along here, so neighbouring lanes always present plate to plate —
+ * nothing in the baseline ever staggers them apart.
+ */
+function laneGeometry(
+  vehicle: Vehicle,
+  type: PileType,
+  options: LoadingOptions,
+) {
+  const halfWidth = maxRadius(type);
+  const usable = vehicle.deckWidth - options.sideMargin * 2;
+  if (usable < halfWidth * 2 || halfWidth * 2 > PACK_MAX_WIDTH) {
+    return null;
+  }
+  const pitch = halfWidth * 2 + options.clearances.helixToHelix;
+  return {
+    halfWidth,
+    usable,
+    pitch,
+    /** Most lanes one pack may band. */
+    perPack: Math.floor((PACK_MAX_WIDTH - halfWidth * 2) / pitch) + 1,
+    widthOf: (lanes: number) => (lanes - 1) * pitch + halfWidth * 2,
+  };
 }
 
 /**
@@ -57,55 +77,47 @@ export function lanesFor(
   type: PileType,
   options: LoadingOptions,
 ): Lane[] {
-  const halfWidth = maxRadius(type);
-  const usable = vehicle.deckWidth - options.sideMargin * 2;
-  if (usable < halfWidth * 2 || halfWidth * 2 > PACK_MAX_WIDTH) {
+  const geometry = laneGeometry(vehicle, type, options);
+  if (!geometry) {
     return [];
   }
-  // Every pile is its widest all the way along, so neighbouring lanes always
-  // present plate to plate. Nothing here ever staggers them apart.
-  const pitch = halfWidth * 2 + options.clearances.helixToHelix;
+  const {halfWidth, usable, pitch, perPack, widthOf} = geometry;
   const gap = options.clearances.helixToHelix;
-  const perPack = Math.floor((PACK_MAX_WIDTH - halfWidth * 2) / pitch) + 1;
-  const packWidthOf = (lanes: number) => (lanes - 1) * pitch + halfWidth * 2;
 
   // Two equal packs when the deck takes them, shrunk together until they fit.
   let paired = perPack;
-  while (paired >= 1 && packWidthOf(paired) * 2 + gap > usable) {
+  while (paired >= 1 && widthOf(paired) * 2 + gap > usable) {
     paired--;
   }
-  if (paired >= 1) {
-    const width = packWidthOf(paired);
-    const leftEdge = -(width * 2 + gap) / 2;
-    const lanes: Lane[] = [];
-    for (let pack = 0; pack < 2; pack++) {
-      const packStart = leftEdge + pack * (width + gap);
-      for (let index = 0; index < paired; index++) {
-        lanes.push({y: packStart + halfWidth + index * pitch, pack});
-      }
-    }
-    return lanes;
+  if (paired < 1) {
+    // One pack, centred: as many lanes as the pack and the deck both allow.
+    return singlePackLanes(vehicle, type, options);
   }
 
-  // One pack, centred: as many lanes as the pack and the deck both allow.
-  return singlePackLanes(vehicle, type, options);
+  const width = widthOf(paired);
+  const leftEdge = -(width * 2 + gap) / 2;
+  return [0, 1].flatMap(pack =>
+    Array.from({length: paired}, (_, index) => ({
+      y: leftEdge + pack * (width + gap) + halfWidth + index * pitch,
+      pack,
+    })),
+  );
 }
 
 /** One centred pack of lanes — what a tier falls back to when a pair of
  * packs would weigh too unalike. */
-export function singlePackLanes(
+function singlePackLanes(
   vehicle: Vehicle,
   type: PileType,
   options: LoadingOptions,
 ): Lane[] {
-  const halfWidth = maxRadius(type);
-  const usable = vehicle.deckWidth - options.sideMargin * 2;
-  if (usable < halfWidth * 2 || halfWidth * 2 > PACK_MAX_WIDTH) {
+  const geometry = laneGeometry(vehicle, type, options);
+  if (!geometry) {
     return [];
   }
-  const pitch = halfWidth * 2 + options.clearances.helixToHelix;
+  const {halfWidth, usable, pitch, perPack} = geometry;
   const count = Math.min(
-    Math.floor((PACK_MAX_WIDTH - halfWidth * 2) / pitch) + 1,
+    perPack,
     Math.floor((usable - halfWidth * 2) / pitch) + 1,
   );
   const span = (count - 1) * pitch;
@@ -220,13 +232,8 @@ export function arrangeNaively(
   options: LoadingOptions,
 ): ArrangeResult {
   const placements: Placement[] = [];
-  const consignments: {
-    id: string;
-    vehicleId: string;
-    trailerId: string | null;
-    phase: null;
-  }[] = [];
-  const unplaced: {pileTypeId: string; quantity: number; reason: string}[] = [];
+  const consignments: Consignment[] = [];
+  const unplaced: UnplacedDemand[] = [];
 
   const combo = naiveCombination(catalogue);
   if (!combo) {
@@ -331,7 +338,7 @@ export function arrangeNaively(
       return 0;
     }
     const spare =
-      payloadCapacity(deck.vehicle) -
+      deck.vehicle.payloadCapacity -
       deck.massUsed -
       options.ancillaryMassPerTier;
     const byMass = Math.floor(spare / type.mass);

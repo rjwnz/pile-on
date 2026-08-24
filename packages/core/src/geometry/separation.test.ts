@@ -1,7 +1,5 @@
 import {describe, expect, it} from '@jest/globals';
 import {
-  lateralSeparationOk,
-  pilesConflict,
   requiredAxisDistance,
   requiredLateralSeparation,
   type SeparationOptions,
@@ -16,7 +14,7 @@ import {
   helixAt,
   pileType,
   place,
-} from './testFixtures';
+} from '../testFixtures';
 
 /** One clearance for every case, unless a test cares about the difference. */
 function clearances(
@@ -319,61 +317,5 @@ describe('requiredLateralSeparation', () => {
 
       expect(requiredAxisDistance(a, b, NO_CLEARANCE)).toBe(0);
     });
-  });
-});
-
-describe('lateralSeparationOk', () => {
-  const options = clearances(20);
-
-  it('accepts a gap exactly on the limit', () => {
-    const a = place(PLAIN, {y: 0});
-    const b = place(PLAIN, {y: SHAFT_TO_SHAFT + 20});
-
-    expect(lateralSeparationOk(a, b, options)).toBe(true);
-  });
-
-  it('rejects a gap one millimetre short', () => {
-    const a = place(PLAIN, {y: 0});
-    const b = place(PLAIN, {y: SHAFT_TO_SHAFT + 19});
-
-    expect(lateralSeparationOk(a, b, options)).toBe(false);
-  });
-
-  it('ignores the sign of the offset', () => {
-    const a = place(PLAIN, {y: 500});
-    const b = place(PLAIN, {y: 500 - (SHAFT_TO_SHAFT + 20)});
-
-    expect(lateralSeparationOk(a, b, options)).toBe(true);
-  });
-
-  it('accepts a gap that only works because one pile sits higher', () => {
-    const a = place(PLAIN, {y: 0});
-    const b = place(PLAIN, {y: 100});
-
-    expect(lateralSeparationOk(a, b, options)).toBe(false);
-    expect(lateralSeparationOk(a, b, options, 120)).toBe(true);
-  });
-});
-
-describe('pilesConflict', () => {
-  it('reports a conflict for overlapping piles in the same tier', () => {
-    const a = place(DOUBLE, {tier: 0, y: 0});
-    const b = place(DOUBLE, {tier: 0, y: 100});
-
-    expect(pilesConflict(a, b, NO_CLEARANCE)).toBe(true);
-  });
-
-  it('never reports a conflict across tiers — dunnage carries the layer above', () => {
-    const a = place(DOUBLE, {tier: 0, y: 0});
-    const b = place(DOUBLE, {tier: 1, y: 0});
-
-    expect(pilesConflict(a, b, NO_CLEARANCE)).toBe(false);
-  });
-
-  it('is happy with well-separated piles in the same tier', () => {
-    const a = place(DOUBLE, {tier: 0, y: 0});
-    const b = place(DOUBLE, {tier: 0, y: 500});
-
-    expect(pilesConflict(a, b, NO_CLEARANCE)).toBe(false);
   });
 });

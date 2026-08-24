@@ -1,7 +1,7 @@
 import type {Kilograms} from '../units';
 import type {PileType} from './pile';
 import type {Placement} from './placement';
-import {deckArea, isTrailer, payloadCapacity, type Vehicle} from './vehicle';
+import {deckArea, isTrailer, type Vehicle} from './vehicle';
 
 /** Reference data. Changes rarely, shared across every job. */
 export interface Catalogue {
@@ -69,10 +69,7 @@ export function combinationDeckArea(combo: VehicleCombination): number {
  * gross limit, because the operator's load figures already account for it.
  */
 export function movementPayloadCapacity(combo: VehicleCombination): Kilograms {
-  return (
-    payloadCapacity(combo.truck) +
-    (combo.trailer ? payloadCapacity(combo.trailer) : 0)
-  );
+  return combo.truck.payloadCapacity + (combo.trailer?.payloadCapacity ?? 0);
 }
 
 /**

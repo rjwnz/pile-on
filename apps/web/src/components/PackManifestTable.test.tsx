@@ -7,15 +7,7 @@ import {
   type Placement,
 } from '@pile-on/core';
 import {PackManifestTable} from './PackManifestTable';
-
-const STARTER = {
-  id: 'SS200-starter',
-  name: 'SS200 starter',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 178,
-  helices: [{offsetFromButt: 400, radius: 225, length: 110}],
-};
+import {SS200_STARTER as STARTER} from '@pile-on/core/testFixtures';
 
 const CATALOGUE: Catalogue = {pileTypes: [STARTER], vehicles: []};
 

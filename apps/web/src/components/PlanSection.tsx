@@ -8,6 +8,7 @@ import {
   totalPileCount,
   validatePlan,
   type Placement,
+  type UnplacedDemand,
 } from '@pile-on/core';
 import {useAppState} from '../state/AppStateProvider';
 import {ConsignmentView} from './ConsignmentView';
@@ -26,9 +27,7 @@ export function PlanSection() {
   const {state, dispatch} = useAppState();
   const {catalogue, job, plan, options} = state;
 
-  const [unplaced, setUnplaced] = useState<
-    readonly {pileTypeId: string; quantity: number; reason: string}[]
-  >([]);
+  const [unplaced, setUnplaced] = useState<readonly UnplacedDemand[]>([]);
   /** What the control needed for the same job. The business case, live. */
   const [baselineMovements, setBaselineMovements] = useState<number | null>(
     null,

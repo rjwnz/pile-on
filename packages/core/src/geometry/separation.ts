@@ -116,33 +116,3 @@ export function requiredLateralSeparation(
   }
   return Math.sqrt(Math.max(0, distance * distance - deltaZ * deltaZ));
 }
-
-/** Whether two placed piles are far enough apart to coexist in a tier. */
-export function lateralSeparationOk(
-  a: PlacedPile,
-  b: PlacedPile,
-  options: SeparationOptions,
-  deltaZ: Millimetres = 0,
-): boolean {
-  const gap = Math.abs(a.placement.y - b.placement.y);
-  return (
-    gap + GEOMETRIC_EPSILON >= requiredLateralSeparation(a, b, options, deltaZ)
-  );
-}
-
-/**
- * Whether two placed piles conflict. Piles in different tiers never conflict —
- * dunnage carries the layer above, so vertical stacking is a tier concern, not
- * a pairwise one.
- */
-export function pilesConflict(
-  a: PlacedPile,
-  b: PlacedPile,
-  options: SeparationOptions,
-  deltaZ: Millimetres = 0,
-): boolean {
-  if (a.placement.tier !== b.placement.tier) {
-    return false;
-  }
-  return !lateralSeparationOk(a, b, options, deltaZ);
-}

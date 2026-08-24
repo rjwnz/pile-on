@@ -225,28 +225,40 @@ function bestPackOf(
   types: readonly PileType[],
   options: PackingOptions,
 ): BuiltPack | null {
-  let best: BuiltPack | null = null;
-  let bestJoins = -1;
+  let best: {pack: BuiltPack; joins: number} | null = null;
   for (const flips of flipPatterns(types.length, options.allowFlips)) {
     const pack = buildFlushPack(types, flips, options);
     if (!pack) {
       continue;
     }
-    const joins = headToTailJoins(flips);
-    const better =
-      !best ||
-      pack.width < best.width - GEOMETRIC_EPSILON ||
-      (pack.width < best.width + GEOMETRIC_EPSILON &&
-        (joins > bestJoins ||
-          (joins === bestJoins &&
-            best.piles[0]!.placement.flipped &&
-            !flips[0]!)));
-    if (better) {
-      best = pack;
-      bestJoins = joins;
+    const band = {pack, joins: headToTailJoins(flips)};
+    if (!best || bandsBetter(band, best)) {
+      best = band;
     }
   }
-  return best;
+  return best?.pack ?? null;
+}
+
+/** One candidate band against the one held, by the order `bestPackOf` sets. */
+function bandsBetter(
+  candidate: {pack: BuiltPack; joins: number},
+  held: {pack: BuiltPack; joins: number},
+): boolean {
+  if (candidate.pack.width < held.pack.width - GEOMETRIC_EPSILON) {
+    return true;
+  }
+  if (candidate.pack.width > held.pack.width + GEOMETRIC_EPSILON) {
+    return false;
+  }
+  if (candidate.joins !== held.joins) {
+    return candidate.joins > held.joins;
+  }
+  // Equal width and equal joins: take the band that loads butt-first, so an
+  // alternating band reads the same way every time.
+  return (
+    held.pack.piles[0]!.placement.flipped &&
+    !candidate.pack.piles[0]!.placement.flipped
+  );
 }
 
 /**

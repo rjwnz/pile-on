@@ -3,11 +3,13 @@ import {
   bearerStations,
   bearingGround,
   footprintOver,
+  intersectSpans,
 } from '../domain/packs';
 import {maxRadius} from '../domain/pile';
 import {balanceTargetOf} from '../domain/vehicle';
 import type {Placement, PlacedPile} from '../domain/placement';
 import {GEOMETRIC_EPSILON, type Kilograms, type Millimetres} from '../units';
+import {groupBy} from '../collections';
 import type {PackingOptions} from './options';
 import {
   buildPackCandidates,
@@ -38,7 +40,7 @@ export interface LayerResult {
   readonly maxRadius: Millimetres;
 }
 
-export const EMPTY_LAYER: LayerResult = {
+const EMPTY_LAYER: LayerResult = {
   placements: [],
   packs: 0,
   mass: 0,
@@ -65,24 +67,6 @@ interface Row {
   readonly mass: Kilograms;
   readonly count: number;
   readonly identical: number;
-}
-
-/** Pairwise intersection of two lists of closed intervals, empties dropped. */
-function intersect(
-  a: readonly (readonly [number, number])[],
-  b: readonly (readonly [number, number])[],
-): [number, number][] {
-  const out: [number, number][] = [];
-  for (const [aLow, aHigh] of a) {
-    for (const [bLow, bHigh] of b) {
-      const low = Math.max(aLow, bLow);
-      const high = Math.min(aHigh, bHigh);
-      if (low <= high) {
-        out.push([low, high]);
-      }
-    }
-  }
-  return out;
 }
 
 /**
@@ -170,7 +154,7 @@ function allowedShifts(
       const onto = footprint
         .filter(([from, to]) => to - from >= pack.width - GEOMETRIC_EPSILON)
         .map(([from, to]): [number, number] => [from - left, to - right]);
-      ranges = intersect(ranges, onto);
+      ranges = intersectSpans(ranges, onto);
       if (ranges.length === 0) {
         return [];
       }
@@ -206,6 +190,24 @@ function bestShift(
     }
   }
   return best;
+}
+
+/**
+ * How good a row is, best first: most piles aboard, then the most identical
+ * bundles, then the shorter run of deck, then the narrower band, then the
+ * truest centring. Compared term by term, smaller wins.
+ */
+function rowRank(row: Row, miss: number): number[] {
+  return [-row.count, -row.identical, row.length, row.width, miss];
+}
+
+function outranks(a: readonly number[], b: readonly number[]): boolean {
+  for (const [index, value] of a.entries()) {
+    if (value !== b[index]) {
+      return value < b[index]!;
+    }
+  }
+  return false;
 }
 
 /** Whether the two demands together stay within what is available. */
@@ -357,12 +359,7 @@ function arrangeRows(
 
 /** Flip whole rows across the centreline until their moments best cancel. */
 function mirrorRows(chain: readonly PlacedPile[]): PlacedPile[] {
-  const byStart = new Map<Millimetres, PlacedPile[]>();
-  for (const pile of chain) {
-    const held = byStart.get(pile.placement.x) ?? [];
-    held.push(pile);
-    byStart.set(pile.placement.x, held);
-  }
+  const byStart = groupBy(chain, pile => pile.placement.x);
   const rows = [...byStart.values()].map(piles => ({
     piles,
     moment: piles.reduce(
@@ -402,13 +399,7 @@ function chainContained(
     return true;
   }
   const ground = bearingGround(input.below, input.catalogue);
-  const byPack = new Map<number, PlacedPile[]>();
-  for (const pile of chain) {
-    const held = byPack.get(pile.placement.pack) ?? [];
-    held.push(pile);
-    byPack.set(pile.placement.pack, held);
-  }
-  for (const piles of byPack.values()) {
+  for (const piles of groupBy(chain, pile => pile.placement.pack).values()) {
     // A pack has to be bearable where it lands, not merely over something:
     // two timbers, each on shaft the tier below actually presents.
     if (bearerStations(piles, ground).length < MIN_BEARERS_PER_PACK) {
@@ -500,7 +491,7 @@ export function packTier(input: TierInput): LayerResult {
         massBudget: massLeft,
       }).filter(pack => pack.length <= room + GEOMETRIC_EPSILON);
 
-      let best: {row: Row; shift: number; miss: number} | null = null;
+      let best: {row: Row; shift: number; rank: number[]} | null = null;
       const consider = (packs: readonly BuiltPack[]) => {
         const row = rowOf(packs, input);
         if (row.mass > massLeft) {
@@ -515,20 +506,9 @@ export function packTier(input: TierInput): LayerResult {
         if (shift === null) {
           return;
         }
-        const miss = Math.abs(shift - wanted);
-        const held = best?.row;
-        if (
-          !held ||
-          row.count > held.count ||
-          (row.count === held.count &&
-            (row.identical > held.identical ||
-              (row.identical === held.identical &&
-                (row.length < held.length ||
-                  (row.length === held.length &&
-                    (row.width < held.width ||
-                      (row.width === held.width && miss < best!.miss)))))))
-        ) {
-          best = {row, shift, miss};
+        const rank = rowRank(row, Math.abs(shift - wanted));
+        if (!best || outranks(rank, best.rank)) {
+          best = {row, shift, rank};
         }
       };
 

@@ -9,47 +9,10 @@ import type {Job} from '../domain/job';
 import type {Helix, PileType} from '../domain/pile';
 import type {Vehicle} from '../domain/vehicle';
 import {validatePlan} from '../validation/plan';
-
-const SP168: PileType = {
-  id: 'SP168-D6',
-  name: 'SP168 6.0 m twin helix',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 178,
-  helices: [
-    {offsetFromButt: 400, radius: 225, length: 110},
-    {offsetFromButt: 1100, radius: 175, length: 110},
-  ],
-};
-
-const SP139: PileType = {
-  id: 'SP139-S4',
-  name: 'SP139 4.5 m single helix',
-  length: 4500,
-  shaftRadius: 70,
-  mass: 96,
-  helices: [{offsetFromButt: 350, radius: 175, length: 90}],
-};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Tractor + 4-axle semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
-};
+import {SEMI, SP139, SP168, job} from '../testFixtures';
 
 const CATALOGUE: Catalogue = {pileTypes: [SP168, SP139], vehicles: [SEMI]};
 const OPTIONS = DEFAULT_PACKING_OPTIONS;
-
-function job(...lines: [string, number][]): Job {
-  return {
-    name: 'test',
-    lines: lines.map(([pileTypeId, quantity]) => ({pileTypeId, quantity})),
-  };
-}
 
 function errors(plan: ReturnType<typeof pack>['plan'], catalogue = CATALOGUE) {
   return validatePlan(plan, catalogue, OPTIONS).filter(

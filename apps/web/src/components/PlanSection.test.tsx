@@ -10,34 +10,13 @@ import {
 } from '@pile-on/core';
 import {AppStateProvider} from '../state/AppStateProvider';
 import {PlanSection} from './PlanSection';
-
-const SP168: PileType = {
-  id: 'SP168-D6',
-  name: 'SP168 6.0 m twin helix',
-  length: 6000,
-  shaftRadius: 84,
-  mass: 178,
-  helices: [
-    {offsetFromButt: 400, radius: 225, length: 110},
-    {offsetFromButt: 1100, radius: 175, length: 110},
-  ],
-};
+import {SEMI, SP168} from '@pile-on/core/testFixtures';
 
 const LONG: PileType = {
   ...SP168,
   id: 'SP219-D14',
   name: 'SP219 14 m',
   length: 14000,
-};
-
-const SEMI: Vehicle = {
-  id: 'SEMI-45',
-  name: 'Tractor + semi',
-  kind: 'semi_trailer',
-  deckLength: 12500,
-  deckWidth: 2450,
-  payloadCapacity: 28200,
-  towableBy: [],
 };
 
 function renderPlan({

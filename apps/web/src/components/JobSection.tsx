@@ -1,7 +1,6 @@
 import {
   JOB_CSV_EXAMPLE,
   combinationsOf,
-  isSingleHelix,
   jobQuantity,
   movementPayloadCapacity,
   parseJobRows,
@@ -16,7 +15,7 @@ import {
 import {groupPileTypes} from '../lib/pileTypeGroups';
 import {useAppState} from '../state/AppStateProvider';
 import {CsvImportPanel} from './CsvImportPanel';
-import {PileTypeBadge} from './PileTypeBadge';
+import {PileTypeBadge, describeHelices} from './PileTypeBadge';
 import {QuantityCell} from './QuantityCell';
 import {Button, EmptyState, Field, Panel} from './ui';
 
@@ -110,17 +109,7 @@ export function JobSection() {
                         {toMetres(type.length).toFixed(2)} m
                       </td>
                       <td className="py-2 pr-3 text-xs">
-                        {type.helices.length === 0
-                          ? 'plain shaft'
-                          : `${
-                              type.helices.length === 1
-                                ? '1 helix'
-                                : `${type.helices.length} helices`
-                            } · ${
-                              isSingleHelix(type)
-                                ? 'interleaves'
-                                : 'no interleave'
-                            }`}
+                        {describeHelices(type)}
                       </td>
                       <td className="py-2 pr-3 text-right tabular-nums">
                         {type.mass} kg

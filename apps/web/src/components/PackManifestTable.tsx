@@ -1,16 +1,23 @@
 import {pileName, toMetres, type PackSummary} from '@pile-on/core';
 
+/**
+ * One pack's contents, one line per length aboard: "3 × SS200 starter
+ * (6.00 m)". The drawing's hover card stacks these; the table runs them
+ * together.
+ */
+export function packContentsLines(summary: PackSummary): string[] {
+  if (summary.contents.length === 0) {
+    return ['nothing the catalogue recognises'];
+  }
+  return summary.contents.map(
+    content =>
+      `${content.count} × ${pileName(content.code, content.part)} (${toMetres(content.length).toFixed(2)} m)`,
+  );
+}
+
 /** One pack's contents as a line of text: "3 × SS200 starter (6.00 m)". */
 export function packContentsLine(summary: PackSummary): string {
-  if (summary.contents.length === 0) {
-    return 'nothing the catalogue recognises';
-  }
-  return summary.contents
-    .map(
-      content =>
-        `${content.count} × ${pileName(content.code, content.part)} (${toMetres(content.length).toFixed(2)} m)`,
-    )
-    .join(', ');
+  return packContentsLines(summary).join(', ');
 }
 
 /**

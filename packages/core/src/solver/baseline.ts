@@ -8,9 +8,10 @@ import {
 } from '../domain/catalogue';
 import {
   MAX_LOAD_HEIGHT,
-  tierHeightFor,
+  loadHeight,
   type LoadingOptions,
 } from '../domain/loading';
+import {PACK_MAX_WIDTH} from '../domain/packs';
 import type {Job, JobLine} from '../domain/job';
 import {maxRadius, type PileType} from '../domain/pile';
 import type {DeckRole, Placement} from '../domain/placement';
@@ -19,7 +20,7 @@ import {
   payloadCapacity,
   type Vehicle,
 } from '../domain/vehicle';
-import type {Kilograms, Millimetres} from '../units';
+import {GEOMETRIC_EPSILON, type Kilograms, type Millimetres} from '../units';
 import {shiftToBalance} from './balance';
 import {unplaceableOnFleet} from './feasibility';
 
@@ -32,6 +33,8 @@ import {unplaceableOnFleet} from './feasibility';
 
 export interface Lane {
   readonly y: Millimetres;
+  /** Which of the tier's (at most two) packs the lane belongs to. */
+  readonly pack: number;
 }
 
 export interface ArrangeResult {
@@ -44,7 +47,11 @@ export interface ArrangeResult {
   }[];
 }
 
-/** Lane centrelines for a tier given over to one pile type. */
+/**
+ * Lane centrelines for a tier given over to one pile type: two packs of
+ * lanes side by side when they fit, one pack otherwise, each at most
+ * `PACK_MAX_WIDTH` across and symmetric about the centreline.
+ */
 export function lanesFor(
   vehicle: Vehicle,
   type: PileType,
@@ -52,21 +59,68 @@ export function lanesFor(
 ): Lane[] {
   const halfWidth = maxRadius(type);
   const usable = vehicle.deckWidth - options.sideMargin * 2;
-  if (usable < halfWidth * 2) {
+  if (usable < halfWidth * 2 || halfWidth * 2 > PACK_MAX_WIDTH) {
     return [];
   }
   // Every pile is its widest all the way along, so neighbouring lanes always
   // present plate to plate. Nothing here ever staggers them apart.
   const pitch = halfWidth * 2 + options.clearances.helixToHelix;
-  const count = Math.floor((usable - halfWidth * 2) / pitch) + 1;
+  const gap = options.clearances.helixToHelix;
+  const perPack = Math.floor((PACK_MAX_WIDTH - halfWidth * 2) / pitch) + 1;
+  const packWidthOf = (lanes: number) => (lanes - 1) * pitch + halfWidth * 2;
+
+  // Two equal packs when the deck takes them, shrunk together until they fit.
+  let paired = perPack;
+  while (paired >= 1 && packWidthOf(paired) * 2 + gap > usable) {
+    paired--;
+  }
+  if (paired >= 1) {
+    const width = packWidthOf(paired);
+    const leftEdge = -(width * 2 + gap) / 2;
+    const lanes: Lane[] = [];
+    for (let pack = 0; pack < 2; pack++) {
+      const packStart = leftEdge + pack * (width + gap);
+      for (let index = 0; index < paired; index++) {
+        lanes.push({y: packStart + halfWidth + index * pitch, pack});
+      }
+    }
+    return lanes;
+  }
+
+  // One pack, centred: as many lanes as the pack and the deck both allow.
+  return singlePackLanes(vehicle, type, options);
+}
+
+/** One centred pack of lanes — what a tier falls back to when a pair of
+ * packs would weigh too unalike. */
+export function singlePackLanes(
+  vehicle: Vehicle,
+  type: PileType,
+  options: LoadingOptions,
+): Lane[] {
+  const halfWidth = maxRadius(type);
+  const usable = vehicle.deckWidth - options.sideMargin * 2;
+  if (usable < halfWidth * 2 || halfWidth * 2 > PACK_MAX_WIDTH) {
+    return [];
+  }
+  const pitch = halfWidth * 2 + options.clearances.helixToHelix;
+  const count = Math.min(
+    Math.floor((PACK_MAX_WIDTH - halfWidth * 2) / pitch) + 1,
+    Math.floor((usable - halfWidth * 2) / pitch) + 1,
+  );
   const span = (count - 1) * pitch;
   return Array.from({length: count}, (_, index) => ({
     y: -span / 2 + index * pitch,
+    pack: 0,
   }));
 }
 
-/** How many piles of a type fit end to end in one lane. */
-export function pilesPerLane(
+/**
+ * How many rows of packs fit end to end along the deck. A pack never lays
+ * piles end to end inside itself — whole packs queue along the deck instead,
+ * `endGap` apart.
+ */
+export function rowsFor(
   vehicle: Vehicle,
   type: PileType,
   options: LoadingOptions,
@@ -82,63 +136,56 @@ export function pilesPerLane(
 interface Cell {
   readonly x: Millimetres;
   readonly y: Millimetres;
+  readonly pack: number;
+}
+
+/** Leading x of each row of packs, nearest the balance point first — where
+ * the leftovers land when demand runs out mid-tier. */
+function rowSlots(
+  vehicle: Vehicle,
+  type: PileType,
+  options: LoadingOptions,
+): {readonly slot: number; readonly x: Millimetres}[] {
+  const target = balanceTargetOf(vehicle);
+  return Array.from({length: rowsFor(vehicle, type, options)}, (_, slot) => ({
+    slot,
+    x: options.headboardGap + slot * (type.length + options.endGap),
+  })).sort(
+    (a, b) =>
+      Math.abs(a.x + type.length / 2 - target) -
+      Math.abs(b.x + type.length / 2 - target),
+  );
 }
 
 /**
- * Every slot in a single-type tier, ordered so that *any* prefix is balanced —
- * each cell greedily picked to keep the running centre of mass on target. A
- * full tier uses all of them either way; this decides where the leftovers sit
- * when demand runs out mid-tier.
+ * Every slot in a full single-type tier: rows of paired packs along the
+ * deck, rows nearest the balance point first. What a full tier holds, and
+ * the hypothetical layout the height check measures.
  */
 export function cellsFor(
   vehicle: Vehicle,
   type: PileType,
   options: LoadingOptions,
+  lanes: readonly Lane[] = lanesFor(vehicle, type, options),
 ): Cell[] {
-  const lanes = lanesFor(vehicle, type, options);
-  const slots = pilesPerLane(vehicle, type, options);
-  const targetX = balanceTargetOf(vehicle);
-
-  const remaining: Cell[] = [];
-  for (let slot = 0; slot < slots; slot++) {
-    for (const lane of lanes) {
-      remaining.push({
-        x: options.headboardGap + slot * (type.length + options.endGap),
-        y: lane.y,
-      });
-    }
-  }
-
-  const chosen: Cell[] = [];
-  let sumX = 0;
-  let sumY = 0;
-  while (remaining.length > 0) {
-    let bestIndex = 0;
-    let bestScore = Infinity;
-    for (const [index, cell] of remaining.entries()) {
-      const count = chosen.length + 1;
-      const meanX = (sumX + cell.x + type.length / 2) / count;
-      const meanY = (sumY + cell.y) / count;
-      const score = Math.hypot(meanX - targetX, meanY);
-      if (score < bestScore) {
-        bestScore = score;
-        bestIndex = index;
-      }
-    }
-    const [cell] = remaining.splice(bestIndex, 1) as [Cell];
-    sumX += cell.x + type.length / 2;
-    sumY += cell.y;
-    chosen.push(cell);
-  }
-  return chosen;
+  return rowSlots(vehicle, type, options).flatMap(row =>
+    lanes.map(lane => ({
+      x: row.x,
+      y: lane.y,
+      pack: row.slot * 2 + lane.pack,
+    })),
+  );
 }
 
 interface OpenDeck {
   readonly role: DeckRole;
   readonly vehicle: Vehicle;
   tier: number;
-  heightUsed: Millimetres;
   massUsed: Kilograms;
+  /** The type the last tier was given over to. Only its own kind may stack
+   * on it: a different type lays out different packs, and those would
+   * overhang the footprint below. */
+  lastTypeId: string | null;
   /** True once a part-filled tier means nothing may stack on this deck. */
   closed: boolean;
 }
@@ -209,8 +256,8 @@ export function arrangeNaively(
         role: 'truck',
         vehicle: combo!.truck,
         tier: 0,
-        heightUsed: 0,
         massUsed: 0,
+        lastTypeId: null,
         closed: false,
       },
     ];
@@ -219,8 +266,8 @@ export function arrangeNaively(
         role: 'trailer',
         vehicle: combo!.trailer,
         tier: 0,
-        heightUsed: 0,
         massUsed: 0,
+        lastTypeId: null,
         closed: false,
       });
     }
@@ -248,8 +295,39 @@ export function arrangeNaively(
     if (deck.closed || deck.tier >= options.maxTiers) {
       return 0;
     }
-    const tierHeight = tierHeightFor(type, options);
-    if (deck.heightUsed + tierHeight > MAX_LOAD_HEIGHT) {
+    if (deck.lastTypeId !== null && deck.lastTypeId !== type.id) {
+      return 0;
+    }
+    const cells = cellsFor(deck.vehicle, type, options);
+    if (cells.length === 0) {
+      return 0;
+    }
+    /*
+     * Bearers are derived from the whole stack — the baseline never staggers
+     * or flips, so its plates align vertically and its bearers come out
+     * thick. Judged the honest way: lay the full hypothetical tier and
+     * measure the stack it would make.
+     */
+    const existing = movement
+      ? placements.filter(
+          p => p.consignmentId === movement!.id && p.deck === deck.role,
+        )
+      : [];
+    const hypothetical: Placement[] = cells.map((cell, index) => ({
+      id: `hypothetical-${index}`,
+      consignmentId: existing[0]?.consignmentId ?? 'hypothetical',
+      deck: deck.role,
+      pileTypeId: type.id,
+      tier: deck.tier,
+      pack: cell.pack,
+      x: cell.x,
+      y: cell.y,
+      flipped: false,
+    }));
+    if (
+      loadHeight([...existing, ...hypothetical], catalogue, options) >
+      MAX_LOAD_HEIGHT
+    ) {
       return 0;
     }
     const spare =
@@ -257,10 +335,7 @@ export function arrangeNaively(
       deck.massUsed -
       options.ancillaryMassPerTier;
     const byMass = Math.floor(spare / type.mass);
-    return Math.max(
-      0,
-      Math.min(cellsFor(deck.vehicle, type, options).length, byMass),
-    );
+    return Math.max(0, Math.min(cells.length, byMass));
   }
 
   for (const {line, type} of demand) {
@@ -296,31 +371,100 @@ export function arrangeNaively(
         continue;
       }
 
-      const cells = cellsFor(deck.vehicle, type, options);
       const take = Math.min(remaining, tierCapacity(deck, type));
 
-      for (let index = 0; index < take; index++) {
-        const cell = cells[index]!;
+      /*
+       * Fill rows of packs, nearest the balance point first. A full row is a
+       * balanced pair; a partial row prefers one centred pack, and where the
+       * leftovers would split a pair too unevenly — every pile here weighs
+       * the same, so the rule is a head count — the row takes a centred pack
+       * of what fits and carries the rest to the next row.
+       */
+      const pairLanes = lanesFor(deck.vehicle, type, options);
+      const soloCap = singlePackLanes(deck.vehicle, type, options).length;
+      const bySide = [0, 1].map(side =>
+        pairLanes
+          .filter(lane => lane.pack === side)
+          .sort((a, b) => Math.abs(a.y) - Math.abs(b.y)),
+      );
+      const ratio = options.minPackMassRatio;
+      // A solo row is re-centred for however many piles it actually holds —
+      // a part-filled pack parked at one side would tip the load.
+      const pitch = maxRadius(type) * 2 + options.clearances.helixToHelix;
+      const centredYs = (count: number): number[] =>
+        Array.from(
+          {length: count},
+          (_, index) => (index - (count - 1) / 2) * pitch,
+        );
+
+      const chosen: Cell[] = [];
+      let toPlace = take;
+      for (const row of rowSlots(deck.vehicle, type, options)) {
+        if (toPlace <= 0) {
+          break;
+        }
+        const wanted = Math.min(toPlace, pairLanes.length);
+        const heavier = Math.ceil(wanted / 2);
+        const lighter = wanted - heavier;
+        const uneven =
+          lighter > 0 && lighter < ratio * heavier - GEOMETRIC_EPSILON;
+        const partial = wanted < pairLanes.length;
+
+        if ((uneven || partial) && wanted <= soloCap) {
+          // One centred pack: balanced, and exempt from the weight match.
+          for (const y of centredYs(wanted)) {
+            chosen.push({x: row.x, y, pack: row.slot * 2});
+          }
+          toPlace -= wanted;
+        } else if (uneven) {
+          const held = Math.min(wanted, soloCap);
+          for (const y of centredYs(held)) {
+            chosen.push({x: row.x, y, pack: row.slot * 2});
+          }
+          toPlace -= held;
+        } else {
+          for (const [side, count] of [heavier, lighter].entries()) {
+            for (const lane of bySide[side]!.slice(0, count)) {
+              chosen.push({x: row.x, y: lane.y, pack: row.slot * 2 + side});
+            }
+          }
+          toPlace -= wanted;
+        }
+      }
+
+      const laid = chosen.length;
+      if (laid === 0) {
+        // The layouts could not hold even one pile; close the deck rather
+        // than loop on it.
+        deck.closed = true;
+        if (movement.decks.every(entry => entry.closed)) {
+          movement = null;
+        }
+        continue;
+      }
+
+      for (const [index, cell] of chosen.entries()) {
         placements.push({
           id: `${movement.id}-${deck.role}-T${deck.tier}-${index}`,
           consignmentId: movement.id,
           deck: deck.role,
           pileTypeId: type.id,
           tier: deck.tier,
+          pack: cell.pack,
           x: cell.x,
           y: cell.y,
           flipped: false,
         });
       }
 
-      remaining -= take;
-      deck.massUsed += take * type.mass + options.ancillaryMassPerTier;
-      deck.heightUsed += tierHeightFor(type, options);
+      remaining -= laid;
+      deck.massUsed += laid * type.mass + options.ancillaryMassPerTier;
+      deck.lastTypeId = type.id;
       deck.tier += 1;
 
       // A partly filled tier closes the deck: nothing may stack on a layer
       // that does not cover it, and `validatePlan` enforces that.
-      if (take < cells.length) {
+      if (laid < cellsFor(deck.vehicle, type, options).length) {
         deck.closed = true;
         if (movement.decks.every(entry => entry.closed)) {
           movement = null;

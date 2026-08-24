@@ -14,6 +14,7 @@ export * from './domain/vehicle';
 export * from './domain/catalogue';
 export * from './domain/job';
 export * from './domain/loading';
+export * from './domain/packs';
 export * from './domain/balance';
 
 export * from './geometry/profile';
@@ -28,9 +29,8 @@ export * from './solver/options';
 export * from './solver/balance';
 export * from './solver/baseline';
 export * from './solver/feasibility';
-export * from './solver/stagger';
-export * from './solver/lane';
-export * from './solver/tier';
+export * from './solver/packBuilder';
+export * from './solver/layer';
 export * from './solver/pack';
 
 export * from './io/fields';

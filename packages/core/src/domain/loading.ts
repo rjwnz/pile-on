@@ -1,8 +1,13 @@
 import type {Kilograms, Millimetres} from '../units';
 import {maxRadius, type PileType} from './pile';
 import type {PlacedPile, Placement} from './placement';
-import type {Catalogue} from './catalogue';
-import {findPileType} from './catalogue';
+import {findPileType, type Catalogue} from './catalogue';
+import {
+  dunnageForProtrusion,
+  layerHeights,
+  shaftProtrusion,
+  type LayerHeight,
+} from './packs';
 
 /**
  * Minimum steel-to-steel gaps, by which two surfaces are meeting. Three
@@ -39,8 +44,17 @@ export interface BalanceTolerance {
 export interface LoadingOptions {
   readonly clearances: ClearanceOptions;
   readonly balance: BalanceTolerance;
-  /** Hardwood bearers under each tier — 100 × 100 per the Truck Loading Code. */
+  /** Thinnest bearer the yard stocks — 100 × 100 per the Truck Loading Code.
+   * A tier needing more to clear the plates below gets a thicker bearer, in
+   * `DUNNAGE_INCREMENT` steps. */
   readonly dunnageThickness: Millimetres;
+  /**
+   * Two packs sharing a tier must weigh alike, or the load is lopsided: the
+   * lighter pack's mass must be at least this fraction of the heavier's.
+   * Zero disables the rule. A tier carrying a single pack is judged by the
+   * lateral balance tolerance instead.
+   */
+  readonly minPackMassRatio: number;
   /** Gap between piles laid end to end in the same lane. */
   readonly endGap: Millimetres;
   /** Clear space kept between the load and each side of the deck. */
@@ -70,6 +84,7 @@ export const DEFAULT_LOADING_OPTIONS: LoadingOptions = Object.freeze({
   clearances: DEFAULT_CLEARANCES,
   balance: DEFAULT_BALANCE_TOLERANCE,
   dunnageThickness: 100,
+  minPackMassRatio: 0.7,
   endGap: 100,
   sideMargin: 50,
   headboardGap: 100,
@@ -84,12 +99,22 @@ export const DEFAULT_LOADING_OPTIONS: LoadingOptions = Object.freeze({
  */
 export const MAX_LOAD_HEIGHT: Millimetres = 3000;
 
-/** Height a tier of this pile type occupies, including its bearers. */
+/**
+ * The least height a tier of this pile type can occupy: bearers thick enough
+ * that its own plates clear the deck, plus the climb from bearer top to the
+ * top of the steel. Exact for a single tier on the deck; a lower bound in a
+ * stack, where the bearers may come out thicker still. The conservative
+ * figure feasibility and the baseline plan against.
+ */
 export function tierHeightFor(
   type: PileType,
   options: LoadingOptions,
 ): Millimetres {
-  return options.dunnageThickness + maxRadius(type) * 2;
+  return (
+    dunnageForProtrusion(shaftProtrusion(type), options) +
+    type.shaftRadius +
+    maxRadius(type)
+  );
 }
 
 /** Tier indices present in a set of placements, bottom first. */
@@ -99,70 +124,44 @@ export function tiersOf(placements: readonly Placement[]): number[] {
   );
 }
 
-/** Height of each tier, keyed by tier index. A tier is as tall as its widest pile. */
-export function tierHeights(
-  placements: readonly Placement[],
-  catalogue: Catalogue,
-  options: LoadingOptions,
-): Map<number, Millimetres> {
-  const heights = new Map<number, Millimetres>();
-  for (const placement of placements) {
-    const type = findPileType(catalogue, placement.pileTypeId);
-    if (!type) {
-      continue;
-    }
-    const height = tierHeightFor(type, options);
-    heights.set(
-      placement.tier,
-      Math.max(heights.get(placement.tier) ?? 0, height),
-    );
-  }
-  return heights;
-}
-
-/** Height of the deck surface of a given tier above the deck itself. */
-function tierBaseHeight(
-  tier: number,
-  heights: ReadonlyMap<number, Millimetres>,
-  options: LoadingOptions,
-): Millimetres {
-  let base = 0;
-  for (const [index, height] of [...heights].sort((a, b) => a[0] - b[0])) {
-    if (index >= tier) {
-      break;
-    }
-    base += height;
-  }
-  return base + options.dunnageThickness;
-}
-
 /**
- * Height of a placed pile's axis above the deck. A pile rests on its widest
- * point, so piles of different diameter sit at different heights in one tier —
- * offset the lateral separation rule gets to spend.
+ * Height of a placed pile's axis above the deck. A pile seats its shaft on
+ * the bearers, so piles of different shaft diameter sit at different heights
+ * in one tier — offset the lateral separation rule gets to spend. `heights`
+ * is the `layerHeights` of the whole deck, which carries each tier's derived
+ * bearers.
  */
 export function axisHeightOf(
   placed: PlacedPile,
-  heights: ReadonlyMap<number, Millimetres>,
-  options: LoadingOptions,
+  heights: ReadonlyMap<number, LayerHeight>,
 ): Millimetres {
-  return (
-    tierBaseHeight(placed.placement.tier, heights, options) +
-    maxRadius(placed.type)
-  );
+  const layer = heights.get(placed.placement.tier);
+  return (layer?.base ?? 0) + placed.type.shaftRadius;
 }
 
-/** Total load height above the deck, bearers included. */
+/**
+ * Total load height above the deck: the highest steel anywhere. Usually a
+ * top-tier plate, but a tall plate lower down can out-reach the whole tier
+ * above it, so this is a maximum over piles rather than a sum over tiers.
+ */
 export function loadHeight(
   placements: readonly Placement[],
   catalogue: Catalogue,
   options: LoadingOptions,
 ): Millimetres {
-  let total = 0;
-  for (const height of tierHeights(placements, catalogue, options).values()) {
-    total += height;
+  const heights = layerHeights(placements, catalogue, options);
+  let top = 0;
+  for (const placement of placements) {
+    const type = findPileType(catalogue, placement.pileTypeId);
+    if (!type) {
+      continue;
+    }
+    top = Math.max(
+      top,
+      axisHeightOf({type, placement}, heights) + maxRadius(type),
+    );
   }
-  return total;
+  return top;
 }
 
 /** Mass of the bearers, chocks and lashings a load of this shape needs. */

@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import {
   axisHeightOf,
   findPileType,
+  layerHeights,
+  maxRadius,
   radiusProfile,
-  tierHeights,
+  tiersOf,
   type Catalogue,
   type LoadingOptions,
   type Placement,
@@ -42,6 +44,11 @@ export interface LoadScene {
 }
 
 const DECK_COLOUR = 0xcbd5e1;
+const BEARER_COLOUR = 0xa78b62;
+/** A bearer timber's footprint along the deck, and how far in from the pile
+ * ends the yard prefers to land one. */
+const TIMBER_WIDTH = 100;
+const TIMBER_INSET = 300;
 /** Enough segments that a shaft reads as round at print zoom. */
 const RADIAL_SEGMENTS = 20;
 
@@ -102,7 +109,69 @@ export function buildLoadScene(input: LoadSceneInput): LoadScene {
   deck.position.set(vehicle.deckLength / 2, 0, -60);
   content.add(deck);
 
-  const heights = tierHeights(placements, catalogue, options);
+  const heights = layerHeights(placements, catalogue, options);
+
+  // The bearers each tier seats its shafts on: single lengths of timber laid
+  // across the deck at stations clear of helix plates, at the derived
+  // thickness — the drawing shows the 200 mm timbers a tier of starters
+  // actually demands.
+  for (const tier of tiersOf(placements)) {
+    const layer = heights.get(tier);
+    if (!layer) {
+      continue;
+    }
+    const inTier = placements.flatMap(placement => {
+      const type = findPileType(catalogue, placement.pileTypeId);
+      return type && placement.tier === tier ? [{type, placement}] : [];
+    });
+    if (inTier.length === 0) {
+      continue;
+    }
+    const x0 = Math.min(...inTier.map(p => p.placement.x));
+    const x1 = Math.max(...inTier.map(p => p.placement.x + p.type.length));
+    const y0 = Math.min(...inTier.map(p => p.placement.y - maxRadius(p.type)));
+    const y1 = Math.max(...inTier.map(p => p.placement.y + maxRadius(p.type)));
+
+    const plates = inTier.flatMap(pile =>
+      radiusProfile(pile)
+        .filter(segment => segment.kind === 'helix')
+        .map(segment => [segment.start, segment.end] as const),
+    );
+    const clearOfPlates = (station: number) =>
+      plates.every(
+        ([start, end]) => station + TIMBER_WIDTH <= start || station >= end,
+      );
+    // One timber near each end, walked inward off any plate in its way.
+    const stations: number[] = [];
+    for (const [preferred, step] of [
+      [x0 + TIMBER_INSET, 50],
+      [x1 - TIMBER_INSET - TIMBER_WIDTH, -50],
+    ] as const) {
+      let station = preferred;
+      const middle = (x0 + x1) / 2;
+      while (
+        !clearOfPlates(station) &&
+        (step > 0 ? station < middle : station > middle)
+      ) {
+        station += step;
+      }
+      stations.push(station);
+    }
+
+    for (const [index, station] of stations.entries()) {
+      const timber = new THREE.Mesh(
+        new THREE.BoxGeometry(TIMBER_WIDTH, y1 - y0, layer.dunnage),
+        new THREE.MeshLambertMaterial({color: BEARER_COLOUR}),
+      );
+      timber.name = `dunnage:${tier}:${index}`;
+      timber.position.set(
+        station + TIMBER_WIDTH / 2,
+        (y0 + y1) / 2,
+        layer.base - layer.dunnage / 2,
+      );
+      content.add(timber);
+    }
+  }
 
   for (const placement of placements) {
     const type = findPileType(catalogue, placement.pileTypeId);
@@ -115,7 +184,7 @@ export function buildLoadScene(input: LoadSceneInput): LoadScene {
      * bearers. That is geometry, so it comes from `core`: the drawing and the
      * separation rule must not hold separate ideas of where steel is.
      */
-    const axisZ = axisHeightOf({type, placement}, heights, options);
+    const axisZ = axisHeightOf({type, placement}, heights);
     const colour = colourForPileType(type.id);
 
     const shaft = tube(

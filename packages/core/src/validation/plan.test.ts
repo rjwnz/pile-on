@@ -25,6 +25,33 @@ const SP168: PileType = {
   ],
 };
 
+const SP139: PileType = {
+  id: 'SP139-S4',
+  name: 'SP139',
+  length: 4500,
+  shaftRadius: 70,
+  mass: 96,
+  helices: [{offsetFromButt: 350, radius: 175, length: 90}],
+};
+
+const STARTER: PileType = {
+  id: 'SS200-starter',
+  name: 'SS200 starter',
+  length: 6000,
+  shaftRadius: 84,
+  mass: 178,
+  helices: [{offsetFromButt: 400, radius: 225, length: 110}],
+};
+
+const EXTENSION: PileType = {
+  id: 'SS200-ext-6000',
+  name: 'SS200 extension',
+  length: 6000,
+  shaftRadius: 84,
+  mass: 132,
+  helices: [],
+};
+
 const SEMI: Vehicle = {
   id: 'SEMI-45',
   name: 'Semi',
@@ -36,6 +63,10 @@ const SEMI: Vehicle = {
 };
 
 const CATALOGUE: Catalogue = {pileTypes: [SP168], vehicles: [SEMI]};
+const FULL_CATALOGUE: Catalogue = {
+  pileTypes: [SP168, SP139, STARTER, EXTENSION],
+  vehicles: [SEMI],
+};
 
 /**
  * Balance is stood down for the rule-by-rule tests below.
@@ -58,6 +89,7 @@ function place(overrides: Partial<Placement> = {}): Placement {
     deck: 'truck',
     pileTypeId: 'SP168-D6',
     tier: 0,
+    pack: 0,
     x: 100,
     y: 0,
     flipped: false,
@@ -90,23 +122,23 @@ describe('the arranger and the validator agree', () => {
     expect(validatePlan(plan, CATALOGUE, STRICT)).toEqual([]);
   });
 
-  it('accepts a part-loaded last truck, which is where balance goes wrong', () => {
-    // 95 leaves the third truck 15 of a possible 40 — a full tier and a tier
-    // with five on it. That is the load the arranger has to keep on its feet.
+  it('accepts the part-loaded trucks a remainder leaves behind', () => {
+    // 95 fills two trucks of 32 and leaves 31: a third truck of full tiers
+    // plus a remainder the row rules split into lone centred packs, and a
+    // last truck carrying what would not pair. Those part-loads are where
+    // balance goes wrong, and every one must stand on its feet.
     const job: Job = {
       name: 'j',
       lines: [{pileTypeId: 'SP168-D6', quantity: 95}],
     };
     const {plan} = arrangeNaively(job, CATALOGUE, STRICT);
-    const last = plan.consignments[plan.consignments.length - 1]!;
-    const onLast = plan.placements.filter(p => p.consignmentId === last.id);
+    const counts = plan.consignments.map(
+      c => plan.placements.filter(p => p.consignmentId === c.id).length,
+    );
 
-    expect(onLast).toHaveLength(15);
-    expect(
-      validatePlan(plan, CATALOGUE, STRICT).filter(
-        v => v.consignmentId === last.id,
-      ),
-    ).toEqual([]);
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(95);
+    expect(counts[counts.length - 1]).toBeLessThan(32);
+    expect(validatePlan(plan, CATALOGUE, STRICT)).toEqual([]);
   });
 
   it('accepts a lane pitch that is exactly the required separation', () => {
@@ -325,9 +357,10 @@ describe('clashes', () => {
   });
 
   it('ignores piles that never share a station along the deck', () => {
+    // Separate rows of the same tier: no shared station, no clash.
     const plan = planWith([
-      place({id: 'a', x: 100, y: 0}),
-      place({id: 'b', x: 6200, y: 0}),
+      place({id: 'a', x: 100, y: 0, pack: 0}),
+      place({id: 'b', x: 6200, y: 0, pack: 1}),
     ]);
 
     expect(rules(plan)).toEqual([]);
@@ -389,21 +422,23 @@ describe('multiple consignments', () => {
 
 describe('support', () => {
   it('accepts a tier resting on a full tier below', () => {
+    // Two rows of packs per tier — packs queue along the deck; piles never
+    // lie end to end inside one pack.
     const plan = planWith([
-      place({id: 'a0', tier: 0, x: 100, y: 0}),
-      place({id: 'a1', tier: 0, x: 6200, y: 0}),
-      place({id: 'b0', tier: 1, x: 100, y: 0}),
-      place({id: 'b1', tier: 1, x: 6200, y: 0}),
+      place({id: 'a0', tier: 0, x: 100, y: 0, pack: 0}),
+      place({id: 'a1', tier: 0, x: 6200, y: 0, pack: 1}),
+      place({id: 'b0', tier: 1, x: 100, y: 0, pack: 0}),
+      place({id: 'b1', tier: 1, x: 6200, y: 0, pack: 1}),
     ]);
 
     expect(rules(plan)).toEqual([]);
   });
 
-  it('bridges the gap between piles laid end to end', () => {
+  it('bridges the gap between rows laid end to end', () => {
     // Tier 0 stops at 6100 and restarts at 6200; the bearers span that.
     const plan = planWith([
-      place({id: 'a0', tier: 0, x: 100}),
-      place({id: 'a1', tier: 0, x: 6200}),
+      place({id: 'a0', tier: 0, x: 100, pack: 0}),
+      place({id: 'a1', tier: 0, x: 6200, pack: 1}),
       place({id: 'b0', tier: 1, x: 3000}),
     ]);
 
@@ -621,5 +656,153 @@ describe('movements with a trailer', () => {
     expect(rules).not.toContain('over-payload');
     expect(rules).not.toContain('over-combined-gross');
     expect(rules).not.toContain('trailer-heavy');
+  });
+});
+
+describe('packs', () => {
+  it('rejects a pack banded wider than the limit', () => {
+    // Three lanes at plate pitch span 1400 mm of steel — no yard bands that.
+    const plan = planWith([
+      place({id: 'a', y: -475}),
+      place({id: 'b', y: 0}),
+      place({id: 'c', y: 475}),
+    ]);
+
+    expect(rules(plan)).toContain('pack-too-wide');
+  });
+
+  it('accepts two packs each inside the limit', () => {
+    const plan = planWith([
+      place({id: 'a', y: -712.5, pack: 0}),
+      place({id: 'b', y: -237.5, pack: 0}),
+      place({id: 'c', y: 237.5, pack: 1}),
+      place({id: 'd', y: 712.5, pack: 1}),
+    ]);
+
+    expect(rules(plan)).not.toContain('pack-too-wide');
+    expect(rules(plan)).not.toContain('too-many-packs');
+    expect(rules(plan)).not.toContain('packs-unbalanced');
+  });
+
+  it('rejects a pack mixing two pile types', () => {
+    const plan = planWith([
+      place({id: 'a', y: 0}),
+      place({id: 'b', y: 475, pileTypeId: 'SP139-S4'}),
+    ]);
+
+    expect(rules(plan, FULL_CATALOGUE)).toContain('pack-mixed-type');
+  });
+
+  it('rejects a pack mixing a starter with its own extensions', () => {
+    const plan = planWith([
+      place({id: 'a', y: 0, pileTypeId: 'SS200-starter'}),
+      place({id: 'b', y: 475, pileTypeId: 'SS200-ext-6000'}),
+    ]);
+
+    expect(rules(plan, FULL_CATALOGUE)).toContain('pack-mixed-type');
+  });
+
+  it('rejects a tier split into three packs', () => {
+    const plan = planWith([
+      place({id: 'a', y: -475, pack: 0}),
+      place({id: 'b', y: 0, pack: 1}),
+      place({id: 'c', y: 475, pack: 2}),
+    ]);
+
+    expect(rules(plan)).toContain('too-many-packs');
+  });
+
+  it('rejects a pair of packs weighing too unalike', () => {
+    // 356 kg beside 178 kg: the lighter is half the heavier, under the 70%
+    // floor the options carry.
+    const plan = planWith([
+      place({id: 'a', y: -700, pack: 0}),
+      place({id: 'b', y: -225, pack: 0}),
+      place({id: 'c', y: 700, pack: 1}),
+    ]);
+
+    expect(rules(plan)).toContain('packs-unbalanced');
+  });
+
+  it('exempts a lone pack from the weight match', () => {
+    const plan = planWith([
+      place({id: 'a', y: -237.5}),
+      place({id: 'b', y: 237.5}),
+    ]);
+
+    expect(rules(plan)).not.toContain('packs-unbalanced');
+  });
+
+  it('rejects an upper pack overhanging the packs below', () => {
+    const plan = planWith([
+      place({id: 'a', y: -475}),
+      place({id: 'b', y: 0}),
+      place({id: 'c', y: 700, tier: 1}),
+    ]);
+
+    expect(rules(plan)).toContain('unsupported-laterally');
+  });
+
+  it('lets an upper pack bridge two level packs below', () => {
+    // The two bottom packs are the same type, so their tops are level and
+    // one set of bearers lies flat across both — the join is solid ground.
+    const plan = planWith([
+      place({id: 'a', y: -712.5, pack: 0}),
+      place({id: 'b', y: -237.5, pack: 0}),
+      place({id: 'c', y: 237.5, pack: 1}),
+      place({id: 'd', y: 712.5, pack: 1}),
+      place({id: 'e', y: -237.5, tier: 1}),
+      place({id: 'f', y: 237.5, tier: 1}),
+    ]);
+
+    expect(rules(plan)).not.toContain('unsupported-laterally');
+  });
+});
+
+describe('rows of packs', () => {
+  it('accepts packs in separate rows along the deck, three and more', () => {
+    const plan = planWith([
+      place({id: 'a', x: 100, pack: 0}),
+      place({id: 'b', x: 6200, pack: 1}),
+      place({id: 'c', x: 100, tier: 1, pack: 0}),
+    ]);
+
+    expect(rules(plan)).not.toContain('too-many-packs');
+  });
+
+  it('exempts packs in different rows from the weight match', () => {
+    // A pack of two behind a pack of one: never abreast, never compared.
+    const plan = planWith([
+      place({id: 'a', x: 100, y: -237.5, pack: 0}),
+      place({id: 'b', x: 100, y: 237.5, pack: 0}),
+      place({id: 'c', x: 6200, y: 0, pack: 1}),
+    ]);
+
+    expect(rules(plan)).not.toContain('packs-unbalanced');
+  });
+
+  it('rejects a pack whose piles are not banded flush', () => {
+    const plan = planWith([
+      place({id: 'a', x: 100, y: 0}),
+      place({id: 'b', x: 6200, y: 475}),
+    ]);
+
+    expect(rules(plan)).toContain('pack-not-flush');
+  });
+
+  it('judges lateral support at every station, not on the tier average', () => {
+    /*
+     * Tier 0 is two rows: a wide pack forward, a narrow pack aft. The upper
+     * pack runs the full deck at a lateral position the forward row carries
+     * but the aft row does not — held on average, unsupported at the rear.
+     */
+    const plan = planWith([
+      place({id: 'a0', x: 100, y: -400, pack: 0}),
+      place({id: 'a1', x: 100, y: 75, pack: 0}),
+      place({id: 'b0', x: 6200, y: -400, pack: 1}),
+      place({id: 'c', x: 3000, y: 0, tier: 1}),
+    ]);
+
+    expect(rules(plan)).toContain('unsupported-laterally');
   });
 });

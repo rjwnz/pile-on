@@ -9,7 +9,15 @@ import {
   type VehicleCombination,
 } from '../domain/catalogue';
 import type {Job} from '../domain/job';
-import {MAX_LOAD_HEIGHT} from '../domain/loading';
+import {MAX_LOAD_HEIGHT, loadHeight} from '../domain/loading';
+import {
+  footprintOver,
+  layerHeights,
+  layersOf,
+  packLateralSpan,
+  packLongitudinalSpan,
+} from '../domain/packs';
+import {loadCentroid} from '../domain/balance';
 import {maxRadius} from '../domain/pile';
 import type {DeckRole, Placement} from '../domain/placement';
 import {
@@ -18,23 +26,21 @@ import {
   payloadCapacity,
   type Vehicle,
 } from '../domain/vehicle';
-import {loadCentroid} from '../domain/balance';
-import type {PlacedPile} from '../domain/placement';
-import {requiredLateralSeparation} from '../geometry/separation';
 import {coveredSpans} from '../validation/plan';
-import type {Kilograms, Millimetres} from '../units';
+import {GEOMETRIC_EPSILON, type Kilograms, type Millimetres} from '../units';
 import {groupBy} from '../collections';
 import {shiftToBalance} from './balance';
 import {unplaceableOnFleet} from './feasibility';
+import {packTier} from './layer';
 import {withoutFlips, type PackingOptions} from './options';
-import {packTier, type TierPlacement} from './tier';
 
 /**
  * The helix-aware packer. Unlike `arrangeNaively` it knows a pile is not a
- * cylinder of its widest diameter: stagger neighbouring lanes so their plates
- * miss and they close from plate pitch to shaft pitch — a sixth lane on a deck
- * that fits five. The pieces live in `stagger.ts` (exact offsets), `lane.ts`
- * (fill patterns) and `tier.ts` (the sweep).
+ * cylinder of its widest diameter: stagger neighbouring piles so their plates
+ * miss and a pack closes from plate pitch to shaft pitch — an extra lane in a
+ * pack that fits two. The pieces live in `stagger.ts` (exact offsets),
+ * `lane.ts` (fill patterns), `packBuilder.ts` (the within-pack sweep) and
+ * `layer.ts` (pairing packs into tiers).
  */
 
 export interface PackedType {
@@ -47,34 +53,6 @@ export interface PackResult {
   readonly plan: LoadPlan;
   /** Demand that could not be placed anywhere, with why. */
   readonly unplaced: readonly PackedType[];
-}
-
-/** Distinct pile half-widths still wanted, widest first. */
-function widthClasses(
-  remaining: ReadonlyMap<string, number>,
-  catalogue: Catalogue,
-): Millimetres[] {
-  const radii = new Set<Millimetres>();
-  for (const [id, count] of remaining) {
-    const type = count > 0 ? findPileType(catalogue, id) : undefined;
-    if (type) {
-      radii.add(maxRadius(type));
-    }
-  }
-  return [...radii].sort((a, b) => b - a);
-}
-
-/** The tallest a tier of this half-width class comes out. */
-function tierHeightForClass(
-  halfWidth: Millimetres,
-  options: PackingOptions,
-): Millimetres {
-  return options.dunnageThickness + halfWidth * 2;
-}
-
-interface TierChoice {
-  readonly result: ReturnType<typeof packTier>;
-  readonly height: Millimetres;
 }
 
 /**
@@ -150,10 +128,11 @@ interface DeckLoad {
 const EMPTY_DECK: DeckLoad = {placements: [], mass: 0, consumed: new Map()};
 
 /**
- * Fill one deck from the demand: the tier loop, then the balance pipeline —
- * mirror, settle (verified, with fallback), shift, nudge — all against this
- * deck's own row. Does not mutate `remaining`; the caller commits `consumed`
- * if it keeps the load.
+ * Fill one deck from the demand: the layer loop, then the balance pipeline —
+ * mirror (verified against the pack footprints), settle (verified, with
+ * fallback), shift, then the rigid slide onto the centreline — all against
+ * this deck's own row. Does not mutate `remaining`; the caller commits
+ * `consumed` if it keeps the load.
  */
 function packOneDeck(
   remaining: ReadonlyMap<string, number>,
@@ -161,17 +140,15 @@ function packOneDeck(
   vehicle: Vehicle,
   options: PackingOptions,
 ): DeckLoad {
-  const maxLoadHeight = MAX_LOAD_HEIGHT;
   const payload = payloadCapacity(vehicle);
 
   const available = new Map(remaining);
   const consumed = new Map<string, number>();
   const onDeck: Placement[] = [];
 
-  let heightUsed = 0;
   let massUsed = 0;
-  let ceiling = Infinity;
   let support: readonly (readonly [Millimetres, Millimetres])[] | null = null;
+  let below: readonly Placement[] | null = null;
 
   for (let tier = 0; tier < options.maxTiers; tier++) {
     const massBudget = payload - massUsed - options.ancillaryMassPerTier;
@@ -180,100 +157,79 @@ function packOneDeck(
     }
 
     /*
-     * Try each remaining diameter as the tier's ceiling and keep the densest
-     * per millimetre of height. The ceiling never rises going up the stack,
-     * and the bottom tier gets no vote — the widest thing still wanted sets
-     * it, else no wide pile could ever board.
+     * The bearers under this tier depend on the tier itself (its plates, and
+     * how they stagger against everything below), so the exact height is only
+     * known after packing. Candidates are screened against the headroom above
+     * the shafts stacked so far, and the finished tier is verified against
+     * the true derived height — popped again if the bearers came out too
+     * thick to fit.
      */
-    const classes = widthClasses(available, catalogue);
-    const allowed = tier === 0 ? classes.slice(0, 1) : classes;
-
-    let best: TierChoice | null = null;
-    for (const halfWidth of allowed) {
-      if (halfWidth > ceiling) {
-        continue;
-      }
-      if (heightUsed + tierHeightForClass(halfWidth, options) > maxLoadHeight) {
-        continue;
-      }
-      const result = packTier({
-        available,
-        catalogue,
-        vehicle,
-        options,
-        maxHalfWidth: halfWidth,
-        massBudget,
-        support,
-      });
-      if (result.placements.length === 0) {
-        continue;
-      }
-      // Charged on what the tier actually holds, not on what it was allowed
-      // to hold. A tier permitted 225 mm plates but filled with 175 mm ones
-      // is a 175 mm tier, and scoring it as tall would hide the better answer.
-      const height = tierHeightForClass(result.halfWidth, options);
-      if (heightUsed + height > maxLoadHeight) {
-        continue;
-      }
-      const density = result.placements.length / height;
-      const bestDensity = best
-        ? best.result.placements.length / best.height
-        : -Infinity;
-      if (
-        density > bestDensity ||
-        (density === bestDensity && height > (best?.height ?? 0))
-      ) {
-        best = {result, height};
-      }
-    }
-
-    if (!best) {
+    const stacked = [...layerHeights(onDeck, catalogue, options).values()];
+    const shaftTopSoFar = stacked[stacked.length - 1]?.shaftTop ?? 0;
+    const headroom = MAX_LOAD_HEIGHT - shaftTopSoFar;
+    if (headroom <= 0) {
       break;
     }
 
-    for (const [index, placed] of best.result.placements.entries()) {
-      onDeck.push({
-        id: `T${tier}-${index}`,
-        consignmentId: '',
-        deck: 'truck',
-        pileTypeId: placed.pileTypeId,
-        tier,
-        x: placed.x,
-        y: placed.y,
-        flipped: placed.flipped,
-      });
+    const layer = packTier({
+      available,
+      catalogue,
+      vehicle,
+      options,
+      headroom,
+      massBudget,
+      support,
+      below,
+    });
+    if (layer.placements.length === 0) {
+      break;
     }
 
-    consume(available, best.result.placements);
-    for (const placed of best.result.placements) {
-      consumed.set(
-        placed.pileTypeId,
-        (consumed.get(placed.pileTypeId) ?? 0) + 1,
-      );
+    const inTier: Placement[] = layer.placements.map((pile, index) => ({
+      ...pile.placement,
+      id: `T${tier}-${index}`,
+      tier,
+    }));
+    onDeck.push(...inTier);
+    if (loadHeight(onDeck, catalogue, options) > MAX_LOAD_HEIGHT) {
+      onDeck.splice(onDeck.length - inTier.length);
+      break;
     }
-    massUsed += best.result.mass + options.ancillaryMassPerTier;
-    heightUsed += best.height;
-    ceiling = best.result.halfWidth;
-    support = spansOf(best.result.placements, catalogue, options);
+
+    for (const pile of layer.placements) {
+      const id = pile.placement.pileTypeId;
+      available.set(id, (available.get(id) ?? 0) - 1);
+      consumed.set(id, (consumed.get(id) ?? 0) + 1);
+    }
+    massUsed += layer.mass + options.ancillaryMassPerTier;
+    support = spansOf(inTier, catalogue, options);
+    below = inTier;
   }
 
   if (onDeck.length === 0) {
     return EMPTY_DECK;
   }
 
-  // Settling is an optimisation and is checked like one: verified, and thrown
-  // away for the sweep's own (already supported) layout if it broke support.
-  const settled = settleTiers(
-    mirrorTiers(onDeck, catalogue),
-    catalogue,
-    vehicle,
-    options,
-  );
-  const kept = allTiersSupported(settled, catalogue, options)
-    ? settled
-    : onDeck;
+  // Mirroring changes cross-tier lateral distances, and settling changes
+  // longitudinal overlaps — both can thicken the derived bearers. Each is an
+  // optimisation and is checked like one: verified, and thrown away for the
+  // already-legal layout when it broke support or pushed the stack over
+  // height.
+  const mirrored = mirrorTiers(onDeck, catalogue, options);
+  const upright =
+    loadHeight(mirrored, catalogue, options) <= MAX_LOAD_HEIGHT
+      ? mirrored
+      : onDeck;
+
+  const settled = settleTiers(upright, catalogue, vehicle, options);
+  const kept =
+    allTiersSupported(settled, catalogue, options) &&
+    allTiersContained(settled, catalogue, options) &&
+    loadHeight(settled, catalogue, options) <= MAX_LOAD_HEIGHT
+      ? settled
+      : upright;
   return {
-    placements: nudgeLanes(
+    placements: centreLaterally(
       shiftToBalance(kept, catalogue, vehicle),
       catalogue,
       vehicle,
@@ -282,6 +238,107 @@ function packOneDeck(
     mass: massUsed,
     consumed,
   };
+}
+
+/**
+ * Slide the whole load sideways onto the centreline, rigid. Every tier moves
+ * by the same amount, so separations, footprints and support all ride along
+ * untouched — the one lateral repair that is safe by construction, and the
+ * only one that reaches a pack pinned off-centre by the footprint below it.
+ */
+function centreLaterally(
+  onTruck: readonly Placement[],
+  catalogue: Catalogue,
+  vehicle: Vehicle,
+  options: PackingOptions,
+): Placement[] {
+  const centroid = loadCentroid(onTruck, catalogue);
+  if (!centroid) {
+    return [...onTruck];
+  }
+  let left = Infinity;
+  let right = -Infinity;
+  for (const placement of onTruck) {
+    const type = findPileType(catalogue, placement.pileTypeId);
+    if (!type) {
+      continue;
+    }
+    left = Math.min(left, placement.y - maxRadius(type));
+    right = Math.max(right, placement.y + maxRadius(type));
+  }
+  if (left > right) {
+    return [...onTruck];
+  }
+  const halfDeck = vehicle.deckWidth / 2 - options.sideMargin;
+  const shift = Math.min(
+    Math.max(-centroid.y, -halfDeck - left),
+    halfDeck - right,
+  );
+  if (Math.abs(shift) <= GEOMETRIC_EPSILON) {
+    return [...onTruck];
+  }
+  return onTruck.map(placement => ({
+    ...placement,
+    y: placement.y + shift,
+  }));
+}
+
+/** `tierContained`, over every adjacent pair of tiers on the deck. */
+function allTiersContained(
+  onTruck: readonly Placement[],
+  catalogue: Catalogue,
+  options: PackingOptions,
+): boolean {
+  const tiers = [...layersOf(onTruck).values()];
+  for (let index = 1; index < tiers.length; index++) {
+    const inTier = [...tiers[index]!.values()].flat();
+    const below = [...tiers[index - 1]!.values()].flat();
+    if (!tierContained(inTier, below, catalogue, options)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Whether every pack in a tier stands wholly on the footprint the tier
+ * below offers over the pack's own run of deck — the containment the row
+ * sweep worked to, re-checked whenever an optimisation moves things.
+ */
+function tierContained(
+  inTier: readonly Placement[],
+  below: readonly Placement[],
+  catalogue: Catalogue,
+  options: PackingOptions,
+): boolean {
+  for (const packs of layersOf(inTier).values()) {
+    for (const pack of packs.values()) {
+      const span = packLateralSpan(pack, catalogue);
+      const xSpan = packLongitudinalSpan(pack, catalogue);
+      if (!span || !xSpan) {
+        continue;
+      }
+      const footprint = footprintOver(
+        below,
+        catalogue,
+        options,
+        xSpan[0],
+        xSpan[1],
+      );
+      if (footprint === null) {
+        continue;
+      }
+      const held = footprint.some(
+        ([from, to]) =>
+          span[0] >= from - GEOMETRIC_EPSILON &&
+          span[1] <= to + GEOMETRIC_EPSILON,
+      );
+      if (!held) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 /** One candidate movement, packed but not committed. */
@@ -515,6 +572,7 @@ function settleTiers(
   const target = balanceTargetOf(vehicle);
   const settled: Placement[] = [];
   let support: readonly (readonly [Millimetres, Millimetres])[] | null = null;
+  let below: readonly Placement[] | null = null;
   let carriedMass = 0;
   let carriedMoment = 0;
 
@@ -537,22 +595,34 @@ function settleTiers(
         : 0;
 
     const ranges = shiftRange(inTier, catalogue, vehicle, support);
-    const shift = ranges.length
-      ? ranges
-          .map(([low, high]) => Math.min(Math.max(wanted, low), high))
-          .reduce((best, option) =>
-            Math.abs(option - wanted) < Math.abs(best - wanted) ? option : best,
-          )
-      : 0;
+    const bySize = ranges
+      .map(([low, high]) => Math.min(Math.max(wanted, low), high))
+      .sort((a, b) => Math.abs(a - wanted) - Math.abs(b - wanted));
 
-    const moved = inTier.map(placement => ({
-      ...placement,
-      x: placement.x + shift,
-    }));
+    // The support ranges know nothing of the pack footprints, so each slide
+    // is verified where it lands: the best option that keeps this tier on
+    // the packs already settled beneath it, falling back to not moving at
+    // all — which can itself be off the footprint if the tier below moved,
+    // and the caller's whole-result verification catches that case.
+    let shift = 0;
+    let moved: Placement[] = [...inTier];
+    for (const option of bySize) {
+      const candidate = inTier.map(placement => ({
+        ...placement,
+        x: placement.x + option,
+      }));
+      if (!below || tierContained(candidate, below, catalogue, options)) {
+        shift = option;
+        moved = candidate;
+        break;
+      }
+    }
+
     settled.push(...moved);
     carriedMass += mass;
     carriedMoment += moment + mass * shift;
     support = spansOf(moved, catalogue, options);
+    below = moved;
   }
 
   return settled;
@@ -560,18 +630,24 @@ function settleTiers(
 
 /**
  * Mirror tiers across the deck centreline until the truck sits level. The
- * sweep biases each tier's mass toward the side it builds from; flipping the
- * sign of y is free (distances and margins are symmetric), and each tier picks
- * the side that best undoes the bias of the tiers below it.
+ * layer builder biases each tier's mass toward wherever its packs came out
+ * heavier; flipping the sign of y is free (distances and margins are
+ * symmetric), and each tier picks the side that best undoes the bias of the
+ * tiers below it. Flipping one tier and not the next can pull a pack off
+ * the footprint below it, so each tier only takes the side that keeps it
+ * contained on the tier as already decided — and when neither side does,
+ * the deck goes back exactly as built, which is contained by construction.
  */
 function mirrorTiers(
   onTruck: readonly Placement[],
   catalogue: Catalogue,
+  options: PackingOptions,
 ): Placement[] {
   const byTier = groupBy(onTruck, placement => placement.tier);
 
   const out: Placement[] = [];
   let moment = 0;
+  let below: readonly Placement[] | null = null;
   for (const [, inTier] of [...byTier].sort((a, b) => a[0] - b[0])) {
     let tierMoment = 0;
     for (const placement of inTier) {
@@ -580,142 +656,31 @@ function mirrorTiers(
         tierMoment += type.mass * placement.y;
       }
     }
-    const mirror =
-      Math.abs(moment - tierMoment) < Math.abs(moment + tierMoment) ? -1 : 1;
-    moment += tierMoment * mirror;
-    out.push(
-      ...inTier.map(placement => ({...placement, y: placement.y * mirror})),
-    );
-  }
-  return out;
-}
+    const flipFirst =
+      Math.abs(moment - tierMoment) < Math.abs(moment + tierMoment);
 
-/**
- * Move single lanes, once moving whole tiers has run out of road. Unlike a
- * tier shift this can undo a stagger, so each nudge is applied, checked, and
- * rolled back if it broke anything. Last resort; only runs when the load is
- * genuinely out of tolerance.
- */
-function nudgeLanes(
-  onTruck: readonly Placement[],
-  catalogue: Catalogue,
-  vehicle: Vehicle,
-  options: PackingOptions,
-): Placement[] {
-  const target = balanceTargetOf(vehicle);
-  let current = [...onTruck];
-
-  const offsetOf = (load: readonly Placement[]) => {
-    const centroid = loadCentroid(load, catalogue);
-    return centroid ? centroid.x - target : 0;
-  };
-
-  const lanesOf = (load: readonly Placement[]) => {
-    const keys = new Set(load.map(p => `${p.tier}:${p.y}`));
-    return [...keys];
-  };
-
-  for (let round = 0; round < 12; round++) {
-    const offset = offsetOf(current);
-    if (Math.abs(offset) <= options.balance.longitudinal) {
-      break;
-    }
-
-    let improved = false;
-    for (const lane of lanesOf(current)) {
-      const inLane = current.filter(p => `${p.tier}:${p.y}` === lane);
-      const laneMass = inLane.reduce((total, placement) => {
-        const type = findPileType(catalogue, placement.pileTypeId);
-        return type ? total + type.mass : total;
-      }, 0);
-      const total = loadCentroid(current, catalogue)?.mass ?? 0;
-      if (laneMass <= 0 || total <= 0) {
-        continue;
-      }
-
-      // Moving this lane by d moves the whole load by d × its share of the mass.
-      const wanted = (-offset * total) / laneMass;
-      const [low, high] = laneTravel(inLane, catalogue, vehicle);
-      const shift = Math.min(Math.max(wanted, low), Math.max(low, high));
-      if (Math.abs(shift) < 1) {
-        continue;
-      }
-
-      const moved = current.map(placement =>
-        `${placement.tier}:${placement.y}` === lane
-          ? {...placement, x: placement.x + shift}
-          : placement,
-      );
-      if (
-        Math.abs(offsetOf(moved)) < Math.abs(offset) &&
-        laneStillClears(moved, lane, catalogue, options) &&
-        allTiersSupported(moved, catalogue, options)
-      ) {
-        current = moved;
-        improved = true;
+    let chosen: Placement[] | null = null;
+    let mirror = 1;
+    for (const sign of flipFirst ? [-1, 1] : [1, -1]) {
+      const candidate =
+        sign === -1
+          ? inTier.map(placement => ({...placement, y: -placement.y}))
+          : [...inTier];
+      if (!below || tierContained(candidate, below, catalogue, options)) {
+        chosen = candidate;
+        mirror = sign;
         break;
       }
     }
-    if (!improved) {
-      break;
+    if (!chosen) {
+      return [...onTruck];
     }
+
+    moment += tierMoment * mirror;
+    out.push(...chosen);
+    below = chosen;
   }
-
-  return current;
-}
-
-/** How far one lane may slide before it leaves the vehicle. */
-function laneTravel(
-  inLane: readonly Placement[],
-  catalogue: Catalogue,
-  vehicle: Vehicle,
-): [Millimetres, Millimetres] {
-  let low = -Infinity;
-  let high = Infinity;
-  for (const placement of inLane) {
-    const type = findPileType(catalogue, placement.pileTypeId);
-    if (!type) {
-      continue;
-    }
-    low = Math.max(low, -placement.x);
-    high = Math.min(high, vehicle.deckLength - (placement.x + type.length));
-  }
-  return [low, high];
-}
-
-/** Whether a moved lane is still clear of everything else in its tier. */
-function laneStillClears(
-  load: readonly Placement[],
-  lane: string,
-  catalogue: Catalogue,
-  options: PackingOptions,
-): boolean {
-  const resolve = (placement: Placement): PlacedPile | null => {
-    const type = findPileType(catalogue, placement.pileTypeId);
-    return type ? {type, placement} : null;
-  };
-
-  const moved = load
-    .filter(p => `${p.tier}:${p.y}` === lane)
-    .map(resolve)
-    .filter(placed => placed !== null);
-  const tier = moved[0]?.placement.tier;
-  const others = load
-    .filter(p => p.tier === tier && `${p.tier}:${p.y}` !== lane)
-    .map(resolve)
-    .filter(placed => placed !== null);
-
-  for (const mine of moved) {
-    for (const other of others) {
-      const deltaZ = maxRadius(mine.type) - maxRadius(other.type);
-      const required = requiredLateralSeparation(mine, other, options, deltaZ);
-      const actual = Math.abs(mine.placement.y - other.placement.y);
-      if (actual + 1e-6 < required) {
-        return false;
-      }
-    }
-  }
-  return true;
+  return out;
 }
 
 /** Whether every tier still lands on material in the tier below it. */
@@ -749,24 +714,12 @@ function allTiersSupported(
   return true;
 }
 
-function consume(
-  remaining: Map<string, number>,
-  placed: readonly TierPlacement[],
-): void {
-  for (const placement of placed) {
-    remaining.set(
-      placement.pileTypeId,
-      (remaining.get(placement.pileTypeId) ?? 0) - 1,
-    );
-  }
-}
-
 /**
  * Where a tier has material, along the deck. Uses the validator's own
  * `coveredSpans` so the packer cannot build tiers the support rule rejects.
  */
 function spansOf(
-  placed: readonly (TierPlacement | Placement)[],
+  placed: readonly Placement[],
   catalogue: Catalogue,
   options: PackingOptions,
 ): [Millimetres, Millimetres][] {

@@ -131,6 +131,13 @@ export function PackingOptionsPanel({
                 value={options.balance.lateral}
                 onChange={lateral => patchBalance({lateral})}
               />
+              <NumberField
+                label="Pack weight match"
+                suffix="ratio"
+                value={options.minPackMassRatio}
+                hint="Two packs sharing a tier: the lighter must weigh at least this fraction of the heavier. 0 turns the rule off."
+                onChange={minPackMassRatio => patch({minPackMassRatio})}
+              />
             </div>
           </section>
 

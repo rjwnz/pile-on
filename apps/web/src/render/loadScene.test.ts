@@ -41,6 +41,7 @@ function place(overrides: Partial<Placement> = {}): Placement {
     deck: 'truck',
     pileTypeId: 'SP168-D6',
     tier: 0,
+    pack: 0,
     x: 100,
     y: 0,
     flipped: false,
@@ -97,23 +98,58 @@ describe('buildLoadScene', () => {
     expect(shaft.position.y).toBeCloseTo(0);
   });
 
-  it('rests the pile on its widest point, not on its shaft', () => {
+  it('seats the pile shaft-on-bearer, its plates hanging below', () => {
     const {content} = build([place({tier: 0})]);
     const shaft = meshesNamed(content, 'shaft:')[0]!;
 
-    // 100 mm of dunnage plus the 225 mm plate radius.
-    expect(shaft.position.z).toBeCloseTo(325);
+    // 200 mm of bearer (the pile's own 141 mm of plate must clear the deck)
+    // plus the 84 mm shaft radius.
+    expect(shaft.position.z).toBeCloseTo(284);
   });
 
-  it('lifts an upper tier clear of the one below it', () => {
+  it('lifts an upper tier clear of the plates below it', () => {
     const {content} = build([
       place({id: 'a', tier: 0}),
       place({id: 'b', tier: 1}),
     ]);
     const [lower, upper] = meshesNamed(content, 'shaft:');
 
-    // A tier is 100 mm of dunnage plus a 450 mm pile.
-    expect(upper!.position.z - lower!.position.z).toBeCloseTo(550);
+    // Plates aligned dead over plates want 475 mm between axes, all of it
+    // vertical here: 350 mm bearers over the 368 shaft-top plane.
+    expect(upper!.position.z - lower!.position.z).toBeCloseTo(518);
+  });
+
+  it('draws two bearer timbers per tier, at their derived thickness', () => {
+    const {content} = build([
+      place({id: 'a', tier: 0}),
+      place({id: 'b', tier: 1}),
+    ]);
+    const timbers = meshesNamed(content, 'dunnage:');
+
+    expect(timbers).toHaveLength(4);
+    // 200 mm timbers under the deck tier (its own plates must clear the
+    // deck); 350 mm under the tier whose plates sit dead over the plates
+    // below.
+    const thicknesses = timbers.map(
+      timber => (timber.geometry as THREE.BoxGeometry).parameters.depth,
+    );
+    expect(thicknesses).toEqual([200, 200, 350, 350]);
+  });
+
+  it('lands its timbers clear of the helix plates', () => {
+    const {content} = build([place({x: 0})]);
+    const plates = meshesNamed(content, 'helix:');
+    const timbers = meshesNamed(content, 'dunnage:');
+
+    for (const timber of timbers) {
+      const [t0, t1] = [timber.position.x - 50, timber.position.x + 50];
+      for (const plate of plates) {
+        const half =
+          (plate.geometry as THREE.CylinderGeometry).parameters.height / 2;
+        const [p0, p1] = [plate.position.x - half, plate.position.x + half];
+        expect(t1 <= p0 || t0 >= p1).toBe(true);
+      }
+    }
   });
 
   it('puts each plate at its own station along the shaft', () => {
@@ -171,8 +207,8 @@ describe('dispose', () => {
 
     dispose();
 
-    // Deck, one shaft and two plates.
-    expect(disposed).toHaveLength(4);
+    // Deck, two bearer timbers, one shaft and two plates.
+    expect(disposed).toHaveLength(6);
   });
 });
 

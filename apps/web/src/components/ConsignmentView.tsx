@@ -4,8 +4,10 @@ import {
   balanceOffset,
   consignmentPayload,
   findVehicle,
+  layerHeights,
   loadHeight,
   loadWidth,
+  packManifest,
   payloadCapacity,
   tiersOf,
   toMetres,
@@ -22,6 +24,7 @@ const IsometricPlanCanvas = lazy(async () => ({
   default: (await import('./IsometricPlanCanvas')).IsometricPlanCanvas,
 }));
 import {useInView} from '../lib/useInView';
+import {PackManifestTable} from './PackManifestTable';
 import {TierPlanSvg} from './TierPlanSvg';
 
 /** The 3D view's box, held open at full size so its arrival shifts nothing. */
@@ -104,6 +107,10 @@ function DeckView({
   const width = loadWidth(placements, catalogue);
   const offset = balanceOffset(placements, catalogue, vehicle);
   const tiers = tiersOf(placements);
+  const heights = layerHeights(placements, catalogue, options);
+  // Computed once and shared: the drawings label packs by the same ids the
+  // manifest table lists.
+  const manifest = packManifest(placements, catalogue, options);
   const isometricTitle = heading ? `Loaded ${heading}` : 'Loaded truck';
 
   return (
@@ -166,12 +173,15 @@ function DeckView({
             catalogue={catalogue}
             tier={tier}
             placements={placements.filter(p => p.tier === tier)}
+            packs={manifest}
             title={`Tier ${tier + 1}${position === 0 ? ' (on the deck)' : ''}${
               position === tiers.length - 1 && tiers.length > 1 ? ' (top)' : ''
-            }`}
+            } · on ${heights.get(tier)?.dunnage ?? options.dunnageThickness} mm bearers`}
           />
         ))}
       </div>
+
+      <PackManifestTable manifest={manifest} />
 
       <div ref={stageRef}>
         {showIsometric ? (

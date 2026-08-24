@@ -1,12 +1,17 @@
 import {
   findPileType,
+  layersOf,
+  packLateralSpan,
+  packWidth,
   radiusProfile,
   toMetres,
   type Catalogue,
+  type PackSummary,
   type Placement,
   type Vehicle,
 } from '@pile-on/core';
 import {colourForPileType} from '../render/palette';
+import {packContentsLine} from './PackManifestTable';
 
 const LABEL_BAND = 420;
 
@@ -22,12 +27,16 @@ export function TierPlanSvg({
   placements,
   tier,
   title,
+  packs = [],
 }: {
   readonly vehicle: Vehicle;
   readonly catalogue: Catalogue;
   readonly placements: readonly Placement[];
   readonly tier: number;
   readonly title: string;
+  /** The deck's pack manifest, so outlines carry the same ids the table
+   * lists. Optional: without it the outlines fall back to widths alone. */
+  readonly packs?: readonly PackSummary[];
 }) {
   const halfWidth = vehicle.deckWidth / 2;
   const toSvgY = (y: number) => halfWidth + y;
@@ -75,6 +84,57 @@ export function TierPlanSvg({
           strokeWidth={8}
           strokeDasharray="80 80"
         />
+
+        {/* Each pack's band: the bundle that is slung and stacked as one. */}
+        {[...(layersOf(placements).get(tier)?.entries() ?? [])].map(
+          ([pack, inPack]) => {
+            const span = packLateralSpan(inPack, catalogue);
+            if (!span) {
+              return null;
+            }
+            const resolved = inPack.filter(placement =>
+              findPileType(catalogue, placement.pileTypeId),
+            );
+            const left = Math.min(...resolved.map(p => p.x));
+            const right = Math.max(
+              ...resolved.map(
+                p => p.x + findPileType(catalogue, p.pileTypeId)!.length,
+              ),
+            );
+            const summary = packs.find(
+              entry => entry.tier === tier && entry.pack === pack,
+            );
+            const width = toMetres(packWidth(inPack, catalogue)).toFixed(2);
+            return (
+              <g key={`pack-${pack}`}>
+                {summary ? (
+                  <title>
+                    {`${summary.id} — ${packContentsLine(summary)} · ${toMetres(summary.length).toFixed(2)} m × ${toMetres(summary.width).toFixed(2)} m · ${Math.round(summary.mass)} kg · on ${summary.dunnage} mm bearers`}
+                  </title>
+                ) : null}
+                <rect
+                  x={left - 40}
+                  y={toSvgY(span[0]) - 40}
+                  width={right - left + 80}
+                  height={span[1] - span[0] + 80}
+                  fill="none"
+                  className="stroke-slate-400"
+                  strokeWidth={10}
+                  strokeDasharray="60 60"
+                  data-testid={`pack-outline-${pack}`}
+                />
+                <text
+                  x={left + 120}
+                  y={toSvgY(span[0]) - 100}
+                  className="fill-slate-500"
+                  fontSize={180}
+                >
+                  {summary ? `${summary.id} · ${width} m` : `${width} m pack`}
+                </text>
+              </g>
+            );
+          },
+        )}
 
         {placements.map(placement => {
           const type = findPileType(catalogue, placement.pileTypeId);

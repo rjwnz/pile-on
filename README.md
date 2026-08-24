@@ -21,23 +21,35 @@ isometric view of each deck, with the load checked against the NZ limits.
 works, and it packs onto a mixed fleet: every truck in the catalogue, each
 towing up to one trailer (`towableBy` on the trailer row says which trucks
 may). A truck and its trailer count as one movement, budgeted together under
-the 44 t route cap, and on the benchmark fixtures the packer takes **14
-movements where the bounding-box control takes 23**. Still to come from
+the 44 t route cap, and on the benchmark fixtures the packer takes **20
+movements where the bounding-box control takes 28**. Still to come from
 stages 4-6: the solo-towing-unit cap, a cost model, LNS repair, and phases.
 
 That is the whole business case, and it comes from one observation: a pile is
 not a cylinder of its widest diameter. A plate is a short fat band on a thin
-shaft, so if two neighbouring lanes put their plates at different stations along
-the deck they may close up from plate-to-plate pitch to plate-to-shaft. On a
-168 mm shaft with a 450 mm plate that is 334 mm apart instead of 475 — a sixth
-lane on a deck that fitted five.
+shaft, so flipping alternate piles in a bundle puts their plates at opposite
+ends and the bundle closes from plate-to-plate pitch to plate-to-shaft. On a
+168 mm shaft with a 450 mm plate that is 334 mm apart instead of 475 — an
+extra pile in every pack that fitted two.
+
+Loads are built the way the yard actually bands and stacks them: **packs** —
+single-type bundles of piles side by side, flush at the leading end, at most
+1.2 m wide — laid in rows along the deck, at most two abreast, packs riding
+abreast weighing alike within a settable ratio. Starters never share a pack
+with extensions. A pile seats its shaft on single bearer timbers that touch
+only shafts; bearer thickness is derived in 50 mm steps so every plate clears
+everything below it, however many tiers down, and upper packs stand wholly on
+the packs beneath at every station. Each deck gets a pack manifest — id,
+contents, dimensions, mass, bearers — matching the labels on the drawings.
+`docs/01-packer-design.md` §12 has the full rule set.
 
 Run `pnpm bench` for the table. `pnpm bench --save` records it, so the next run
 shows what moved.
 
-The packer also does three things the control never does: it mixes pile lengths
-down a single lane, mixes types across a tier, and keeps every load balanced by
-sliding tiers along the deck and turning alternate ones round.
+The packer also does things the control never does: it flips piles within a
+pack so their plates miss, mixes extension lengths in a pack when banding them
+apart would strand one, and keeps every load balanced by sliding rows and
+tiers along the deck and turning alternate tiers round.
 
 **Stage 1** is what it rests on — the validator telling the whole truth, and the
 numbers it judges against being settable and saved with the job:
@@ -97,9 +109,10 @@ randomly generated catalogues, not just the cases someone thought to write down.
 Two things are best-effort, and it is worth knowing which:
 
 **Balance on awkward geometry.** It is a tolerance, not a fact about the steel.
-The packer spends three separate repairs on it and then leaves any remaining
-violation visible rather than hiding it. On five piles of wildly unequal mass and
-length, the best reachable answer can sit outside a 200 mm tolerance.
+The packer spends its repairs on it — mirroring tiers, settling them along the
+deck, shifting the whole load — and then leaves any remaining violation visible
+rather than hiding it. On five piles of wildly unequal mass and length, the best
+reachable answer can sit outside a 200 mm tolerance.
 
 **Beating the baseline on _every_ catalogue.** Both are heuristics. On geometry
 nobody would buy — a 9 m pile with a 476 mm plate next to a 3.3 m plain shaft —

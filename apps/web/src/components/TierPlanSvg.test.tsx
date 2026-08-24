@@ -1,6 +1,12 @@
 import {describe, expect, it} from '@jest/globals';
 import {render, screen} from '@testing-library/react';
-import type {Catalogue, Placement, Vehicle} from '@pile-on/core';
+import {
+  DEFAULT_LOADING_OPTIONS,
+  packManifest,
+  type Catalogue,
+  type Placement,
+  type Vehicle,
+} from '@pile-on/core';
 import {TierPlanSvg} from './TierPlanSvg';
 import {colourForPileType} from '../render/palette';
 
@@ -35,6 +41,7 @@ function place(overrides: Partial<Placement> = {}): Placement {
     deck: 'truck',
     pileTypeId: 'SP168-D6',
     tier: 0,
+    pack: 0,
     x: 100,
     y: 0,
     flipped: false,
@@ -112,10 +119,49 @@ describe('TierPlanSvg', () => {
     );
   });
 
+  it('outlines each pack of the tier with its banded width', () => {
+    renderTier([
+      place({id: 'a', y: -712.5, pack: 0}),
+      place({id: 'b', y: -237.5, pack: 0}),
+      place({id: 'c', y: 400, pack: 1}),
+    ]);
+
+    expect(screen.getByTestId('pack-outline-0')).toBeInTheDocument();
+    expect(screen.getByTestId('pack-outline-1')).toBeInTheDocument();
+    // Two lanes at 475 mm pitch plus a 225 mm plate each side.
+    expect(screen.getByText('0.93 m pack')).toBeInTheDocument();
+    expect(screen.getByText('0.45 m pack')).toBeInTheDocument();
+  });
+
+  it('labels packs by their manifest id, with the details on hover', () => {
+    const placements = [
+      place({id: 'a', y: -712.5, pack: 0}),
+      place({id: 'b', y: -237.5, pack: 0}),
+      place({id: 'c', y: 400, pack: 1}),
+    ];
+    render(
+      <TierPlanSvg
+        vehicle={SEMI}
+        catalogue={CATALOGUE}
+        placements={placements}
+        tier={0}
+        title="Tier 1"
+        packs={packManifest(placements, CATALOGUE, DEFAULT_LOADING_OPTIONS)}
+      />,
+    );
+
+    expect(screen.getByText('P1 · 0.93 m')).toBeInTheDocument();
+    expect(screen.getByText('P2 · 0.45 m')).toBeInTheDocument();
+    expect(
+      screen.getByText(/P1 — 2 × SP168-D6 starter \(6\.00 m\)/),
+    ).toBeInTheDocument();
+  });
+
   it('skips a placement whose pile type is missing rather than crashing', () => {
     renderTier([place({pileTypeId: 'GHOST'})]);
 
     expect(screen.queryByTestId('segment-shaft')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pack-outline-0')).not.toBeInTheDocument();
     expect(screen.getByRole('img')).toBeInTheDocument();
   });
 

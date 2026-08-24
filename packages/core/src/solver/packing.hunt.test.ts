@@ -31,6 +31,12 @@ const HARD = [
   'not-towable',
   'vehicle-is-trailer',
   'unknown-trailer',
+  'pack-too-wide',
+  'pack-mixed-type',
+  'pack-not-flush',
+  'too-many-packs',
+  'packs-unbalanced',
+  'unsupported-laterally',
 ];
 
 /** Sometimes the fleet is just the semi; sometimes it can also tow. */

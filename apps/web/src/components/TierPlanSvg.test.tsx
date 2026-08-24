@@ -1,5 +1,5 @@
 import {describe, expect, it} from '@jest/globals';
-import {render, screen} from '@testing-library/react';
+import {fireEvent, render, screen} from '@testing-library/react';
 import {
   DEFAULT_LOADING_OPTIONS,
   packManifest,
@@ -25,6 +25,20 @@ function place(overrides: Partial<Placement> = {}): Placement {
     flipped: false,
     ...overrides,
   };
+}
+
+/** The drawing as the app builds it: with the deck's pack manifest. */
+function renderManifested(placements: Placement[]) {
+  return render(
+    <TierPlanSvg
+      vehicle={SEMI}
+      catalogue={CATALOGUE}
+      placements={placements}
+      tier={0}
+      title="Tier 1"
+      packs={packManifest(placements, CATALOGUE, DEFAULT_LOADING_OPTIONS)}
+    />,
+  );
 }
 
 function renderTier(placements: Placement[] = [place()]) {
@@ -70,7 +84,7 @@ describe('TierPlanSvg', () => {
     renderTier();
 
     // Half-width 1225 less the 84 mm shaft radius.
-    const shaft = screen.getAllByTestId('segment-shaft')[0];
+    const shaft = screen.getAllByTestId('segment-shaft')[0]!;
     expect(shaft).toHaveAttribute('y', '1141');
     expect(shaft).toHaveAttribute('height', '168');
   });
@@ -112,7 +126,7 @@ describe('TierPlanSvg', () => {
     expect(screen.getByText('0.45 m pack')).toBeInTheDocument();
   });
 
-  it('labels packs by their manifest id, with the details on hover', () => {
+  it('labels packs by their manifest id', () => {
     const placements = [
       place({id: 'a', y: -712.5, pack: 0}),
       place({id: 'b', y: -237.5, pack: 0}),
@@ -131,9 +145,71 @@ describe('TierPlanSvg', () => {
 
     expect(screen.getByText('P1 · 0.93 m')).toBeInTheDocument();
     expect(screen.getByText('P2 · 0.45 m')).toBeInTheDocument();
-    expect(
-      screen.getByText(/P1 — 2 × SP168-D6 starter \(6\.00 m\)/),
-    ).toBeInTheDocument();
+  });
+
+  it('names the pack and lists its lengths when a pipe is pointed at', () => {
+    const placements = [
+      place({id: 'a', y: -712.5, pack: 0}),
+      place({id: 'b', y: -237.5, pack: 0}),
+      place({id: 'c', y: 400, pack: 1}),
+    ];
+    renderManifested(placements);
+
+    expect(screen.queryByTestId('plan-hover-card')).not.toBeInTheDocument();
+
+    fireEvent.mouseMove(screen.getAllByTestId('segment-shaft')[0]!);
+    const card = screen.getByTestId('plan-hover-card');
+
+    expect(card).toHaveTextContent('P1');
+    expect(card).toHaveTextContent('2 × SP168-D6 starter (6.00 m)');
+    expect(card).toHaveTextContent('on 2 × 200 mm');
+  });
+
+  it('follows the pointer from one pack to the next without a stale card', () => {
+    const placements = [
+      place({id: 'a', y: -712.5, pack: 0}),
+      place({id: 'b', y: -237.5, pack: 0}),
+      place({id: 'c', y: 400, pack: 1}),
+    ];
+    renderManifested(placements);
+    const shafts = screen.getAllByTestId('segment-shaft');
+
+    fireEvent.mouseMove(shafts[0]!);
+    expect(screen.getByTestId('plan-hover-card')).toHaveTextContent(
+      '2 × SP168-D6 starter (6.00 m)',
+    );
+
+    fireEvent.mouseMove(shafts[2]!);
+    expect(screen.getByTestId('plan-hover-card')).toHaveTextContent(
+      '1 × SP168-D6 starter (6.00 m)',
+    );
+  });
+
+  it('drops the card over bare deck, and again when the pointer leaves', () => {
+    renderManifested([place()]);
+    const shaft = screen.getAllByTestId('segment-shaft')[0]!;
+
+    fireEvent.mouseMove(shaft);
+    expect(screen.getByTestId('plan-hover-card')).toBeInTheDocument();
+
+    // Bare deck: the pointer is on the drawing but on nothing that is loaded.
+    fireEvent.mouseMove(screen.getByRole('img'));
+    expect(screen.queryByTestId('plan-hover-card')).not.toBeInTheDocument();
+
+    fireEvent.mouseMove(shaft);
+    fireEvent.mouseLeave(screen.getByRole('img'));
+    expect(screen.queryByTestId('plan-hover-card')).not.toBeInTheDocument();
+  });
+
+  it('names the timber and what rides on it when a bearer is pointed at', () => {
+    renderManifested([place()]);
+
+    fireEvent.mouseMove(screen.getAllByTestId('bearer')[0]!);
+    const card = screen.getByTestId('plan-hover-card');
+
+    expect(card).toHaveTextContent('P1 bearer 1 of 2');
+    expect(card).toHaveTextContent('200 mm timber');
+    expect(card).toHaveTextContent('345 mm along the deck');
   });
 
   it('draws the timbers under every pack of the tier', () => {
@@ -162,11 +238,6 @@ describe('TierPlanSvg', () => {
     // plate covers 445–555: it backs off to 345 so it ends where the plate
     // starts, which is the shorter walk.
     expect(timbers[0]).toHaveAttribute('x', '345');
-    expect(
-      screen.getByText(
-        /P1 bearer 1 of 2 — 200 mm timber, 345 mm along the deck/,
-      ),
-    ).toBeInTheDocument();
   });
 
   it('skips a placement whose pile type is missing rather than crashing', () => {

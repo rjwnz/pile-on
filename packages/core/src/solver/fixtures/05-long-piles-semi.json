@@ -22,21 +22,21 @@
   "catalogue": {
     "pileTypes": [
       {
-        "id": "SP219-D9",
-        "name": "SP219 9.0 m twin helix",
-        "length": 9000,
-        "shaftRadius": 110,
-        "mass": 396,
+        "id": "SP219-D7",
+        "name": "SP219 7.0 m twin helix",
+        "length": 7000,
+        "shaftRadius": 109.55,
+        "mass": 362,
         "helices": [
           {
             "offsetFromButt": 500,
-            "radius": 300,
-            "length": 140
+            "radius": 300.0,
+            "length": 170
           },
           {
             "offsetFromButt": 1400,
-            "radius": 250,
-            "length": 140
+            "radius": 250.0,
+            "length": 145
           }
         ]
       }
@@ -58,10 +58,10 @@
     ]
   },
   "job": {
-    "name": "Bridge abutment — 9 m piles",
+    "name": "Bridge abutment \u2014 7 m piles",
     "lines": [
       {
-        "pileTypeId": "SP219-D9",
+        "pileTypeId": "SP219-D7",
         "quantity": 24
       }
     ]

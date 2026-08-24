@@ -25,37 +25,37 @@
         "id": "SP168-D6",
         "name": "SP168 6.0 m twin helix",
         "length": 6000,
-        "shaftRadius": 84,
-        "mass": 178,
+        "shaftRadius": 84.15,
+        "mass": 196,
         "helices": [
           {
             "offsetFromButt": 400,
-            "radius": 225,
-            "length": 110
+            "radius": 225.0,
+            "length": 126
           },
           {
             "offsetFromButt": 1100,
-            "radius": 175,
-            "length": 110
+            "radius": 175.0,
+            "length": 106
           }
         ]
       },
       {
-        "id": "SP273-D8",
-        "name": "SP273 8.0 m twin helix, heavy wall",
-        "length": 8000,
-        "shaftRadius": 137,
-        "mass": 610,
+        "id": "SP273-D7",
+        "name": "SP273 7.0 m twin helix, heavy wall",
+        "length": 7000,
+        "shaftRadius": 136.55,
+        "mass": 495,
         "helices": [
           {
             "offsetFromButt": 500,
-            "radius": 300,
-            "length": 120
+            "radius": 300.0,
+            "length": 175
           },
           {
             "offsetFromButt": 1500,
-            "radius": 250,
-            "length": 120
+            "radius": 250.0,
+            "length": 150
           }
         ]
       }
@@ -92,14 +92,14 @@
     ]
   },
   "job": {
-    "name": "Substation piling — rigid towing its 4-axle",
+    "name": "Substation piling \u2014 rigid towing its 4-axle",
     "lines": [
       {
         "pileTypeId": "SP168-D6",
         "quantity": 64
       },
       {
-        "pileTypeId": "SP273-D8",
+        "pileTypeId": "SP273-D7",
         "quantity": 16
       }
     ]

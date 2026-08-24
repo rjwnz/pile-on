@@ -25,18 +25,18 @@
         "id": "SP168-D6",
         "name": "SP168 6.0 m twin helix",
         "length": 6000,
-        "shaftRadius": 84,
-        "mass": 178,
+        "shaftRadius": 84.15,
+        "mass": 196,
         "helices": [
           {
             "offsetFromButt": 400,
-            "radius": 225,
-            "length": 110
+            "radius": 225.0,
+            "length": 126
           },
           {
             "offsetFromButt": 1100,
-            "radius": 175,
-            "length": 110
+            "radius": 175.0,
+            "length": 106
           }
         ]
       }
@@ -58,7 +58,7 @@
     ]
   },
   "job": {
-    "name": "Te Rapa warehouse — one type",
+    "name": "Te Rapa warehouse \u2014 one type",
     "lines": [
       {
         "pileTypeId": "SP168-D6",

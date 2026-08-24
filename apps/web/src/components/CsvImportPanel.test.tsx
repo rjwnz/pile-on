@@ -32,9 +32,9 @@ describe('CsvImportPanel', () => {
 
     expect(onImport).toHaveBeenCalledTimes(1);
     const [items, replace] = onImport.mock.calls[0] as [unknown[], boolean];
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(6);
     expect(replace).toBe(false);
-    expect(screen.getByRole('status')).toHaveTextContent('Imported 3 rows.');
+    expect(screen.getByRole('status')).toHaveTextContent('Imported 6 rows.');
   });
 
   it('reports every bad row instead of importing', async () => {

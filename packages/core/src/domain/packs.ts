@@ -1,5 +1,6 @@
 import type {Kilograms, Millimetres} from '../units';
 import {GEOMETRIC_EPSILON} from '../units';
+import {radiusProfile} from '../geometry/profile';
 import {requiredAxisDistance} from '../geometry/separation';
 import {findPileType, type Catalogue} from './catalogue';
 import type {LoadingOptions} from './loading';
@@ -18,15 +19,17 @@ import type {PlacedPile, Placement} from './placement';
  * slung and stacked; a tier holds rows of packs on bearers, at most two
  * abreast at any station along the deck.
  *
- * A bearer is a single length of timber laid across the deck, touching only
- * shafts — a pile seats its *shaft* on the timber, and its plates hang below
- * and stand proud above. The bearers under a tier are sized in
- * `DUNNAGE_INCREMENT` steps so the tier's own plates clear everything
- * beneath: the deck, and every plate poking up from any tier below, however
- * far down it started. What this deliberately does not model is where along
- * the deck each timber lands — a station clear of plates is assumed to
- * exist, which holds for real catalogues where plates are short bands on
- * long shafts.
+ * A bearer is a length of timber laid across a pack, touching only shafts —
+ * a pile seats its *shaft* on the timber, and its plates hang below and stand
+ * proud above. The bearers under a tier are sized in `DUNNAGE_INCREMENT`
+ * steps so the tier's own plates clear everything beneath: the deck, and
+ * every plate poking up from any tier below, however far down it started.
+ *
+ * Where along the deck each timber lands is derived too, per pack rather
+ * than per tier: a pack rides on `MIN_BEARERS_PER_PACK` timbers at least,
+ * one near each end, because a bundle on a single bearer see-saws. Rows laid
+ * head to tail down the deck are the case that makes this bite — timbers
+ * sized to the tier would put one under each row, not two under each pack.
  *
  * Everything here is derived from the placements — pack membership is the
  * only stored fact (`Placement.pack`), so the solver, the validator and the
@@ -475,6 +478,288 @@ export function layerHeights(
   return heights;
 }
 
+/** A bearer timber's footprint along the deck. The yard cuts one section and
+ * varies the thickness, so width is a constant and thickness is derived. */
+export const BEARER_WIDTH: Millimetres = 100;
+
+/** Where the yard would rather land a timber: this far in from the pack's
+ * ends — close enough to the end to hold the bundle down, far enough in that
+ * the slings and the forks have somewhere to go. */
+export const BEARER_END_INSET: Millimetres = 300;
+
+/** A bundle on one timber see-saws, so every pack rides on at least two. */
+export const MIN_BEARERS_PER_PACK = 2;
+
+/** One timber under one pack. */
+export interface Bearer {
+  readonly tier: number;
+  /** The stored pack index within its tier. */
+  readonly pack: number;
+  /** Leading edge of the timber along the deck. */
+  readonly x: Millimetres;
+  readonly width: Millimetres;
+  /** Across the deck: the timber runs the width of the pack it carries. */
+  readonly span: readonly [Millimetres, Millimetres];
+  readonly thickness: Millimetres;
+  /** Top face — where the pack's shafts rest, mm above the deck. */
+  readonly top: Millimetres;
+}
+
+/** Subtract closed intervals from closed intervals. */
+function subtractSpans(
+  from: readonly (readonly [Millimetres, Millimetres])[],
+  cutters: readonly (readonly [Millimetres, Millimetres])[],
+): [Millimetres, Millimetres][] {
+  let left: [Millimetres, Millimetres][] = from.map(([a, b]) => [a, b]);
+  for (const [c0, c1] of cutters) {
+    const next: [Millimetres, Millimetres][] = [];
+    for (const [a, b] of left) {
+      if (c1 <= a + GEOMETRIC_EPSILON || c0 >= b - GEOMETRIC_EPSILON) {
+        next.push([a, b]);
+        continue;
+      }
+      if (c0 > a + GEOMETRIC_EPSILON) {
+        next.push([a, Math.min(b, c0)]);
+      }
+      if (c1 < b - GEOMETRIC_EPSILON) {
+        next.push([Math.max(a, c1), b]);
+      }
+    }
+    left = next;
+  }
+  return left.filter(([a, b]) => b - a > GEOMETRIC_EPSILON);
+}
+
+/** Every stretch of deck where a pile presents a plate rather than shaft. */
+function plateSpans(
+  piles: readonly PlacedPile[],
+): [Millimetres, Millimetres][] {
+  return piles.flatMap<[Millimetres, Millimetres]>(pile =>
+    radiusProfile(pile)
+      .filter(segment => segment.kind === 'helix')
+      .map<[Millimetres, Millimetres]>(segment => [segment.start, segment.end]),
+  );
+}
+
+/**
+ * What a tier offers the timbers of the tier above: the shaft it presents,
+ * along the deck. Piles laid end to end are *not* bridged here — the
+ * longitudinal support rule lets a pack span a small gap between rows, but a
+ * 100 mm timber dropped into that gap holds nothing — and stretches where a
+ * plate pokes up above the shafts are cut out, because a timber laid across
+ * a plate rocks on it.
+ */
+export function bearingGround(
+  layer: readonly Placement[],
+  catalogue: Catalogue,
+): [Millimetres, Millimetres][] {
+  const piles = resolve(layer, catalogue);
+  const shaft = coveredSpans(
+    piles.map<[Millimetres, Millimetres]>(pile => [
+      pile.placement.x,
+      pile.placement.x + pile.type.length,
+    ]),
+    0,
+  );
+  return subtractSpans(shaft, plateSpans(piles));
+}
+
+/**
+ * Where a timber may land under these piles, as intervals of its *leading*
+ * edge. Three conditions, and all of them are about touching shaft:
+ *
+ *   1. inside every pile of the pack — a timber past the end of the shortest
+ *      pile carries the rest of the pack and lets that one hang;
+ *   2. clear of every plate in the pack, which hangs below the shafts and
+ *      would take the whole load on its edge;
+ *   3. on ground that will hold it: the deck (`ground` null, which is
+ *      continuous), or the shaft the tier below presents.
+ */
+export function bearerWindows(
+  piles: readonly PlacedPile[],
+  ground: readonly (readonly [Millimetres, Millimetres])[] | null,
+): [Millimetres, Millimetres][] {
+  if (piles.length === 0) {
+    return [];
+  }
+  const start = Math.max(...piles.map(pile => pile.placement.x));
+  const end = Math.min(
+    ...piles.map(pile => pile.placement.x + pile.type.length),
+  );
+  if (end - start < BEARER_WIDTH - GEOMETRIC_EPSILON) {
+    return [];
+  }
+
+  const seat: [Millimetres, Millimetres][] = ground
+    ? ground.flatMap<[Millimetres, Millimetres]>(([low, high]) => {
+        const lo = Math.max(low, start);
+        const hi = Math.min(high, end);
+        return hi > lo ? [[lo, hi]] : [];
+      })
+    : [[start, end]];
+
+  return subtractSpans(seat, plateSpans(piles))
+    .map<[Millimetres, Millimetres]>(([low, high]) => [
+      low,
+      high - BEARER_WIDTH,
+    ])
+    .filter(([low, high]) => high >= low - GEOMETRIC_EPSILON);
+}
+
+/**
+ * The feasible station nearest `target`, or null when there is none. A plate
+ * sitting on the preferred station leaves a choice of walking the timber
+ * inward or outward by the same distance; `inward` says which of those is
+ * toward the middle of the pack, and the yard walks inward — a timber nearer
+ * the end holds less of the bundle down.
+ */
+function nearestStation(
+  windows: readonly (readonly [Millimetres, Millimetres])[],
+  target: Millimetres,
+  inward: 'higher' | 'lower',
+): Millimetres | null {
+  let best: Millimetres | null = null;
+  let bestGap = Infinity;
+  for (const [low, high] of windows) {
+    const clamped = Math.min(Math.max(target, low), high);
+    const gap = Math.abs(clamped - target);
+    const tied = Math.abs(gap - bestGap) <= GEOMETRIC_EPSILON;
+    const better = tied
+      ? best !== null && (inward === 'higher' ? clamped > best : clamped < best)
+      : gap < bestGap;
+    if (better || best === null) {
+      best = clamped;
+      bestGap = Math.min(gap, bestGap);
+    }
+  }
+  return best;
+}
+
+/**
+ * Where the timbers under a pack land, front to rear.
+ *
+ * One near each end, walked inward off any plate or off any gap in the ground
+ * beneath, and if the inset pair collapses onto one timber the extreme
+ * feasible pair is tried before giving up. Fewer than
+ * `MIN_BEARERS_PER_PACK` stations back means this pack cannot be borne where
+ * it stands — the packer refuses to build it and the validator says so.
+ */
+export function bearerStations(
+  piles: readonly PlacedPile[],
+  ground: readonly (readonly [Millimetres, Millimetres])[] | null,
+): Millimetres[] {
+  const windows = bearerWindows(piles, ground);
+  if (windows.length === 0) {
+    return [];
+  }
+  const start = Math.max(...piles.map(pile => pile.placement.x));
+  const end = Math.min(
+    ...piles.map(pile => pile.placement.x + pile.type.length),
+  );
+
+  const apart = (a: Millimetres, b: Millimetres) =>
+    b - a >= BEARER_WIDTH - GEOMETRIC_EPSILON;
+
+  const front = nearestStation(windows, start + BEARER_END_INSET, 'higher');
+  const rear = nearestStation(
+    windows,
+    end - BEARER_END_INSET - BEARER_WIDTH,
+    'lower',
+  );
+  if (front === null || rear === null) {
+    return [];
+  }
+  const [low, high] = [Math.min(front, rear), Math.max(front, rear)];
+  if (apart(low, high)) {
+    return [low, high];
+  }
+
+  // The inset pair landed on the same timber. The ends of the feasible range
+  // are the last chance to get two under this pack.
+  const first = Math.min(...windows.map(([edge]) => edge));
+  const last = Math.max(...windows.map(([, edge]) => edge));
+  return apart(first, last) ? [first, last] : [low];
+}
+
+/**
+ * Every timber under one deck, derived from the placements alone.
+ *
+ * Tier by tier from the bottom: each tier's thickness comes from
+ * `layerHeights`, and each pack's stations from the shaft the tier below
+ * presents. A pack with fewer than `MIN_BEARERS_PER_PACK` timbers here is a
+ * pack the validator rejects, so what the drawings show is exactly what the
+ * rule was applied to.
+ */
+export function deckBearers(
+  placements: readonly Placement[],
+  catalogue: Catalogue,
+  options: LoadingOptions,
+): Bearer[] {
+  const heights = layerHeights(placements, catalogue, options);
+  const bearers: Bearer[] = [];
+  let below: Placement[] | null = null;
+
+  for (const [tier, packs] of layersOf(placements)) {
+    const ground = below ? bearingGround(below, catalogue) : null;
+    const height = heights.get(tier);
+    for (const [pack, inPack] of packs) {
+      const span = packLateralSpan(inPack, catalogue);
+      if (!span || !height) {
+        continue;
+      }
+      for (const x of bearerStations(resolve(inPack, catalogue), ground)) {
+        bearers.push({
+          tier,
+          pack,
+          x,
+          width: BEARER_WIDTH,
+          span,
+          thickness: height.dunnage,
+          top: height.base,
+        });
+      }
+    }
+    below = [...packs.values()].flat();
+  }
+
+  return bearers;
+}
+
+/** A deck's bearers keyed `tier:pack`, in the order they were derived. */
+function groupBearers(bearers: readonly Bearer[]): Map<string, Bearer[]> {
+  const grouped = new Map<string, Bearer[]>();
+  for (const bearer of bearers) {
+    const key = `${bearer.tier}:${bearer.pack}`;
+    const held = grouped.get(key);
+    if (held) {
+      held.push(bearer);
+    } else {
+      grouped.set(key, [bearer]);
+    }
+  }
+  return grouped;
+}
+
+/**
+ * Whether every pack of a deck gets its timbers. The packer checks tiers with
+ * this before keeping them, so a plan that cannot be borne is never offered.
+ */
+export function everyPackIsBorne(
+  placements: readonly Placement[],
+  catalogue: Catalogue,
+  options: LoadingOptions,
+): boolean {
+  const borne = groupBearers(deckBearers(placements, catalogue, options));
+  for (const [tier, packs] of layersOf(placements)) {
+    for (const pack of packs.keys()) {
+      if ((borne.get(`${tier}:${pack}`)?.length ?? 0) < MIN_BEARERS_PER_PACK) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 /** One kind of pile inside a pack, rolled up for the manifest. */
 export interface PackContent {
   readonly code: string;
@@ -501,6 +786,8 @@ export interface PackSummary {
   readonly mass: Kilograms;
   /** Bearer thickness under the pack's tier. */
   readonly dunnage: Millimetres;
+  /** The timbers this pack rides on, front to rear. */
+  readonly bearers: readonly Bearer[];
 }
 
 /**
@@ -515,6 +802,7 @@ export function packManifest(
   options: LoadingOptions,
 ): PackSummary[] {
   const heights = layerHeights(placements, catalogue, options);
+  const bearers = groupBearers(deckBearers(placements, catalogue, options));
 
   const entries: Omit<PackSummary, 'id'>[] = [];
   for (const [tier, packs] of layersOf(placements)) {
@@ -553,6 +841,7 @@ export function packManifest(
           : 0,
         mass: packMass(inPack, catalogue),
         dunnage: heights.get(tier)?.dunnage ?? options.dunnageThickness,
+        bearers: bearers.get(`${tier}:${pack}`) ?? [],
       });
     }
   }

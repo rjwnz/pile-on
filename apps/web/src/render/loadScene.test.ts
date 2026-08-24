@@ -119,7 +119,7 @@ describe('buildLoadScene', () => {
     expect(upper!.position.z - lower!.position.z).toBeCloseTo(518);
   });
 
-  it('draws two bearer timbers per tier, at their derived thickness', () => {
+  it('draws two bearer timbers per pack, at their derived thickness', () => {
     const {content} = build([
       place({id: 'a', tier: 0}),
       place({id: 'b', tier: 1}),
@@ -134,6 +134,31 @@ describe('buildLoadScene', () => {
       timber => (timber.geometry as THREE.BoxGeometry).parameters.depth,
     );
     expect(thicknesses).toEqual([200, 200, 350, 350]);
+  });
+
+  it('bears every pack of a tier, not just the tier', () => {
+    // Two rows head to tail in one tier: timbers drawn per tier would leave
+    // one under each row, and a bundle on one timber see-saws.
+    const {content} = build([
+      place({id: 'a', x: 100, pack: 0}),
+      place({id: 'b', x: 6300, pack: 1}),
+    ]);
+
+    expect(meshesNamed(content, 'dunnage:0:0:')).toHaveLength(2);
+    expect(meshesNamed(content, 'dunnage:0:1:')).toHaveLength(2);
+  });
+
+  it('runs each timber across the pack it carries, not across the tier', () => {
+    const {content} = build([
+      place({id: 'a', x: 100, y: -300, pack: 0}),
+      place({id: 'b', x: 6300, y: 300, pack: 1}),
+    ]);
+    const [first] = meshesNamed(content, 'dunnage:0:0:');
+
+    // Pack 0 is one pile at y = −300 with a 225 mm reach: 450 mm of timber
+    // centred on the pile, not 1050 mm reaching across to pack 1.
+    expect((first!.geometry as THREE.BoxGeometry).parameters.height).toBe(450);
+    expect(first!.position.y).toBeCloseTo(-300);
   });
 
   it('lands its timbers clear of the helix plates', () => {

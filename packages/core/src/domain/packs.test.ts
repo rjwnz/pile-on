@@ -1,9 +1,23 @@
-import {DOUBLE, PLAIN, SINGLE, place, pileType} from '../geometry/testFixtures';
+import {
+  DOUBLE,
+  PILE_LENGTH,
+  PLAIN,
+  SINGLE,
+  helixAt,
+  place,
+  pileType,
+} from '../geometry/testFixtures';
 import type {Catalogue} from './catalogue';
 import {DEFAULT_LOADING_OPTIONS, axisHeightOf} from './loading';
 import {
+  BEARER_END_INSET,
+  BEARER_WIDTH,
   DUNNAGE_INCREMENT,
+  bearerStations,
+  bearingGround,
+  deckBearers,
   dunnageUnder,
+  everyPackIsBorne,
   footprintOver,
   layerHeights,
   layerProtrusion,
@@ -204,6 +218,133 @@ describe('bearers under a layer', () => {
         OPTIONS,
       ),
     ).toBe(150);
+  });
+});
+
+describe('where the timbers under a pack land', () => {
+  const stationsFor = (piles: ReturnType<typeof place>[]) =>
+    bearerStations(piles, null);
+
+  it('puts one near each end of the pack', () => {
+    // A 6 m plain shaft: 300 mm in from the lead end, 300 mm in from the
+    // trailing end less the timber's own 100 mm.
+    expect(stationsFor([place(PLAIN, {x: 0})])).toEqual([
+      BEARER_END_INSET,
+      PILE_LENGTH - BEARER_END_INSET - BEARER_WIDTH,
+    ]);
+  });
+
+  it('never lands a timber on a plate', () => {
+    // A plate over the preferred station: 350 mm from the butt, 100 long, so
+    // it covers 300–400 — exactly where the front timber wants to be.
+    const blocked = pileType('blocked', [helixAt(350)]);
+    const [front, rear] = stationsFor([place(blocked, {x: 0})]);
+
+    // Walked inward to clear the plate rather than outward toward the end.
+    expect(front).toBe(400);
+    expect(rear).toBe(PILE_LENGTH - BEARER_END_INSET - BEARER_WIDTH);
+  });
+
+  it('stays inside the shortest pile of a mixed pack', () => {
+    const short = pileType('short', [], {length: 3000});
+    const stations = stationsFor([
+      place(PLAIN, {id: 'long', x: 0}),
+      place(short, {id: 'short', x: 0, y: 400}),
+    ]);
+
+    expect(stations).toEqual([BEARER_END_INSET, 3000 - BEARER_END_INSET - 100]);
+  });
+
+  it('gives up rather than pretend one timber is two', () => {
+    // A stub barely longer than a timber, with a plate over most of it.
+    const stub = pileType('stub', [helixAt(90, {length: 100})], {length: 250});
+
+    expect(stationsFor([place(stub, {x: 0})]).length).toBeLessThan(2);
+  });
+});
+
+describe('the ground a tier offers the timbers above it', () => {
+  it('does not bridge the gap between rows', () => {
+    // Two rows laid end to end with a 200 mm gap: a 100 mm timber dropped in
+    // that gap holds nothing, so the ground stops and restarts.
+    const rows = [
+      place(PLAIN, {id: 'a', x: 0}).placement,
+      place(PLAIN, {id: 'b', x: PILE_LENGTH + 200, pack: 1}).placement,
+    ];
+
+    expect(bearingGround(rows, CATALOGUE)).toEqual([
+      [0, PILE_LENGTH],
+      [PILE_LENGTH + 200, PILE_LENGTH * 2 + 200],
+    ]);
+  });
+
+  it('cuts out the plates poking up out of the tier', () => {
+    // SINGLE's plate covers 450–550 of a pile laid at x = 0.
+    expect(bearingGround([place(SINGLE, {x: 0}).placement], CATALOGUE)).toEqual(
+      [
+        [0, 450],
+        [550, PILE_LENGTH],
+      ],
+    );
+  });
+
+  it('keeps an upper tier off the shaft the row below does not reach', () => {
+    // Tier 1 spans the join between two rows below. Its timbers have to land
+    // on one row or the other, never over the gap between them.
+    const placements = [
+      place(PLAIN, {id: 'a', tier: 0, x: 0}).placement,
+      place(PLAIN, {id: 'b', tier: 0, x: PILE_LENGTH + 200, pack: 1}).placement,
+      place(PLAIN, {id: 'c', tier: 1, x: PILE_LENGTH - 3000}).placement,
+    ];
+    const above = deckBearers(placements, CATALOGUE, OPTIONS).filter(
+      bearer => bearer.tier === 1,
+    );
+
+    expect(above).toHaveLength(2);
+    for (const bearer of above) {
+      const overGap =
+        bearer.x + bearer.width > PILE_LENGTH && bearer.x < PILE_LENGTH + 200;
+      expect(overGap).toBe(false);
+    }
+  });
+});
+
+describe('every pack on two timbers', () => {
+  it('bears each pack of a tier separately', () => {
+    // The head-to-tail case: two rows in one tier. Timbers sized to the tier
+    // would put one under each row; each pack needs two of its own.
+    const placements = [
+      place(PLAIN, {id: 'a', x: 0, pack: 0}).placement,
+      place(PLAIN, {id: 'b', x: PILE_LENGTH + 200, pack: 1}).placement,
+    ];
+    const bearers = deckBearers(placements, CATALOGUE, OPTIONS);
+
+    expect(bearers.filter(bearer => bearer.pack === 0)).toHaveLength(2);
+    expect(bearers.filter(bearer => bearer.pack === 1)).toHaveLength(2);
+    expect(everyPackIsBorne(placements, CATALOGUE, OPTIONS)).toBe(true);
+  });
+
+  it('runs each timber the width of the pack it carries, at the tier thickness', () => {
+    const placements = [
+      place(SINGLE, {id: 'a', x: 0, y: -300}).placement,
+      place(SINGLE, {id: 'b', x: 0, y: 300}).placement,
+    ];
+    const [bearer] = deckBearers(placements, CATALOGUE, OPTIONS);
+
+    // Steel from −500 to 500 (helix radius 200 either side of the outer
+    // axes), on the 200 mm timbers the fixture's 140 mm protrusion demands.
+    expect(bearer!.span).toEqual([-500, 500]);
+    expect(bearer!.thickness).toBe(200);
+    expect(bearer!.top).toBe(200);
+  });
+
+  it('says no when a pack cannot be borne where it stands', () => {
+    const stub = pileType('stub', [helixAt(90, {length: 100})], {length: 250});
+    const placements = [place(stub, {x: 0}).placement];
+
+    expect(
+      everyPackIsBorne(placements, {pileTypes: [stub], vehicles: []}, OPTIONS),
+    ).toBe(false);
   });
 });
 

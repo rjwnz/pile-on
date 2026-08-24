@@ -157,6 +157,39 @@ describe('TierPlanSvg', () => {
     ).toBeInTheDocument();
   });
 
+  it('draws the timbers under every pack of the tier', () => {
+    const placements = [
+      place({id: 'a', x: 100, pack: 0}),
+      place({id: 'b', x: 6300, pack: 1}),
+    ];
+    render(
+      <TierPlanSvg
+        vehicle={SEMI}
+        catalogue={CATALOGUE}
+        placements={placements}
+        tier={0}
+        title="Tier 1"
+        packs={packManifest(placements, CATALOGUE, DEFAULT_LOADING_OPTIONS)}
+      />,
+    );
+    const timbers = screen.getAllByTestId('bearer');
+
+    // Two under each pack, and each one 100 mm of timber along the deck.
+    expect(timbers).toHaveLength(4);
+    for (const timber of timbers) {
+      expect(timber).toHaveAttribute('width', '100');
+    }
+    // P1's front timber wants 300 mm in from the leading end, at 400, but the
+    // plate covers 445–555: it backs off to 345 so it ends where the plate
+    // starts, which is the shorter walk.
+    expect(timbers[0]).toHaveAttribute('x', '345');
+    expect(
+      screen.getByText(
+        /P1 bearer 1 of 2 — 200 mm timber, 345 mm along the deck/,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('skips a placement whose pile type is missing rather than crashing', () => {
     renderTier([place({pileTypeId: 'GHOST'})]);
 

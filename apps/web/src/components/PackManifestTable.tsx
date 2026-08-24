@@ -14,6 +14,18 @@ export function packContentsLine(summary: PackSummary): string {
 }
 
 /**
+ * One pack's dunnage as a line of text: "2 × 200 mm". The count is the point
+ * — a pack rides on two timbers at least, and the table is where a loader
+ * counts them off against the drawing.
+ */
+export function bearerLine(summary: PackSummary): string {
+  if (summary.bearers.length === 0) {
+    return `no bearers — ${summary.dunnage} mm timbers will not land`;
+  }
+  return `${summary.bearers.length} × ${summary.dunnage} mm`;
+}
+
+/**
  * The text breakdown of one deck's packs: what travels banded with what,
  * where it rides, and what it weighs — the list the yard actually bands and
  * slings from. Ids match the labels on the tier drawings.
@@ -73,7 +85,7 @@ export function PackManifestTable({
                   {Math.round(summary.mass).toLocaleString('en-NZ')} kg
                 </td>
                 <td className="py-1 tabular-nums text-slate-700">
-                  {summary.dunnage} mm
+                  {bearerLine(summary)}
                 </td>
               </tr>
             ))}
